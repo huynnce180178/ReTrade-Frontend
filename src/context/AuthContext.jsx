@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }) => {
           roles: authData.roles,
           avatarUrl: authData.avatarUrl,
           phone: authData.phone,
+          isPasswordSet: authData.isPasswordSet,
         };
 
         setToken(authData.token);
@@ -98,6 +99,7 @@ export const AuthProvider = ({ children }) => {
           roles: authData.roles,
           avatarUrl: authData.avatarUrl,
           phone: authData.phone,
+          isPasswordSet: authData.isPasswordSet,
         };
         setToken(authData.token);
         setUser(userObj);

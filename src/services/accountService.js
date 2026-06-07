@@ -17,6 +17,7 @@ const accountService = {
   },
 
   changePassword: (oldPassword, newPassword) => post('/Account/change-password', { oldPassword, newPassword }),
+  setPassword: (newPassword) => post('/Account/set-password', { newPassword }),
   updateProfile: (data) => api.put('/Account/my-account', data).then(r => r.data),
   getAllAccounts: () => get('/Account'),
   forgotPassword: (email) => post('/Account/forgot-password', { email }),

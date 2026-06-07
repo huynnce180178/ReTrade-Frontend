@@ -3,10 +3,14 @@ import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import accountService from '../../../services/accountService';
 import { useToast } from '../../../context/ToastContext';
 import { forceLogout } from '../../../utils/authUtils';
+import { useAuth } from '../../../context/AuthContext';
 import '../../../styles/MyAccount.css';
 
 export default function ChangePassword() {
   const { showToast } = useToast();
+  const { user, setUser } = useAuth();
+  const isPasswordSet = user?.isPasswordSet !== false;
+
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,7 +32,7 @@ export default function ChangePassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!oldPassword || !newPassword || !confirmPassword) {
+    if ((isPasswordSet && !oldPassword) || !newPassword || !confirmPassword) {
       showToast('All fields are required.', 'error');
       return;
     }
@@ -43,16 +47,25 @@ export default function ChangePassword() {
 
     setLoading(true);
     try {
-      const res = await accountService.changePassword(oldPassword, newPassword);
-      showToast('Password changed successfully. Logging out...', 'success');
+      if (isPasswordSet) {
+        await accountService.changePassword(oldPassword, newPassword);
+      } else {
+        await accountService.setPassword(newPassword);
+      }
+      showToast(isPasswordSet ? 'Password changed successfully. Logging out...' : 'Password set successfully. Logging out...', 'success');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      
+      const updatedUser = { ...user, isPasswordSet: true };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
       setTimeout(() => {
         forceLogout();
       }, 1500);
     } catch (err) {
-      showToast(err?.response?.data || 'Failed to change password.', 'error');
+      showToast(err?.response?.data || `Failed to ${isPasswordSet ? 'change' : 'set'} password.`, 'error');
     } finally {
       setLoading(false);
     }
@@ -74,8 +87,8 @@ export default function ChangePassword() {
                     <span className="material-symbols-outlined">shield_lock</span>
                   </div>
                   <div>
-                    <h1 className="ma-headline">Change Password</h1>
-                    <p className="ma-subtitle">Update your password to keep your account secure.</p>
+                    <h1 className="ma-headline">{isPasswordSet ? 'Change Password' : 'Set Password'}</h1>
+                    <p className="ma-subtitle">{isPasswordSet ? 'Update your password to keep your account secure.' : 'Create a password for your account to sign in using username/password next time.'}</p>
                   </div>
                 </div>
               </div>
@@ -83,39 +96,41 @@ export default function ChangePassword() {
               <div className="ma-card ma-info-card">
                 <form className="ma-form" onSubmit={handleSubmit}>
                   {/* Current Password */}
-                  <div className="ma-form-group" style={{ marginBottom: '24px' }}>
-                    <label className="ma-label">Current Password</label>
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        type={showCurrentPassword ? 'text' : 'password'}
-                        className="ma-input"
-                        value={oldPassword}
-                        onChange={(e) => setOldPassword(e.target.value)}
-                        required
-                        style={{ paddingRight: '40px' }}
-                      />
-                      <button
-                        type="button"
-                        style={{
-                          position: 'absolute',
-                          right: 0,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'rgba(65, 72, 69, 0.6)',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-                          {showCurrentPassword ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
+                  {isPasswordSet && (
+                    <div className="ma-form-group" style={{ marginBottom: '24px' }}>
+                      <label className="ma-label">Current Password</label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showCurrentPassword ? 'text' : 'password'}
+                          className="ma-input"
+                          value={oldPassword}
+                          onChange={(e) => setOldPassword(e.target.value)}
+                          required
+                          style={{ paddingRight: '40px' }}
+                        />
+                        <button
+                          type="button"
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'rgba(65, 72, 69, 0.6)',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                            {showCurrentPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* New Password */}
                   <div className="ma-form-group" style={{ marginBottom: '24px' }}>
@@ -189,7 +204,7 @@ export default function ChangePassword() {
 
                   <div className="ma-form-actions">
                     <button type="submit" className="ma-btn-primary" disabled={loading}>
-                      {loading ? 'Saving Changes...' : 'Save Changes'}
+                      {loading ? (isPasswordSet ? 'Saving Changes...' : 'Setting Password...') : (isPasswordSet ? 'Save Changes' : 'Set Password')}
                     </button>
                     <button type="button" className="ma-btn-secondary" onClick={() => { setOldPassword(''); setNewPassword(''); setConfirmPassword(''); }}>
                       Cancel
