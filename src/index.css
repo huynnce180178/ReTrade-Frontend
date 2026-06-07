@@ -1,9 +1,449 @@
-body {
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import './styles/responsive-grid.css';
+
+:root {
+  /* Colors - Resonance Luxe Luxury Palette */
+  --bg-primary: #f5f5f5;
+  /* Neutral Warm Off-White */
+  --bg-secondary: #ffffff;
+  /* Card & Panel Pure White */
+  --bg-tertiary: #eaeaea;
+  /* Structure grey accent */
+
+  --text-primary: #02241b;
+  /* Primary Deep Pine Green */
+  --text-secondary: #065f46;
+  /* Secondary Emerald Green */
+  --text-muted: #5c706b;
+  /* Muted Green-Grey Text */
+
+  --primary: #02241b;
+  /* Pine Green */
+  --primary-hover: #065f46;
+  /* Emerald Green */
+  --primary-glow: rgba(2, 36, 27, 0.12);
+
+  --secondary: #065f46;
+  /* Emerald */
+  --secondary-hover: #0b9485;
+  /* Turquoise / Teal */
+
+  --accent: #0b9485;
+  /* Turquoise */
+  --accent-glow: rgba(11, 148, 133, 0.15);
+
+  --success: #10b981;
+  --success-glow: rgba(16, 185, 129, 0.1);
+  --error: #dc2626;
+  --error-glow: rgba(220, 38, 38, 0.1);
+  --warning: #d97706;
+
+  --border-color: rgba(2, 36, 27, 0.08);
+  --border-color-hover: rgba(2, 36, 27, 0.16);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(2, 36, 27, 0.06);
+
+  /* Fonts */
+  --font-main: 'Manrope', sans-serif;
+  --font-title: 'Playfair Display', serif;
+
+  /* Layout */
+  --header-height: 80px;
+  --container-max-width: 1280px;
+  --border-radius-sm: 8px;
+  --border-radius-md: 16px;
+  --border-radius-lg: 24px;
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project-logo-img {
+  height: 75px;
+  object-fit: contain;
+  mix-blend-mode: multiply; /* Loại bỏ nền trắng của ảnh */
+}
+
+/* Fix riêng cho Footer nền tối */
+.footer-logo .project-logo-img {
+  mix-blend-mode: screen; /* Loại bỏ nền đen (sau khi bị invert) */
+}
+
+/* Reset & Base Styles */
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-*, *::before, *::after {
-  box-sizing: inherit;
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: var(--transition-smooth);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Common Layout Utilities */
+.container {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+  width: 100%;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-primary-text {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 10px 30px -10px rgba(2, 36, 27, 0.08);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  transition: var(--transition-smooth);
+}
+
+.glass-card:hover {
+  border-color: var(--border-color-hover);
+  transform: translateY(-4px);
+  box-shadow: 0 15px 30px -10px rgba(2, 36, 27, 0.1);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: var(--border-radius-sm);
+  font-weight: 600;
+  font-size: 14px;
+  transition: var(--transition-smooth);
+  gap: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: white;
+  box-shadow: 0 4px 15px var(--primary-glow);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(2, 36, 27, 0.25);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: rgba(2, 36, 27, 0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: rgba(2, 36, 27, 0.08);
+  border-color: var(--text-secondary);
+}
+
+.btn-outline {
+  border: 1px solid var(--primary);
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.btn-outline:hover {
+  background: var(--primary-glow);
+  box-shadow: 0 0 15px var(--primary-glow);
+  transform: translateY(-1px);
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-primary);
+  font-size: 15px;
+  transition: var(--transition-smooth);
+}
+
+.form-input:focus {
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(6, 95, 70, 0.15);
+  background: var(--bg-secondary);
+}
+
+.form-error {
+  font-size: 12px;
+  color: var(--error);
+  margin-top: 6px;
+}
+
+/* Password Input Wrapper */
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper .form-input {
+  padding-right: 48px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  height: calc(100% - 2px);
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: var(--transition-smooth);
+  user-select: none;
+  z-index: 2;
+  border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
+}
+
+.password-toggle-btn:hover {
+  color: var(--text-secondary);
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid var(--secondary);
+  border-radius: 4px;
+}
+
+.password-toggle-btn svg {
+  display: block;
+}
+
+
+/* Animations */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(2, 36, 27, 0.3);
+  }
+
+  70% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 8px rgba(2, 36, 27, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(2, 36, 27, 0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.animate-slide-right {
+  animation: slideInRight 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9999px;
+}
+
+.badge-danger {
+  background-color: var(--error);
+  color: white;
+}
+
+.badge-success {
+  background-color: var(--success-glow);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Footer Resonance Luxe Dark Green Theme overrides */
+.site-footer {
+  background-color: var(--primary) !important;
+  color: var(--bg-primary) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.site-footer .footer-heading {
+  color: #ffffff !important;
+}
+
+.site-footer .footer-list a {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.site-footer .footer-list a:hover {
+  color: #ffffff !important;
+}
+
+.site-footer .brand-description,
+.site-footer .newsletter-text,
+.site-footer .copyright-text,
+.site-footer .made-text {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.site-footer .social-icon-link {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.site-footer .social-icon-link:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-2px);
+}
+
+.site-footer .newsletter-input {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.site-footer .newsletter-input:focus {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(11, 148, 133, 0.3) !important;
+}
+
+.site-footer .newsletter-input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.site-footer .newsletter-btn {
+  background: #ffffff !important;
+  color: var(--primary) !important;
+  box-shadow: none !important;
+}
+
+.site-footer .newsletter-btn:hover {
+  background: #eaeaea !important;
+  transform: translateY(-2px);
 }

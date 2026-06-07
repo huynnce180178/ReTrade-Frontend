@@ -1,81 +1,57 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import BASE_API_URL from './services/base.api.url.js';
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+
+const GOOGLE_CLIENT_ID = '743075993817-g2um0aknujbhp10vtfjmtg12gq6iaoid.apps.googleusercontent.com';
+import MainLayout from './layouts/MainLayout/MainLayout';
+
+import Home from './pages/Buyer/Home/Home';
+import Login from './pages/Buyer/Login/Login';
+import Register from './pages/Buyer/Register/Register';
+import ForgotPassword from './pages/Buyer/ForgotPassword/ForgotPassword';
+import ResetPassword from './pages/Buyer/ResetPassword/ResetPassword';
+import MyAccount from './pages/Buyer/MyAccount/MyAccount';
+import ChangePassword from './pages/Buyer/ChangePassword/ChangePassword';
+import AddressBook from './pages/Buyer/AddressBook/AddressBook';
+import PurchaseHistory from './pages/Buyer/PurchaseHistory/PurchaseHistory';
+import BidHistory from './pages/Buyer/BidHistory/BidHistory';
+import Product from './pages/Buyer/Product/Product';
+import Auction from './pages/Buyer/Auction/Auction';
+import Wishlist from './pages/Buyer/Wishlist/Wishlist';
+import Support from './pages/Buyer/Support/Support';
 
 function App() {
-  const [status, setStatus] = useState('Đang kết nối...');
-  const [checking, setChecking] = useState(true);
-
-  const checkConnection = useCallback(async (timeoutMs = 5000) => {
-    setChecking(true);
-    setStatus('Đang kết nối...');
-    const url = `${BASE_API_URL}/Test`;
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { method: 'GET', signal: controller.signal });
-      clearTimeout(id);
-      setChecking(false);
-      if (res.ok) {
-        setStatus('Kết nối database thành công');
-      } else {
-        setStatus('Lỗi kết nối');
-      }
-    } catch (err) {
-      clearTimeout(id);
-      setChecking(false);
-      setStatus('Lỗi kết nối');
-    }
-  }, []);
-
-  useEffect(() => {
-    checkConnection();
-  }, [checkConnection]);
-
   return (
-    <main style={styles.container}>
-      <div style={styles.statusContainer}>
-        <span style={{
-          ...styles.statusDot, 
-          backgroundColor: checking ? '#f59e0b' : (status === 'Kết nối database thành công' ? '#10b981' : '#ef4444')
-        }}></span>
-        <span style={styles.statusText}>{status}</span>
-      </div>
-    </main>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AuthProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Home />} />
+                <Route path="product" element={<Product />} />
+                <Route path="auction" element={<Auction />} />
+                <Route path="wishlist" element={<Wishlist />} />
+                <Route path="support" element={<Support />} />
+                <Route path="login" element={<Login />} />
+                <Route path="register" element={<Register />} />
+                <Route path="forgot-password" element={<ForgotPassword />} />
+                <Route path="reset-password" element={<ResetPassword />} />
+                <Route path="my-account" element={<MyAccount />} />
+                <Route path="change-password" element={<ChangePassword />} />
+                <Route path="address-book" element={<AddressBook />} />
+                <Route path="purchase-history" element={<PurchaseHistory />} />
+                <Route path="bid-history" element={<BidHistory />} />
+                {/* Profile page removed */}
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }
-
-const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '100vh',
-    width: '100vw',
-    backgroundColor: '#0f172a',
-    fontFamily: '"Inter", "Roboto", "Segoe UI", sans-serif',
-    margin: 0,
-    color: '#f8fafc'
-  },
-  statusContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    backgroundColor: '#334155',
-    padding: '10px 20px',
-    borderRadius: '9999px',
-    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
-  },
-  statusDot: {
-    width: '12px',
-    height: '12px',
-    borderRadius: '50%',
-    marginRight: '12px',
-    boxShadow: '0 0 8px rgba(0,0,0,0.5)'
-  },
-  statusText: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#e2e8f0'
-  }
-};
 
 export default App;

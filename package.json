@@ -10,15 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "axios": "^1.7.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.23.1",
-    "redux": "^5.0.1"
+    "react-router-dom": "^6.23.1"
   },
   "devDependencies": {
-    "@types/react": "^18.2.56",
-    "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",
