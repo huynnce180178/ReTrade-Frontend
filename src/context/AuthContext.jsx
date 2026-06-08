@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import accountService from '../services/accountService';
+import profileService from '../services/profileService';
 import { forceLogout } from '../utils/authUtils';
 
 const AuthContext = createContext(null);
@@ -18,12 +19,19 @@ export const AuthProvider = ({ children }) => {
       if (storedToken) {
         try {
           setToken(storedToken);
-          if (storedUserJson) {
-            setUser(JSON.parse(storedUserJson));
+          const storedUser = storedUserJson ? JSON.parse(storedUserJson) : null;
+          if (storedUser) {
+            setUser(storedUser);
           }
-          const freshProfile = await accountService.getMyAccount();
-          setUser(freshProfile);
-          localStorage.setItem('user', JSON.stringify(freshProfile));
+          const freshProfile = await profileService.getMyProfile();
+          const mergedProfile = {
+            ...storedUser,
+            ...freshProfile,
+            roles: freshProfile.roles || storedUser?.roles || [],
+            isPasswordSet: freshProfile.isPasswordSet ?? storedUser?.isPasswordSet,
+          };
+          setUser(mergedProfile);
+          localStorage.setItem('user', JSON.stringify(mergedProfile));
         } catch (err) {
           console.error('Failed to validate token on startup:', err);
           handleLogout();

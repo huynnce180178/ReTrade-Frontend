@@ -9,7 +9,6 @@ const accountService = {
   verify: (data) => post('/Account/verify', data),
   resendOtp: (email) => post('/Account/resend-otp', { email }),
   login: (data) => post('/Account/login', data),
-  getMyAccount: () => get('/Account/my-account'),
   uploadAvatar: (file) => {
     const form = new FormData();
     form.append('avatar', file);
@@ -18,7 +17,6 @@ const accountService = {
 
   changePassword: (oldPassword, newPassword) => post('/Account/change-password', { oldPassword, newPassword }),
   setPassword: (newPassword) => post('/Account/set-password', { newPassword }),
-  updateProfile: (data) => api.put('/Account/my-account', data).then(r => r.data),
   getAllAccounts: () => get('/Account'),
   forgotPassword: (email) => post('/Account/forgot-password', { email }),
   resetPassword: (data) => post('/Account/reset-password', data),

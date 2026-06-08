@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -21,6 +21,8 @@ import Product from './pages/Buyer/Product/Product';
 import Auction from './pages/Buyer/Auction/Auction';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Support from './pages/Buyer/Support/Support';
+import UserProfile from './pages/Buyer/UserProfile/UserProfile';
+import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 
 function App() {
   return (
@@ -35,11 +37,14 @@ function App() {
                 <Route path="auction" element={<Auction />} />
                 <Route path="wishlist" element={<Wishlist />} />
                 <Route path="support" element={<Support />} />
+                <Route path="users/:userId" element={<UserProfile />} />
+                <Route path="sellers/:sellerId" element={<SellerProfile />} />
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
                 <Route path="forgot-password" element={<ForgotPassword />} />
                 <Route path="reset-password" element={<ResetPassword />} />
-                <Route path="my-account" element={<MyAccount />} />
+                <Route path="profile" element={<MyAccount />} />
+                <Route path="my-account" element={<Navigate to="/profile" replace />} />
                 <Route path="change-password" element={<ChangePassword />} />
                 <Route path="address-book" element={<AddressBook />} />
                 <Route path="purchase-history" element={<PurchaseHistory />} />

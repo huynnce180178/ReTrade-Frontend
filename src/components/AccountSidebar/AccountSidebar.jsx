@@ -52,9 +52,9 @@ export default function AccountSidebar() {
 
       <nav className="profile-sidebar-menu">
         <p className="sidebar-group-title">Account</p>
-        <Link to="/my-account" className={`menu-item ${isActive('/my-account')}`}>
+        <Link to="/profile" className={`menu-item ${isActive('/profile')}`}>
           <span className="material-symbols-outlined">account_circle</span>
-          Personal Info
+          Profile
         </Link>
         <Link to="/change-password" className={`menu-item ${isActive('/change-password')}`}>
           <span className="material-symbols-outlined">shield_lock</span>

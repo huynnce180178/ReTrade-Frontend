@@ -322,6 +322,28 @@
   gap: 12px;
 }
 
+.ma-form-group-wide {
+  grid-column: 1 / -1;
+}
+
+.ma-inline-note {
+  margin-bottom: 18px;
+  color: #5c706b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ma-section-divider {
+  padding-top: 36px;
+  margin-top: 36px;
+  margin-bottom: 28px;
+  border-top: 1px solid rgba(113, 121, 117, 0.1);
+}
+
+.ma-section-divider .ma-card-title {
+  margin-bottom: 8px;
+}
+
 .mt-8 {
   margin-top: 32px;
 }
