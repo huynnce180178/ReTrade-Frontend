@@ -115,7 +115,7 @@ export default function Header() {
               </div>
             ) : (
               <div className="mobile-auth-links">
-                <Link to="/my-account" className="nav-link" onClick={() => setMobileMenuOpen(false)}>My Account</Link>
+                <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
                 <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
               </div>
             )}
@@ -203,12 +203,12 @@ export default function Header() {
                     )}
                   </div>
                   <hr className="dropdown-divider" />
-                  <Link to="/my-account" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                  <Link to="/profile" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                       <circle cx="12" cy="7" r="4"></circle>
                     </svg>
-                    My Account
+                    Profile
                   </Link>
 
                   {user.roles?.includes('Admin') && (

@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import '../../../styles/MyAccount.css';
 import accountService from '../../../services/accountService';
+import profileService from '../../../services/profileService';
 import { useToast } from '../../../context/ToastContext';
 
 export default function MyAccount() {
@@ -18,6 +19,14 @@ export default function MyAccount() {
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [defaultAddress, setDefaultAddress] = useState(null);
+  const [street, setStreet] = useState('');
+  const [provinceId, setProvinceId] = useState('');
+  const [districtId, setDistrictId] = useState('');
+  const [wardCode, setWardCode] = useState('');
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -28,6 +37,37 @@ export default function MyAccount() {
       setPhone(user.phone || '');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const loadProfileDetail = async () => {
+      setProfileLoading(true);
+      try {
+        const profile = await profileService.getMyProfile();
+        const address = profile?.defaultAddress || null;
+
+        setDefaultAddress(address);
+        setUsername(profile?.username || '');
+        setFirstName(profile?.firstName || '');
+        setLastName(profile?.lastName || '');
+        setEmail(profile?.email || '');
+        setPhone(profile?.phone || '');
+        setStreet(address?.street || '');
+        setProvinceId(address?.provinceId ?? '');
+        setDistrictId(address?.districtId ?? '');
+        setWardCode(address?.wardCode || '');
+        setReceiverName(address?.receiverName || `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim());
+        setReceiverPhone(address?.receiverPhone || profile?.phone || '');
+      } catch (err) {
+        showToast(err?.response?.data || 'Failed to load profile details.', 'error');
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadProfileDetail();
+  }, [user, showToast]);
 
   if (loading) {
     return (
@@ -101,14 +141,30 @@ export default function MyAccount() {
     e.preventDefault();
     try {
       showToast('Saving changes...', 'info');
-      const updatedProfile = await accountService.updateProfile({
+      const addressPayload = street || receiverName || receiverPhone || provinceId || districtId || wardCode
+        ? {
+            addressId: defaultAddress?.addressId,
+            receiverName: receiverName || `${firstName} ${lastName}`.trim(),
+            receiverPhone: receiverPhone || phone,
+            street,
+            provinceId: provinceId === '' ? null : Number(provinceId),
+            districtId: districtId === '' ? null : Number(districtId),
+            wardCode,
+            isDefault: true,
+            status: defaultAddress?.status || 'Active',
+          }
+        : null;
+
+      const updatedProfile = await profileService.updateMyProfile({
         username,
         firstName,
         lastName,
         email,
-        phone
+        phone,
+        address: addressPayload,
       });
       if (updatedProfile) {
+        setDefaultAddress(updatedProfile.defaultAddress || null);
         setUser((u) => {
           const updated = { ...u, ...updatedProfile };
           localStorage.setItem('user', JSON.stringify(updated));
@@ -128,6 +184,12 @@ export default function MyAccount() {
       setLastName(user.lastName || '');
       setEmail(user.email || '');
       setPhone(user.phone || '');
+      setStreet(defaultAddress?.street || '');
+      setProvinceId(defaultAddress?.provinceId ?? '');
+      setDistrictId(defaultAddress?.districtId ?? '');
+      setWardCode(defaultAddress?.wardCode || '');
+      setReceiverName(defaultAddress?.receiverName || '');
+      setReceiverPhone(defaultAddress?.receiverPhone || '');
     }
   };
 
@@ -158,6 +220,7 @@ export default function MyAccount() {
               {/* Personal Information Form Card */}
               <div className="ma-card ma-info-card">
                 <h4 className="ma-card-title">Basic Details</h4>
+                {profileLoading && <p className="ma-inline-note">Loading latest profile data...</p>}
                 <form className="ma-form" onSubmit={handleSaveChanges}>
                   <div className="ma-form-grid">
                     <div className="ma-form-group">
@@ -179,6 +242,38 @@ export default function MyAccount() {
                     <div className="ma-form-group">
                       <label className="ma-label">Phone Number</label>
                       <input type="tel" className="ma-input" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="ma-section-divider">
+                    <h4 className="ma-card-title">Default Address</h4>
+                    <p className="ma-subtitle-small">This address is created when missing and updated when already available.</p>
+                  </div>
+
+                  <div className="ma-form-grid">
+                    <div className="ma-form-group">
+                      <label className="ma-label">Receiver Name</label>
+                      <input type="text" className="ma-input" value={receiverName} onChange={(e) => setReceiverName(e.target.value)} />
+                    </div>
+                    <div className="ma-form-group">
+                      <label className="ma-label">Receiver Phone</label>
+                      <input type="tel" className="ma-input" value={receiverPhone} onChange={(e) => setReceiverPhone(e.target.value)} />
+                    </div>
+                    <div className="ma-form-group ma-form-group-wide">
+                      <label className="ma-label">Street Address</label>
+                      <input type="text" className="ma-input" value={street} onChange={(e) => setStreet(e.target.value)} placeholder="House number, street, building" />
+                    </div>
+                    <div className="ma-form-group">
+                      <label className="ma-label">Province ID</label>
+                      <input type="number" className="ma-input" value={provinceId} onChange={(e) => setProvinceId(e.target.value)} />
+                    </div>
+                    <div className="ma-form-group">
+                      <label className="ma-label">District ID</label>
+                      <input type="number" className="ma-input" value={districtId} onChange={(e) => setDistrictId(e.target.value)} />
+                    </div>
+                    <div className="ma-form-group">
+                      <label className="ma-label">Ward Code</label>
+                      <input type="text" className="ma-input" value={wardCode} onChange={(e) => setWardCode(e.target.value)} />
                     </div>
                   </div>
 
