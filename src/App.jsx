@@ -26,6 +26,7 @@ import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
+import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 
 function App() {
   return (
@@ -61,11 +62,12 @@ function App() {
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="/admin/category" replace />} />
                 <Route path="category" element={<Category />} />
+                <Route path="users" element={<UserAccounts />} />
                 <Route path="*" element={
                   <div className="admin-placeholder-page">
                     <span className="material-symbols-outlined admin-placeholder-icon">construction</span>
                     <h2>Feature Under Construction</h2>
-                    <p>This administrative view is currently empty. Category Management is fully implemented.</p>
+                    <p>This administrative view is currently empty. Category Management and User Accounts are fully implemented.</p>
                   </div>
                 } />
               </Route>
