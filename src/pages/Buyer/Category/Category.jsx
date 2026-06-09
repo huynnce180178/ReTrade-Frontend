@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import categoryService from '../../../services/categoryService';
@@ -7,13 +8,29 @@ import '../../../styles/Category.css';
 export default function Category() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const location = useLocation();
   const isAdmin = user?.roles?.includes('Admin') || false;
+  const isAdminView = isAdmin && location.pathname.startsWith('/admin');
 
   const [categories, setCategories] = useState([]);
   const [hierarchicalCategories, setHierarchicalCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  
+  // Admin OData filtering & sorting states
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Active' | 'Inactive'
+  const [isRootOnly, setIsRootOnly] = useState(false);
+  const [sortBy, setSortBy] = useState('NameAsc'); // 'NameAsc' | 'NameDesc' | 'Newest' | 'Oldest'
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,26 +42,122 @@ export default function Category() {
   const [parentId, setParentId] = useState('');
   const [attributes, setAttributes] = useState([]); // Array of { attributeId, name, dataType, isRequired }
 
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const modalImageInputRef = useRef(null);
+
+  const handleModalImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveSelectedImage = () => {
+    setSelectedImageFile(null);
+    setImagePreview('');
+    if (modalImageInputRef.current) {
+      modalImageInputRef.current.value = '';
+    }
+  };
+
+  const imageInputRef = useRef(null);
+
+  const handleChooseImage = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      showToast('Uploading category image...', 'info');
+      const res = await categoryService.uploadImage(selectedCategory.categoryId, file);
+      if (res?.imageUrl) {
+        setCategories((prev) =>
+          prev.map((c) =>
+            c.categoryId === selectedCategory.categoryId
+              ? { ...c, imageUrl: res.imageUrl }
+              : c
+          )
+        );
+        setSelectedCategory((prev) => ({ ...prev, imageUrl: res.imageUrl }));
+        showToast('Category image updated successfully.', 'success');
+      } else {
+        showToast('Upload succeeded but no image URL was returned.', 'warning');
+      }
+    } catch (err) {
+      showToast(err?.response?.data || 'Failed to upload category image.', 'error');
+    }
+  };
+
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [debouncedSearchTerm, statusFilter, isRootOnly, sortBy, isAdminView]);
 
   const fetchCategories = async () => {
     try {
       setLoading(true);
       
-      // Admin gets all categories (active & inactive) to manage. Regular users only get active categories via OData filter.
-      const data = isAdmin 
-        ? await categoryService.getAll() 
-        : await categoryService.getAllActive();
+      const queryParams = [];
+      const filterConditions = [];
+
+      // 1. Search term filter
+      if (debouncedSearchTerm.trim()) {
+        filterConditions.push(`contains(tolower(Name), '${debouncedSearchTerm.toLowerCase().replace(/'/g, "''")}')`);
+      }
+
+      // 2. View-specific filters
+      if (isAdminView) {
+        // Status filter
+        if (statusFilter !== 'All') {
+          filterConditions.push(`Status eq '${statusFilter}'`);
+        }
+        // Hierarchy filter (Root only)
+        if (isRootOnly) {
+          filterConditions.push(`ParentId eq null`);
+        }
+      } else {
+        // Buyer view only sees active categories
+        filterConditions.push("Status eq 'Active'");
+      }
+
+      if (filterConditions.length > 0) {
+        queryParams.push(`$filter=${filterConditions.join(' and ')}`);
+      }
+
+      // 3. Sorting
+      let orderByStr = 'Name asc';
+      if (isAdminView) {
+        switch (sortBy) {
+          case 'NameDesc':
+            orderByStr = 'Name desc';
+            break;
+          case 'Newest':
+            orderByStr = 'CreatedAt desc';
+            break;
+          case 'Oldest':
+            orderByStr = 'CreatedAt asc';
+            break;
+          case 'NameAsc':
+          default:
+            orderByStr = 'Name asc';
+            break;
+        }
+      }
+      queryParams.push(`$orderby=${orderByStr}`);
+
+      const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+
+      const data = isAdminView 
+        ? await categoryService.getAll(queryString) 
+        : await categoryService.getAllActive(queryString);
       
-      // Handle both raw array and OData response formats
       const categoriesArray = Array.isArray(data) ? data : (data && Array.isArray(data.value) ? data.value : []);
       setCategories(categoriesArray);
       
-      // Select the first category by default if available
       if (categoriesArray && categoriesArray.length > 0) {
-        // Find if there was a previously selected category to maintain selection
         const prevSelected = selectedCategory 
           ? categoriesArray.find(c => c.categoryId === selectedCategory.categoryId)
           : categoriesArray[0];
@@ -80,11 +193,9 @@ export default function Category() {
       const flattened = [];
       const traverse = (node, depth) => {
         flattened.push({ ...node, depth });
-        node.children.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         node.children.forEach(child => traverse(child, depth + 1));
       };
 
-      roots.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       roots.forEach(root => traverse(root, 0));
 
       setHierarchicalCategories(flattened);
@@ -93,9 +204,7 @@ export default function Category() {
     }
   }, [categories]);
 
-  const filteredCategories = hierarchicalCategories.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCategories = hierarchicalCategories;
 
   const handleOpenCreateModal = () => {
     setModalMode('create');
@@ -103,6 +212,8 @@ export default function Category() {
     setDescription('');
     setParentId('');
     setAttributes([]);
+    setSelectedImageFile(null);
+    setImagePreview('');
     setIsModalOpen(true);
   };
 
@@ -120,6 +231,8 @@ export default function Category() {
         isRequired: attr.isRequired || false
       }));
     setAttributes(activeAttrs);
+    setSelectedImageFile(null);
+    setImagePreview(category.imageUrl || '');
     setIsModalOpen(true);
   };
 
@@ -166,16 +279,29 @@ export default function Category() {
     };
 
     try {
+      let savedCategory = null;
       if (modalMode === 'create') {
         showToast('Creating category...', 'info');
-        await categoryService.create(payload);
+        savedCategory = await categoryService.create(payload);
         showToast('Category created successfully.', 'success');
       } else {
         showToast('Updating category...', 'info');
-        await categoryService.update(selectedCategory.categoryId, payload);
+        savedCategory = await categoryService.update(selectedCategory.categoryId, payload);
         showToast('Category updated successfully.', 'success');
       }
+
+      if (selectedImageFile && (savedCategory || modalMode === 'edit')) {
+        const categoryIdToUpload = modalMode === 'create' ? savedCategory.categoryId : selectedCategory.categoryId;
+        showToast('Uploading category image...', 'info');
+        const imgRes = await categoryService.uploadImage(categoryIdToUpload, selectedImageFile);
+        if (imgRes?.imageUrl && modalMode === 'edit') {
+          setSelectedCategory(prev => ({ ...prev, imageUrl: imgRes.imageUrl }));
+        }
+      }
+
       setIsModalOpen(false);
+      setSelectedImageFile(null);
+      setImagePreview('');
       await fetchCategories();
     } catch (err) {
       const errMsg = err?.response?.data || 'Failed to save category.';
@@ -206,13 +332,13 @@ export default function Category() {
         <div>
           <h1 className="category-headline">Categories</h1>
           <p className="category-subtitle">
-            {isAdmin 
+            {isAdminView 
               ? 'Manage product categories and custom specification attributes (Admin Mode)' 
               : 'Browse and inspect categories and their specification attributes'
             }
           </p>
         </div>
-        {isAdmin && (
+        {isAdminView && (
           <button className="btn btn-primary" onClick={handleOpenCreateModal}>
             <span className="material-symbols-outlined">add_circle</span>
             Add Category
@@ -232,6 +358,49 @@ export default function Category() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+
+          {isAdminView && (
+            <div className="admin-filter-toolbar">
+              <div className="filter-group-status">
+                <span className="filter-toolbar-label">Status:</span>
+                <div className="status-btn-group">
+                  {['All', 'Active', 'Inactive'].map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      className={`status-filter-btn ${statusFilter === status ? 'active' : ''}`}
+                      onClick={() => setStatusFilter(status)}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="filter-group-hierarchy-sort">
+                <label className="root-only-label">
+                  <input
+                    type="checkbox"
+                    checked={isRootOnly}
+                    onChange={(e) => setIsRootOnly(e.target.checked)}
+                  />
+                  <span>Root only</span>
+                </label>
+                <div className="sort-selector-wrapper">
+                  <span className="material-symbols-outlined sort-icon">sort</span>
+                  <select
+                    className="admin-sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="NameAsc">Name A-Z</option>
+                    <option value="NameDesc">Name Z-A</option>
+                    <option value="Newest">Newest</option>
+                    <option value="Oldest">Oldest</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -266,13 +435,37 @@ export default function Category() {
           {selectedCategory ? (
             <div>
               <div className="detail-header-card">
-                <div className="detail-title-block">
-                  <span className={`badge ${selectedCategory.status === 'Active' ? 'badge-success' : 'badge-danger'}`} style={{ marginBottom: '8px' }}>
-                    {selectedCategory.status}
-                  </span>
-                  <h2>{selectedCategory.name}</h2>
+                <div className="detail-header-with-image">
+                  <div className="category-image-container">
+                    {selectedCategory.imageUrl ? (
+                      <img src={selectedCategory.imageUrl} alt={selectedCategory.name} className="category-detail-img" />
+                    ) : (
+                      <div className="category-detail-img-placeholder">
+                        <span className="material-symbols-outlined" style={{ fontSize: '48px' }}>category</span>
+                      </div>
+                    )}
+                    {isAdminView && (
+                      <div className="category-image-overlay" onClick={handleChooseImage}>
+                        <span className="material-symbols-outlined">photo_camera</span>
+                        <span>Update Image</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleImageChange}
+                  />
+                  <div className="detail-title-block">
+                    <span className={`badge ${selectedCategory.status === 'Active' ? 'badge-success' : 'badge-danger'}`} style={{ marginBottom: '8px' }}>
+                      {selectedCategory.status}
+                    </span>
+                    <h2>{selectedCategory.name}</h2>
+                  </div>
                 </div>
-                {isAdmin && (
+                {isAdminView && (
                   <div className="details-actions-bar" style={{ marginTop: 0 }}>
                     <button className="btn btn-outline" onClick={() => handleOpenEditModal(selectedCategory)}>
                       <span className="material-symbols-outlined">edit</span>
@@ -377,6 +570,32 @@ export default function Category() {
                     onChange={(e) => setName(e.target.value)} 
                     required 
                   />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Category Image</label>
+                  <div className="modal-category-image-wrapper">
+                    {imagePreview ? (
+                      <div className="modal-image-preview-container">
+                        <img src={imagePreview} alt="Preview" className="modal-image-preview" />
+                        <button type="button" className="remove-preview-btn" onClick={handleRemoveSelectedImage}>
+                          <span className="material-symbols-outlined">cancel</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="modal-image-upload-trigger" onClick={() => modalImageInputRef.current?.click()}>
+                        <span className="material-symbols-outlined">add_photo_alternate</span>
+                        <span>Select Category Image</span>
+                      </div>
+                    )}
+                    <input
+                      ref={modalImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleModalImageChange}
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">
