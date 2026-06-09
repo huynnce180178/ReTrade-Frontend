@@ -84,6 +84,9 @@ export default function Header() {
           <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
             Auction
           </NavLink>
+          <NavLink to="/category" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+            Category
+          </NavLink>
           <NavLink to="/wishlist" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
             Wishlist
           </NavLink>
@@ -207,6 +210,16 @@ export default function Header() {
                     </svg>
                     Profile
                   </Link>
+
+                  {user.roles?.includes('Admin') && (
+                    <Link to="/admin" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                      </svg>
+                      Admin Panel
+                    </Link>
+                  )}
 
 
                   <button className="dropdown-item logout-item" onClick={handleLogoutClick}>

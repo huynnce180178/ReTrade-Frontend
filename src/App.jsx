@@ -21,6 +21,8 @@ import Product from './pages/Buyer/Product/Product';
 import Auction from './pages/Buyer/Auction/Auction';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Support from './pages/Buyer/Support/Support';
+import Category from './pages/Buyer/Category/Category';
+import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 
@@ -49,7 +51,21 @@ function App() {
                 <Route path="address-book" element={<AddressBook />} />
                 <Route path="purchase-history" element={<PurchaseHistory />} />
                 <Route path="bid-history" element={<BidHistory />} />
+                <Route path="category" element={<Category />} />
                 {/* Profile page removed */}
+              </Route>
+
+              {/* Admin Panel Routes */}
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Navigate to="/admin/category" replace />} />
+                <Route path="category" element={<Category />} />
+                <Route path="*" element={
+                  <div className="admin-placeholder-page">
+                    <span className="material-symbols-outlined admin-placeholder-icon">construction</span>
+                    <h2>Feature Under Construction</h2>
+                    <p>This administrative view is currently empty. Category Management is fully implemented.</p>
+                  </div>
+                } />
               </Route>
             </Routes>
           </BrowserRouter>
