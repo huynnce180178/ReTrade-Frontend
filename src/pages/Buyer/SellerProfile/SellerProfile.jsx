@@ -30,7 +30,7 @@ const hasRole = (user, roleName) => {
 
 export default function SellerProfile() {
   const { sellerId } = useParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +39,8 @@ export default function SellerProfile() {
   const [activeTab, setActiveTab] = useState('about');
 
   useEffect(() => {
+    if (authLoading) return;
+
     const loadSeller = async () => {
       setLoading(true);
       setError('');
@@ -53,7 +55,7 @@ export default function SellerProfile() {
     };
 
     loadSeller();
-  }, [sellerId]);
+  }, [sellerId, authLoading, user?.accountId]);
 
   useEffect(() => {
     const resolvedSellerId = seller?.sellerId;

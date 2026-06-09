@@ -523,6 +523,16 @@
   color: currentColor;
 }
 
+.item-symbol-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 18px !important;
+  color: currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Subscription Modal Styles */
 .sub-modal-overlay {
   position: fixed;

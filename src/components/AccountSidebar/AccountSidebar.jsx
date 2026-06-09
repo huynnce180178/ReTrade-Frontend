@@ -10,6 +10,7 @@ export default function AccountSidebar() {
   if (!user) return null;
 
   const isAdmin = user?.roles?.includes('Admin') || false;
+  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
   const getInitials = () => {
     if (user.firstName && user.lastName) {
@@ -66,6 +67,13 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">location_on</span>
           Address Book
         </Link>
+
+        {isSeller && (
+          <Link to="/seller-dashboard" className={`menu-item ${isActive('/seller-dashboard')}`}>
+            <span className="material-symbols-outlined">storefront</span>
+            Seller Dashboard
+          </Link>
+        )}
 
         <p className="sidebar-group-title mt-4">Activity</p>
         <Link to="/purchase-history" className={`menu-item ${isActive('/purchase-history')}`}>
