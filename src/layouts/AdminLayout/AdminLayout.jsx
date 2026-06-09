@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import '../../layouts/AdminLayout/AdminLayout.css';
@@ -7,6 +7,20 @@ export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
   if (loading) {
     return (
@@ -75,14 +89,63 @@ export default function AdminLayout() {
             <span className="material-symbols-outlined">settings</span>
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '8px' }}>
-            <div className="avatar-circle" style={{ width: '36px', height: '36px' }}>
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="Admin Avatar" className="admin-avatar-img" />
-              ) : (
-                <div className="admin-avatar-placeholder">{getInitials()}</div>
-              )}
-            </div>
+          <div className="user-dropdown-wrapper" ref={dropdownRef} style={{ marginLeft: '8px' }}>
+            <button className="user-profile-trigger" onClick={() => setDropdownOpen(!dropdownOpen)} style={{ padding: '4px 12px 4px 4px', border: '1px solid #e5e7eb', background: '#ffffff', borderRadius: '40px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <div className="avatar-circle" style={{ width: '30px', height: '30px' }}>
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                ) : (
+                  getInitials()
+                )}
+              </div>
+              <span className="username-text" style={{ fontSize: '13px', fontWeight: '600' }}>{getDisplayName()}</span>
+              <span className={`dropdown-arrow ${dropdownOpen ? 'open' : ''}`}>▾</span>
+            </button>
+
+            {dropdownOpen && (
+              <div className="user-dropdown animate-fade-in" style={{ top: '48px', right: 0, position: 'absolute', width: '260px', padding: '12px', background: '#ffffff', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb', zIndex: 1000 }}>
+                <div className="dropdown-user-info">
+                  <p className="dropdown-name" style={{ margin: 0, fontWeight: 700, fontSize: '14px' }}>{getDisplayName()}</p>
+                  <p className="dropdown-email" style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email || `@${user.username}`}</p>
+                  {user.roles && (
+                    <div className="dropdown-roles" style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                      {user.roles.map((r, idx) => (
+                        <span key={idx} className="badge badge-success" style={{ fontSize: '9px', padding: '2px 6px', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '4px' }}>{r}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <hr className="dropdown-divider" style={{ border: 0, borderTop: '1px solid #e5e7eb', margin: '8px 0' }} />
+                <Link to="/profile" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon" style={{ width: '16px', height: '16px', marginRight: '8px' }}>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  Profile
+                </Link>
+
+                {isSeller && (
+                  <Link to="/seller-dashboard" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                    <span className="material-symbols-outlined item-symbol-icon" style={{ fontSize: '18px', marginRight: '8px' }}>storefront</span>
+                    Seller Dashboard
+                  </Link>
+                )}
+
+                <Link to="/" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                  <span className="material-symbols-outlined item-symbol-icon" style={{ fontSize: '18px', marginRight: '8px' }}>home</span>
+                  Back to Live Site
+                </Link>
+
+                <button className="dropdown-item logout-item" onClick={handleLogoutClick}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon" style={{ width: '16px', height: '16px', marginRight: '8px' }}>
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
