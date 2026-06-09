@@ -9,6 +9,8 @@ export default function AccountSidebar() {
 
   if (!user) return null;
 
+  const isAdmin = user?.roles?.includes('Admin') || false;
+
   const getInitials = () => {
     if (user.firstName && user.lastName) {
       return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
@@ -74,6 +76,16 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">gavel</span>
           Bid History
         </Link>
+
+        {isAdmin && (
+          <>
+            <p className="sidebar-group-title mt-4">Management</p>
+            <Link to="/category" className={`menu-item ${isActive('/category')}`}>
+              <span className="material-symbols-outlined">category</span>
+              Categories
+            </Link>
+          </>
+        )}
       </nav>
     </aside>
   );
