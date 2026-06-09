@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import accountService from '../services/accountService';
 import profileService from '../services/profileService';
 import { forceLogout } from '../utils/authUtils';
+import { createAccountHubConnection } from '../services/accountRealtimeService';
 
 const AuthContext = createContext(null);
 
@@ -10,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const accountHubRef = useRef(null);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -42,6 +44,41 @@ export const AuthProvider = ({ children }) => {
 
     initializeAuth();
   }, []);
+
+  useEffect(() => {
+    if (!token || !user?.accountId) {
+      return undefined;
+    }
+
+    const connection = createAccountHubConnection();
+    accountHubRef.current = connection;
+    let disposed = false;
+
+    const handleForceLogout = () => {
+      handleLogout();
+    };
+
+    connection.on('ForceLogout', handleForceLogout);
+
+    const startConnection = async () => {
+      try {
+        await connection.start();
+        if (!disposed) {
+          await connection.invoke('JoinAccountGroup', user.accountId);
+        }
+      } catch (error) {
+        console.error('Failed to connect account hub:', error);
+      }
+    };
+
+    startConnection();
+
+    return () => {
+      disposed = true;
+      connection.off('ForceLogout', handleForceLogout);
+      connection.stop().catch(() => {});
+    };
+  }, [token, user?.accountId]);
 
   const handleLogin = async (username, password) => {
     setError(null);

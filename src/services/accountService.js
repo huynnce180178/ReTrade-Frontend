@@ -9,6 +9,9 @@ const accountService = {
   verify: (data) => post('/Account/verify', data),
   resendOtp: (email) => post('/Account/resend-otp', { email }),
   login: (data) => post('/Account/login', data),
+  getAdminUserList: (query = '') => get(`/Admin/user-list${query}`),
+  banUser: (accountId) => api.patch(`/Admin/users/${accountId}/ban`).then((r) => r.data),
+  deactivateMe: () => api.patch('/Account/deactivate-me').then((r) => r.data),
   uploadAvatar: (file) => {
     const form = new FormData();
     form.append('avatar', file);

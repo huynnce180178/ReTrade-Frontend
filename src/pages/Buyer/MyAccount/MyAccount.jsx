@@ -6,6 +6,7 @@ import '../../../styles/MyAccount.css';
 import accountService from '../../../services/accountService';
 import profileService from '../../../services/profileService';
 import { useToast } from '../../../context/ToastContext';
+import { forceLogout } from '../../../utils/authUtils';
 
 export default function MyAccount() {
   const { user, loading, setUser } = useAuth();
@@ -27,6 +28,8 @@ export default function MyAccount() {
   const [receiverName, setReceiverName] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -193,6 +196,20 @@ export default function MyAccount() {
     }
   };
 
+  const handleDeactivateAccount = async () => {
+    try {
+      setDeactivateLoading(true);
+      await accountService.deactivateMe();
+      showToast('Your account has been deactivated.', 'success');
+      setShowDeactivateModal(false);
+      forceLogout();
+    } catch (err) {
+      showToast(err?.response?.data || 'Failed to deactivate account.', 'error');
+    } finally {
+      setDeactivateLoading(false);
+    }
+  };
+
   return (
     <div className="profile-page-wrapper container animate-fade-in">
       <div className="profile-grid">
@@ -319,10 +336,57 @@ export default function MyAccount() {
                 </p>
               </div>
 
+              <div className="ma-danger-card" style={{ flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="material-symbols-outlined ma-danger-icon">cancel</span>
+                  <h4 className="ma-danger-title" style={{ margin: 0 }}>Deactivate Account</h4>
+                </div>
+                <p className="ma-danger-text" style={{ fontSize: '14px' }}>
+                  If you no longer want to use ReTrade, you can deactivate your account. You will be logged out immediately and receive a confirmation email.
+                </p>
+                <button type="button" className="ma-danger-btn" onClick={() => setShowDeactivateModal(true)}>
+                  Deactivate Account
+                </button>
+              </div>
+
             </div>
           </div>
         </main>
       </div>
+
+      {showDeactivateModal && (
+        <div className="ma-deactivate-overlay" onClick={() => !deactivateLoading && setShowDeactivateModal(false)}>
+          <div className="ma-deactivate-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ma-deactivate-header">
+              <div>
+                <p className="ma-deactivate-kicker">Inactive User</p>
+                <h3>Deactivate your account?</h3>
+              </div>
+              <button type="button" className="ma-deactivate-close" onClick={() => setShowDeactivateModal(false)} disabled={deactivateLoading}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="ma-deactivate-body">
+              <p>
+                Your account will be set to <strong>Inactive</strong>, you will be logged out immediately, and you will receive a confirmation email.
+              </p>
+              <div className="ma-deactivate-note">
+                You can ask support by replying to the email if you have any questions.
+              </div>
+            </div>
+
+            <div className="ma-deactivate-footer">
+              <button type="button" className="ma-btn-secondary" onClick={() => setShowDeactivateModal(false)} disabled={deactivateLoading}>
+                Cancel
+              </button>
+              <button type="button" className="ma-danger-btn" onClick={handleDeactivateAccount} disabled={deactivateLoading}>
+                {deactivateLoading ? 'Processing...' : 'Deactivate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
