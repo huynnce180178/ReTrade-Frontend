@@ -25,6 +25,7 @@ import Category from './pages/Buyer/Category/Category';
 import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
+import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
                 <Route path="support" element={<Support />} />
                 <Route path="users/:userId" element={<UserProfile />} />
                 <Route path="sellers/:sellerId" element={<SellerProfile />} />
+                <Route path="seller-dashboard" element={<SellerDashboard />} />
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
                 <Route path="forgot-password" element={<ForgotPassword />} />

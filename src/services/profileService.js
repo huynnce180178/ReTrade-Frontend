@@ -6,9 +6,9 @@ const post = (url) => api.post(url).then((r) => r.data);
 const del = (url) => api.delete(url).then((r) => r.data);
 
 const profileService = {
-  getMyProfile: () => get('/Profile/me'),
-  updateMyProfile: (data) => put('/Profile/me', data),
-  getUserProfile: (userId) => get(`/Profile/user/${userId}`),
+  getMyProfile: () => get('/Profile/my-profile'),
+  updateMyProfile: (data) => put('/Profile/my-profile', data),
+  getUserProfile: (userId) => get(`/Profile/user-profile/${userId}`),
   getSellerInformation: (sellerId) => get(`/Seller/${sellerId}`),
   followSeller: (sellerId) => post(`/Seller/${sellerId}/follow`),
   unfollowSeller: (sellerId) => del(`/Seller/${sellerId}/follow`),

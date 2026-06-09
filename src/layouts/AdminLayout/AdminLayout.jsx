@@ -175,7 +175,7 @@ export default function AdminLayout() {
               <span>System Status: Optimal</span>
             </div>
 
-            <Link to="/my-account" className="admin-profile-link">
+            <Link to="/profile" className="admin-profile-link">
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>account_box</span>
               Admin Profile
             </Link>

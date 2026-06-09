@@ -62,6 +62,8 @@ export default function Header() {
     return user.username;
   };
 
+  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
+
   return (
     <>
       <header className="site-header glass-panel">
@@ -116,6 +118,7 @@ export default function Header() {
             ) : (
               <div className="mobile-auth-links">
                 <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
+                {isSeller && <Link to="/seller-dashboard" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Seller Dashboard</Link>}
                 <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
               </div>
             )}
@@ -210,6 +213,13 @@ export default function Header() {
                     </svg>
                     Profile
                   </Link>
+
+                  {isSeller && (
+                    <Link to="/seller-dashboard" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <span className="material-symbols-outlined item-symbol-icon">storefront</span>
+                      Seller Dashboard
+                    </Link>
+                  )}
 
                   {user.roles?.includes('Admin') && (
                     <Link to="/admin" className="dropdown-item" onClick={() => setDropdownOpen(false)}>

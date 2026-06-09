@@ -52,6 +52,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', authData.token);
         const userObj = {
           accountId: authData.accountId,
+          userId: authData.userId,
           username: authData.username,
           email: authData.email,
           firstName: authData.firstName,
@@ -100,6 +101,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', authData.token);
         const userObj = {
           accountId: authData.accountId,
+          userId: authData.userId,
           username: authData.username,
           email: authData.email,
           firstName: authData.firstName,
