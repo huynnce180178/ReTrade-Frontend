@@ -19,6 +19,7 @@ import PurchaseHistory from './pages/Buyer/PurchaseHistory/PurchaseHistory';
 import BidHistory from './pages/Buyer/BidHistory/BidHistory';
 import Product from './pages/Buyer/Product/Product';
 import Auction from './pages/Buyer/Auction/Auction';
+import PaymentResult from './pages/Buyer/PaymentResult/PaymentResult';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Support from './pages/Buyer/Support/Support';
 import Category from './pages/Buyer/Category/Category';
@@ -54,6 +55,7 @@ function App() {
                 <Route path="address-book" element={<AddressBook />} />
                 <Route path="purchase-history" element={<PurchaseHistory />} />
                 <Route path="bid-history" element={<BidHistory />} />
+                <Route path="payment/vnpay-return" element={<PaymentResult />} />
                 <Route path="category" element={<Category />} />
                 {/* Profile page removed */}
               </Route>
