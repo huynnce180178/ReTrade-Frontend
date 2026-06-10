@@ -610,6 +610,18 @@
   padding: 0 24px 24px;
 }
 
+.sub-loading-state,
+.sub-empty-state {
+  grid-column: 1 / -1;
+  padding: 32px 20px;
+  text-align: center;
+  border-radius: 12px;
+  background: #f4f4f3;
+  border: 1px dashed #c1c8c4;
+  color: #414845;
+  font-family: 'Manrope', sans-serif;
+}
+
 @media (min-width: 768px) {
   .sub-modal-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -718,6 +730,28 @@
   margin-bottom: 16px;
 }
 
+.sub-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-bottom: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(2, 36, 27, 0.08);
+  color: #02241b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.featured-card .sub-role-badge,
+.dark-card .sub-role-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f4f3;
+}
+
 .price-num {
   font-family: 'Playfair Display', serif;
   font-size: 24px;
@@ -792,6 +826,11 @@
   border-radius: 4px;
 }
 
+.sub-card-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .sub-card-btn:active {
   transform: scale(0.98);
 }
@@ -858,6 +897,28 @@
   cursor: pointer;
   z-index: 1002;
   transition: all 0.3s ease;
+}
+
+.active-package-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #a6f2d1 !important;
+  border: 1px solid rgba(166, 242, 209, 0.4) !important;
+  cursor: not-allowed !important;
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.active-package-btn:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.active-package-btn .material-symbols-outlined {
+  font-size: 18px;
 }
 
 .mobile-menu-toggle:hover {
