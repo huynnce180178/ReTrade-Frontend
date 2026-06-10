@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import subscriptionService from '../../services/subscriptionService';
 
 import './Header.css';
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [subscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [packages, setPackages] = useState([]);
+  const [activePackages, setActivePackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
+  const [purchaseLoadingId, setPurchaseLoadingId] = useState('');
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
 
@@ -39,6 +46,34 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!subscriptionModalOpen) {
+      return;
+    }
+
+    const loadData = async () => {
+      setLoadingPackages(true);
+      try {
+        if (packages.length === 0) {
+          const data = await subscriptionService.getAll();
+          setPackages(Array.isArray(data) ? data : []);
+        }
+
+        if (user) {
+          const myData = await subscriptionService.getMyActiveSubscriptions();
+          setActivePackages(Array.isArray(myData) ? myData : []);
+        }
+      } catch (error) {
+        console.error('Failed to load service packages:', error);
+        showToast('Không tải được danh sách gói dịch vụ.', 'error');
+      } finally {
+        setLoadingPackages(false);
+      }
+    };
+
+    loadData();
+  }, [subscriptionModalOpen, user, packages.length, showToast]);
+
   const handleLogoutClick = () => {
     logout();
     setDropdownOpen(false);
@@ -64,41 +99,151 @@ export default function Header() {
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0
+    }).format(value || 0);
+
+  const getPackageVisual = (serviceId) => {
+    switch (serviceId) {
+      case 'SERVICE_UPGRADE_SELLER':
+        return {
+          cardClass: 'sub-card featured-card',
+          iconWrapClass: 'sub-icon-wrap member-bg',
+          icon: 'storefront',
+          tagline: 'Mở khóa hành trình bán hàng trên ReTrade.',
+          buttonClass: 'sub-card-btn white-btn',
+          note: ''
+        };
+      case 'SERVICE_VOUCHER_FEATURE':
+        return {
+          cardClass: 'sub-card',
+          iconWrapClass: 'sub-icon-wrap seller-bg',
+          icon: 'local_offer',
+          tagline: 'Trải nghiệm tính năng voucher cho shop của bạn.',
+          buttonClass: 'sub-card-btn primary-btn',
+          note: ''
+        };
+      case 'SERVICE_PRIORITY_LISTING':
+        return {
+          cardClass: 'sub-card dark-card',
+          iconWrapClass: 'sub-icon-wrap featured-bg',
+          icon: 'stars',
+          tagline: 'Tăng độ hiển thị và ưu tiên trên giao diện.',
+          buttonClass: 'sub-card-btn green-btn',
+          note: ''
+        };
+      default:
+        return {
+          cardClass: 'sub-card',
+          iconWrapClass: 'sub-icon-wrap seller-bg',
+          icon: 'workspace_premium',
+          tagline: 'Gói dịch vụ dành cho tài khoản của bạn.',
+          buttonClass: 'sub-card-btn primary-btn',
+          note: ''
+        };
+    }
+  };
+
+  const getFeatureLines = (pkg) =>
+    (pkg.benefitsDescription || '')
+      .split(/[.;]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const handlePurchasePackage = async (serviceId) => {
+    if (!user) {
+      showToast('Vui lòng đăng nhập để mua gói dịch vụ.', 'warning');
+      setSubscriptionModalOpen(false);
+      navigate('/login');
+      return;
+    }
+
+    setPurchaseLoadingId(serviceId);
+    try {
+      const result = await subscriptionService.purchase(serviceId);
+      if (!result?.paymentUrl) {
+        throw new Error('Không tạo được liên kết thanh toán.');
+      }
+
+      window.location.href = result.paymentUrl;
+    } catch (error) {
+      console.error('Failed to create payment url:', error);
+      const message = error.response?.data?.message || error.response?.data || error.message || 'Không thể tạo thanh toán VNPAY.';
+      showToast(String(message), 'error');
+    } finally {
+      setPurchaseLoadingId('');
+    }
+  };
+
   return (
     <>
       <header className="site-header glass-panel">
-      <div className="header-container">
-        <Link to="/" className="header-logo" style={{ textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>
-          <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-primary, #02241B)', letterSpacing: '1px' }}>RETRADE</span>
-        </Link>
+        <div className="header-container">
+          <Link to="/" className="header-logo" style={{ textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>
+            <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-primary, #02241B)', letterSpacing: '1px' }}>RETRADE</span>
+          </Link>
 
-        <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-          <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
-        </button>
+          <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
+          </button>
 
-        <nav className={`header-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-          <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-            Home
-          </NavLink>
-          <NavLink to="/product" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-            Product
-          </NavLink>
-          <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-            Auction
-          </NavLink>
-          <NavLink to="/category" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-            Category
-          </NavLink>
-          <NavLink to="/wishlist" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-            Wishlist
-          </NavLink>
-          
-          <div className="mobile-only-menu-items">
-            <div className="search-input-wrapper mobile-search-wrapper">
+          <nav className={`header-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+            <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+              Home
+            </NavLink>
+            <NavLink to="/product" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+              Product
+            </NavLink>
+            <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+              Auction
+            </NavLink>
+            <NavLink to="/category" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+              Category
+            </NavLink>
+            <NavLink to="/wishlist" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+              Wishlist
+            </NavLink>
+
+            <div className="mobile-only-menu-items">
+              <div className="search-input-wrapper mobile-search-wrapper">
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+              <button className="btn-subscription mobile-sub-btn" onClick={() => { setSubscriptionModalOpen(true); setMobileMenuOpen(false); }}>
+                Subscription
+              </button>
+              {!user ? (
+                <div className="mobile-auth-links">
+                  <Link to="/login" className="btn-login-link nav-link" onClick={() => setMobileMenuOpen(false)}>Login</Link>
+                  <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>Register</Link>
+                </div>
+              ) : (
+                <div className="mobile-auth-links">
+                  <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
+                  {isSeller && <Link to="/seller-dashboard" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Seller Dashboard</Link>}
+                  <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
+                </div>
+              )}
+            </div>
+          </nav>
+
+          <div className="header-search desktop-only-search">
+            <div className="search-input-wrapper">
               <input
                 type="text"
                 className="search-input"
-                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -106,152 +251,121 @@ export default function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
+          </div>
 
-            <button className="btn-subscription mobile-sub-btn" onClick={() => { setSubscriptionModalOpen(true); setMobileMenuOpen(false); }}>
+          <div className="header-actions">
+            <button className="btn-subscription" onClick={() => setSubscriptionModalOpen(true)}>
+              <span className="sub-glow"></span>
               Subscription
             </button>
-            {!user ? (
-              <div className="mobile-auth-links">
-                <Link to="/login" className="btn-login-link nav-link" onClick={() => setMobileMenuOpen(false)}>Login</Link>
-                <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>Register</Link>
-              </div>
-            ) : (
-              <div className="mobile-auth-links">
-                <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
-                {isSeller && <Link to="/seller-dashboard" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Seller Dashboard</Link>}
-                <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
-              </div>
-            )}
-          </div>
-        </nav>
 
-        <div className="header-search desktop-only-search">
-          <div className="search-input-wrapper">
-            <input
-              type="text"
-              className="search-input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </div>
-
-        <div className="header-actions">
-          <button className="btn-subscription" onClick={() => setSubscriptionModalOpen(true)}>
-            <span className="sub-glow"></span>
-            Subscription
-          </button>
-
-          <div className="notification-wrapper" ref={notifRef}>
-            <button className="icon-btn notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
-              <svg className="bell-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
-              <span className="notif-badge">3</span>
-            </button>
-
-            {notifOpen && (
-              <div className="notif-dropdown animate-fade-in">
-                <div className="notif-header">
-                  <h4>Notifications</h4>
-                  <button className="text-btn">Mark all read</button>
-                </div>
-                <div className="notif-list">
-                  <div className="notif-item unread">
-                    <p className="notif-text">Your item <strong>Vespa Sprint 2022</strong> has a new auction bid!</p>
-                    <span className="notif-time">2 mins ago</span>
-                  </div>
-                  <div className="notif-item unread">
-                    <p className="notif-text">Welcome to ReTrade! Get verified to start listing products.</p>
-                    <span className="notif-time">1 hour ago</span>
-                  </div>
-                  <div className="notif-item">
-                    <p className="notif-text">Your wishlist item <strong>iPhone 14 Pro Max</strong> drops in price!</p>
-                    <span className="notif-time">Yesterday</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {user ? (
-            <div className="user-dropdown-wrapper" ref={dropdownRef}>
-              <button className="user-profile-trigger" onClick={() => setDropdownOpen(!dropdownOpen)}>
-                <div className="avatar-circle">
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
-                  ) : (
-                    getInitials()
-                  )}
-                </div>
-                <span className="username-text">{getDisplayName()}</span>
-                <span className={`dropdown-arrow ${dropdownOpen ? 'open' : ''}`}>▾</span>
+            <div className="notification-wrapper" ref={notifRef}>
+              <button className="icon-btn notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
+                <svg className="bell-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span className="notif-badge">3</span>
               </button>
 
-              {dropdownOpen && (
-                <div className="user-dropdown animate-fade-in">
-                  <div className="dropdown-user-info">
-                    <p className="dropdown-name">{getDisplayName()}</p>
-                    <p className="dropdown-email">{user.email || `@${user.username}`}</p>
-                    {user.roles && (
-                      <div className="dropdown-roles">
-                        {user.roles.map((r, idx) => (
-                          <span key={idx} className="badge badge-success">{r}</span>
-                        ))}
-                      </div>
-                    )}
+              {notifOpen && (
+                <div className="notif-dropdown animate-fade-in">
+                  <div className="notif-header">
+                    <h4>Notifications</h4>
+                    <button className="text-btn">Mark all read</button>
                   </div>
-                  <hr className="dropdown-divider" />
-                  <Link to="/profile" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                      <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                    Profile
-                  </Link>
-
-                  {isSeller && (
-                    <Link to="/seller-dashboard" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
-                      <span className="material-symbols-outlined item-symbol-icon">storefront</span>
-                      Seller Dashboard
-                    </Link>
-                  )}
-
-                  {user.roles?.includes('Admin') && (
-                    <Link to="/admin" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="9" y1="3" x2="9" y2="21"></line>
-                      </svg>
-                      Admin Panel
-                    </Link>
-                  )}
-
-
-                  <button className="dropdown-item logout-item" onClick={handleLogoutClick}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                      <polyline points="16 17 21 12 16 7"></polyline>
-                      <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                    Logout
-                  </button>
+                  <div className="notif-list">
+                    <div className="notif-item unread">
+                      <p className="notif-text">Your item <strong>Vespa Sprint 2022</strong> has a new auction bid!</p>
+                      <span className="notif-time">2 mins ago</span>
+                    </div>
+                    <div className="notif-item unread">
+                      <p className="notif-text">Welcome to ReTrade! Get verified to start listing products.</p>
+                      <span className="notif-time">1 hour ago</span>
+                    </div>
+                    <div className="notif-item">
+                      <p className="notif-text">Your wishlist item <strong>iPhone 14 Pro Max</strong> drops in price!</p>
+                      <span className="notif-time">Yesterday</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="auth-buttons">
-              <Link to="/login" className="btn-login-link">Login</Link>
-              <Link to="/register" className="btn btn-primary btn-register-nav">Register</Link>
-            </div>
-          )}
+
+            {user ? (
+              <div className="user-dropdown-wrapper" ref={dropdownRef}>
+                <button className="user-profile-trigger" onClick={() => setDropdownOpen(!dropdownOpen)}>
+                  <div className="avatar-circle">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                    ) : (
+                      getInitials()
+                    )}
+                  </div>
+                  <span className="username-text">{getDisplayName()}</span>
+                  <span className={`dropdown-arrow ${dropdownOpen ? 'open' : ''}`}>▾</span>
+                </button>
+
+                {dropdownOpen && (
+                  <div className="user-dropdown animate-fade-in">
+                    <div className="dropdown-user-info">
+                      <p className="dropdown-name">{getDisplayName()}</p>
+                      <p className="dropdown-email">{user.email || `@${user.username}`}</p>
+                      {user.roles && (
+                        <div className="dropdown-roles">
+                          {user.roles.map((r, idx) => (
+                            <span key={idx} className="badge badge-success">{r}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <hr className="dropdown-divider" />
+                    <Link to="/profile" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                      Profile
+                    </Link>
+
+                    {isSeller && (
+                      <Link to="/seller-dashboard" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        <span className="material-symbols-outlined item-symbol-icon">storefront</span>
+                        Seller Dashboard
+                      </Link>
+                    )}
+
+                    {user.roles?.includes('Admin') && (
+                      <Link to="/admin" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                          <line x1="9" y1="3" x2="9" y2="21"></line>
+                        </svg>
+                        Admin Panel
+                      </Link>
+                    )}
+
+
+                    <button className="dropdown-item logout-item" onClick={handleLogoutClick}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                      </svg>
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="auth-buttons">
+                <Link to="/login" className="btn-login-link">Login</Link>
+                <Link to="/register" className="btn btn-primary btn-register-nav">Register</Link>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
       {subscriptionModalOpen && (
         <div className="sub-modal-overlay animate-fade-in" onClick={() => setSubscriptionModalOpen(false)}>
           <div className="sub-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -259,85 +373,71 @@ export default function Header() {
               <span className="material-symbols-outlined">close</span>
             </button>
             <div className="sub-modal-header">
-              <h2>Elevate Your Experience</h2>
-              <p>Join our inner circle. Choose a plan tailored to your lifestyle, whether you're here to curate your wardrobe or build a fashion empire.</p>
+              <h2>Nâng tầm trải nghiệm của bạn</h2>
+              <p>Chọn gói dịch vụ phù hợp với vai trò của bạn và thanh toán ngay bằng VNPAY.</p>
             </div>
             <div className="sub-modal-grid">
-              {/* Card 1: Seller Pack */}
-              <div className="sub-card">
-                <div className="sub-card-header">
-                  <div className="sub-icon-wrap seller-bg">
-                    <span className="material-symbols-outlined">storefront</span>
-                  </div>
-                  <h3>Seller Pack</h3>
-                  <p>Perfect for rising entrepreneurs.</p>
-                </div>
-                <div className="sub-price">
-                  <span className="price-num">100.000 VND</span>
-                  <span className="price-period"> / month</span>
-                </div>
-                <ul className="sub-features">
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Post products easily</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Sell items effortlessly</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>First listing free</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Create auctions for more visibility</span></li>
-                </ul>
-                <button className="sub-card-btn primary-btn" onClick={() => { alert('Thank you for choosing Seller Pack!'); setSubscriptionModalOpen(false); }}>
-                  Get Started
-                </button>
-              </div>
+              {loadingPackages ? (
+                <div className="sub-loading-state">Đang tải gói dịch vụ...</div>
+              ) : packages.length === 0 ? (
+                <div className="sub-empty-state">Chưa có gói dịch vụ nào để hiển thị.</div>
+              ) : (
+                packages.map((pkg, index) => {
+                  const visual = getPackageVisual(pkg.serviceId);
+                  const featureLines = getFeatureLines(pkg);
+                  const activePackage = activePackages.find(a => a.serviceId === pkg.serviceId);
 
-              {/* Card 2: Member Pack */}
-              <div className="sub-card featured-card">
-                <div className="popular-badge">POPULAR</div>
-                <div className="sub-card-header">
-                  <div className="sub-icon-wrap member-bg">
-                    <span className="material-symbols-outlined">workspace_premium</span>
-                  </div>
-                  <h3>Member Pack</h3>
-                  <p>Enhance your shopping journey.</p>
-                </div>
-                <div className="sub-price">
-                  <span className="price-num">50.000 VND</span>
-                  <span className="price-period"> / month</span>
-                </div>
-                <ul className="sub-features">
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Monthly vouchers</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Purchase products at discounted prices</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Shipping fee discounts</span></li>
-                </ul>
-                <button className="sub-card-btn white-btn" onClick={() => { alert('Thank you for subscribing to Member Pack!'); setSubscriptionModalOpen(false); }}>
-                  Subscribe Now
-                </button>
-              </div>
+                  let daysLeft = 0;
+                  if (activePackage && activePackage.endDate) {
+                    const diffTime = Math.abs(new Date(activePackage.endDate) - new Date());
+                    daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  }
 
-              {/* Card 3: Featured Pack */}
-              <div className="sub-card dark-card">
-                <div className="sub-card-header">
-                  <div className="sub-icon-wrap featured-bg">
-                    <span className="material-symbols-outlined">stars</span>
-                  </div>
-                  <h3>Featured Pack</h3>
-                  <p>Maximum exposure for your brand.</p>
-                </div>
-                <div className="sub-price">
-                  <span className="price-num">60.000 VND</span>
-                  <span className="price-period"> / month</span>
-                </div>
-                <ul className="sub-features">
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Highlight products at the top of the website</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Homepage feature spotlight</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Highlight auctions</span></li>
-                  <li><span className="material-symbols-outlined check-icon">check_circle</span><span>Push notification advertisements for your shop</span></li>
-                  <li className="note-li"><p>Note: Exclusive to active Seller Pack subscribers</p></li>
-                </ul>
-                <button className="sub-card-btn green-btn" onClick={() => { alert('Thank you for upgrading to Featured Pack!'); setSubscriptionModalOpen(false); }}>
-                  Upgrade to Featured
-                </button>
-              </div>
-            </div>
-            <div className="sub-modal-footer">
-              <p>All plans include our Authentication Guarantee. Billed monthly.</p>
+                  return (
+                    <div key={pkg.serviceId} className={visual.cardClass}>
+                      {pkg.serviceId === 'SERVICE_UPGRADE_SELLER' && <div className="popular-badge">PHỔ BIẾN</div>}
+                      <div className="sub-card-header">
+                        <div className={visual.iconWrapClass}>
+                          <span className="material-symbols-outlined">{visual.icon}</span>
+                        </div>
+                        <h3>{pkg.name}</h3>
+                        <p>{visual.tagline}</p>
+                      </div>
+                      <div className="sub-role-badge">Đối tượng: {pkg.targetRole}</div>
+                      <div className="sub-price">
+                        <span className="price-num">{formatCurrency(pkg.price)}</span>
+                        <span className="price-period"> / {pkg.durationDays} ngày</span>
+                      </div>
+                      <ul className="sub-features">
+                        {featureLines.map((feature, featureIndex) => (
+                          <li key={`${pkg.serviceId}-${featureIndex}`}>
+                            <span className="material-symbols-outlined check-icon">check_circle</span>
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                        {visual.note && (
+                          <li className="note-li"><p>{visual.note}</p></li>
+                        )}
+                      </ul>
+
+                      {activePackage ? (
+                        <button className="sub-card-btn white-btn active-package-btn" disabled>
+                          <span className="material-symbols-outlined">verified</span>
+                          Đang kích hoạt (Còn {daysLeft} ngày)
+                        </button>
+                      ) : (
+                        <button
+                          className={visual.buttonClass}
+                          disabled={purchaseLoadingId === pkg.serviceId}
+                          onClick={() => handlePurchasePackage(pkg.serviceId)}
+                        >
+                          {purchaseLoadingId === pkg.serviceId ? 'Đang chuyển đến VNPAY...' : 'Mua qua VNPAY'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
