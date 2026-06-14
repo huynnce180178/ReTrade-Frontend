@@ -24,6 +24,11 @@ const statusTone = (status) => statusPalette[status] || 'neutral';
 
 const normalizeText = (value) => (value || '').toString().trim().toLowerCase();
 
+const isInactiveStatus = (status) => {
+  const s = (status || '').toString().toLowerCase();
+  return s === 'inactive' || s === 'ban' || s === 'banned' || s.includes('inactive') || s.includes('ban') || s.includes('banned');
+};
+
 const extractErrorMessage = (error) => {
   if (!error) return '';
   if (typeof error === 'string') return error;
@@ -306,13 +311,15 @@ export default function UserAccounts() {
   const confirmStatusAction = async () => {
     if (!pendingActionUser?.accountId) return;
 
-    const isInactive = pendingActionUser.status === 'Inactive';
+    const isInactive = isInactiveStatus(pendingActionUser?.status);
     const actionLabel = isInactive ? 'activate' : 'ban';
+    const pastTense = isInactive ? 'activated' : 'banned';
 
     try {
       setActionLoading(true);
+      // Backend exposes a ban endpoint that toggles status between Active <-> Inactive.
       await accountService.banUser(pendingActionUser.accountId);
-      showToast(`User ${actionLabel}d successfully.`, 'success');
+      showToast(`User ${pastTense} successfully.`, 'success');
       setPendingActionUser(null);
       await fetchUsers();
     } catch (error) {
@@ -322,7 +329,13 @@ export default function UserAccounts() {
     }
   };
 
-  const pendingIsInactive = pendingActionUser?.status === 'Inactive';
+  const pendingIsInactive = (() => {
+    const statusFromPending = pendingActionUser?.status;
+    if (statusFromPending) return isInactiveStatus(statusFromPending);
+    // fallback: find the user in current users list by accountId
+    const found = users.find((u) => u.accountId === pendingActionUser?.accountId);
+    return isInactiveStatus(found?.status);
+  })();
 
   return (
     <div className="admin-user-list-page animate-fade-in">
@@ -485,11 +498,11 @@ export default function UserAccounts() {
                             </button>
                             <button
                               type="button"
-                              className={`admin-action-btn ${user.status === 'Inactive' ? 'outline' : 'danger'}`}
+                              className={`admin-action-btn ${isInactiveStatus(user.status) ? 'outline' : 'danger'}`}
                               onClick={(e) => { e.stopPropagation(); openStatusActionModal(user); }}
                             >
                               <span className="material-symbols-outlined">block</span>
-                              {user.status === 'Inactive' ? 'Activate' : 'Inactive User'}
+                              {isInactiveStatus(user.status) ? 'Unban' : 'Ban'}
                             </button>
                           </div>
                         </td>
@@ -575,8 +588,8 @@ export default function UserAccounts() {
                 <button type="button" className="admin-action-btn outline" onClick={() => handleActionStub('Open audit log')}>
                   Audit Log
                 </button>
-                <button type="button" className={`admin-action-btn ${selectedUser.status === 'Inactive' ? 'outline' : 'danger'}`} onClick={() => openStatusActionModal(selectedUser)}>
-                  {selectedUser.status === 'Inactive' ? 'Activate User' : 'Inactive User'}
+                <button type="button" className={`admin-action-btn ${isInactiveStatus(selectedUser.status) ? 'outline' : 'danger'}`} onClick={() => openStatusActionModal(selectedUser)}>
+                  {isInactiveStatus(selectedUser.status) ? 'Unban User' : 'Ban'}
                 </button>
               </div>
             </>
@@ -595,8 +608,8 @@ export default function UserAccounts() {
           <div className="admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-confirm-modal-header">
               <div>
-                <p className="admin-confirm-kicker">Inactive User</p>
-                <h3>{pendingIsInactive ? 'Activate this account?' : 'Vô hiệu hóa tài khoản này?'}</h3>
+                <p className="admin-confirm-kicker">{pendingIsInactive ? 'Unban User' : 'Ban User'}</p>
+                <h3>{pendingIsInactive ? 'Unban this account?' : 'Ban this account?'}</h3>
               </div>
               <button type="button" className="admin-confirm-close" onClick={closeStatusActionModal} disabled={actionLoading}>
                 <span className="material-symbols-outlined">close</span>
@@ -606,9 +619,9 @@ export default function UserAccounts() {
             <div className="admin-confirm-modal-body">
               <p>
                 {pendingIsInactive
-                  ? 'Tài khoản này đang ở trạng thái Inactive. Khi kích hoạt lại, người dùng sẽ có thể đăng nhập và thực hiện giao dịch.'
-                  : 'Tài khoản sẽ bị chuyển sang Inactive, không được phép đăng nhập hoặc thực hiện giao dịch. Hệ thống cũng sẽ gửi email thông báo đến địa chỉ đã đăng ký.'}
-              </p>
+                  ? 'This account is currently Banned. Unbanning will allow the user to sign in and transact.'
+                  : 'This account will be set to Banned, preventing sign in or transactions. The system will send an email notification to the registered address.'}
+                </p>
 
               <div className="admin-confirm-target-card">
                 <span>Account</span>
@@ -618,7 +631,7 @@ export default function UserAccounts() {
 
               {!pendingIsInactive && (
                 <div className="admin-confirm-note">
-                  Người dùng sẽ cần kiểm tra email để xem thông báo vô hiệu hóa tài khoản.
+                  The user will receive an email notification about the ban.
                 </div>
               )}
             </div>
@@ -633,7 +646,7 @@ export default function UserAccounts() {
                 onClick={confirmStatusAction}
                 disabled={actionLoading}
               >
-                {actionLoading ? 'Processing...' : pendingIsInactive ? 'Activate' : 'Inactive User'}
+                {actionLoading ? 'Processing...' : pendingIsInactive ? 'Unban' : 'Ban'}
               </button>
             </div>
           </div>
