@@ -195,7 +195,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">rule</span>
-                Listing Approval
+                Product Management
               </NavLink>
 
               <NavLink 
