@@ -14,6 +14,10 @@ export const useToast = () => {
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const showToast = useCallback((message, type = 'error', duration = 4000) => {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -21,11 +25,7 @@ export const ToastProvider = ({ children }) => {
     setTimeout(() => {
       removeToast(id);
     }, duration);
-  }, []);
-
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+  }, [removeToast]);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -37,7 +37,7 @@ export const ToastProvider = ({ children }) => {
               {toast.type === 'success' ? '✓' : toast.type === 'warning' ? '⚠️' : toast.type === 'error' ? '⚠️' : 'ℹ️'}
             </span>
             <div className="toast-content">{toast.message}</div>
-            <button className="toast-close-btn" onClick={() => removeToast(toast.id)} aria-label="Close message">×</button>
+            <button type="button" className="toast-close-btn" onClick={() => removeToast(toast.id)} aria-label="Close message">×</button>
           </div>
         ))}
       </div>
