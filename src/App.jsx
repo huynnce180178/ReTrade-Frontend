@@ -28,6 +28,7 @@ import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
+import Listings from './pages/Admin/Listings/Listings';
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
                 <Route index element={<Navigate to="/admin/category" replace />} />
                 <Route path="category" element={<Category />} />
                 <Route path="users" element={<UserAccounts />} />
+                <Route path="listings" element={<Listings />} />
                 <Route path="*" element={
                   <div className="admin-placeholder-page">
                     <span className="material-symbols-outlined admin-placeholder-icon">construction</span>
