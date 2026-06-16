@@ -27,6 +27,8 @@ import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
+import OrderManagement from './pages/Seller/OrderManagement/OrderManagement';
+import OrderDetail from './pages/Seller/OrderDetail/OrderDetail';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 
 function App() {
@@ -45,6 +47,8 @@ function App() {
                 <Route path="users/:userId" element={<UserProfile />} />
                 <Route path="sellers/:sellerId" element={<SellerProfile />} />
                 <Route path="seller-dashboard" element={<SellerDashboard />} />
+                <Route path="seller-dashboard/orders" element={<OrderManagement />} />
+                <Route path="seller-dashboard/orders/:orderId" element={<OrderDetail />} />
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
                 <Route path="forgot-password" element={<ForgotPassword />} />

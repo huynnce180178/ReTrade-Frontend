@@ -65,7 +65,7 @@ export default function SellerDashboard() {
           <Link className="active" to="/seller-dashboard"><span className="material-symbols-outlined">dashboard</span>Dashboard</Link>
           <Link to="/product"><span className="material-symbols-outlined">inventory_2</span>My Products</Link>
           <Link to="/auction"><span className="material-symbols-outlined">gavel</span>Auction Manager</Link>
-          <Link to="/purchase-history"><span className="material-symbols-outlined">orders</span>Orders</Link>
+          <Link to="/seller-dashboard/orders"><span className="material-symbols-outlined">orders</span>Orders</Link>
           <Link to="/support"><span className="material-symbols-outlined">mail</span>Messages</Link>
           <p>Information</p>
           <Link to="/profile"><span className="material-symbols-outlined">person</span>Personal Information</Link>
