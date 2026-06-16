@@ -68,7 +68,7 @@ export default function OrderDetail() {
   const loadOrder = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await orderService.getById(orderId);
+      const data = await orderService.getById(orderId, { sellerId: user?.userId || user?.id });
       setOrder(data);
       setForm({
         status: data?.status || 'Pending',
@@ -81,7 +81,7 @@ export default function OrderDetail() {
     } finally {
       setLoading(false);
     }
-  }, [orderId, showToast]);
+  }, [orderId, showToast, user]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -152,7 +152,7 @@ export default function OrderDetail() {
         shippingProvider: form.shippingProvider || null,
         expectedDeliveryTime: form.expectedDeliveryTime ? new Date(form.expectedDeliveryTime).toISOString() : null,
       };
-      const updated = await orderService.updateStatus(orderId, payload);
+      const updated = await orderService.updateStatus(orderId, payload, { sellerId: user?.userId || user?.id });
       setOrder(updated);
       setForm({
         status: updated?.status || form.status,
