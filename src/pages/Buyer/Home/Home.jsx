@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import productService from '../../../services/productService';
 import wishlistService from '../../../services/wishlistService';
+import categoryService from '../../../services/categoryService';
+import userFavoriteService from '../../../services/userFavoriteService';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import FavoriteCategoriesModal from '../../../components/FavoriteCategoriesModal/FavoriteCategoriesModal';
 import '../../../styles/Home.css';
 
 function formatPrice(price) {
@@ -14,12 +17,20 @@ function formatPrice(price) {
 export default function Home() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const isLoggedIn = !!user;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [togglingId, setTogglingId] = useState(null);
+
+  const [categories, setCategories] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
+  const [favoriteProducts, setFavoriteProducts] = useState({});
+  const [showFavModal, setShowFavModal] = useState(false);
 
   // Fetch all root categories for the horizontal list
   useEffect(() => {
@@ -38,7 +49,7 @@ export default function Home() {
   // Fetch favorites
   useEffect(() => {
     if (!isLoggedIn) {
-      fetchLatestProducts();
+      fetchProducts();
       return;
     }
     fetchFavorites();
@@ -51,7 +62,7 @@ export default function Home() {
       const favs = Array.isArray(data) ? data : [];
       setFavorites(favs);
       if (favs.length === 0) {
-        fetchLatestProducts();
+        fetchProducts();
         
         // Show modal if no favorites
         if (user && user.userId) {
@@ -78,7 +89,7 @@ export default function Home() {
         setFavoriteProducts(productMap);
       }
     } catch {
-      fetchLatestProducts();
+      fetchProducts();
     } finally {
       setLoadingFavorites(false);
     }
@@ -108,6 +119,19 @@ export default function Home() {
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
   useEffect(() => { fetchWishlist(); }, [fetchWishlist]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/product?search=${encodeURIComponent(searchQuery)}`);
+    } else {
+      navigate(`/product`);
+    }
+  };
+
+  const handleTagClick = (tag) => {
+    navigate(`/product?search=${encodeURIComponent(tag)}`);
+  };
 
   const handleToggleWishlist = async (product) => {
     if (!user) {
@@ -351,9 +375,14 @@ export default function Home() {
 
 function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) {
   const isOutOfStock = product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || product.stockQuantity <= 0;
+  const navigate = useNavigate();
 
   return (
-    <div className="home-product-card glass-card">
+    <div 
+      className="home-product-card glass-card"
+      onClick={() => navigate(`/product/${product.productId}`)}
+      style={{ cursor: 'pointer' }}
+    >
       <div className="home-product-img-wrap">
         {product.mainImageUrl ? (
           <img src={product.mainImageUrl} alt={product.name} className="home-product-img" />
@@ -363,7 +392,10 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
         {!isOutOfStock && (
           <button
             className={`home-wishlist-btn${isWishlisted ? ' active' : ''}`}
-            onClick={() => onToggleWishlist(product)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleWishlist(product);
+            }}
             disabled={toggling}
             title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
           >
