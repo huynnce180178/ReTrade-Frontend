@@ -313,7 +313,22 @@
 }
 
 .om-primary-action.muted {
-  background: #eef2f0;
+  border: 1px solid rgba(15, 123, 95, 0.28);
+  background: linear-gradient(180deg, #ffffff 0%, #f3faf7 100%);
+  color: #0f7b5f;
+  box-shadow: 0 8px 18px rgba(2, 36, 27, 0.06);
+}
+
+.om-primary-action.muted:hover {
+  border-color: #0f7b5f;
+  background: #0f7b5f;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(15, 123, 95, 0.18);
+}
+
+.om-primary-action.muted:focus-visible {
+  outline: 3px solid rgba(15, 123, 95, 0.18);
+  outline-offset: 2px;
 }
 
 .om-actions button:disabled {
