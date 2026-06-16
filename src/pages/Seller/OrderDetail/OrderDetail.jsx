@@ -4,7 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
-import '../../../styles/SellerDashboard.css';
+import './OrderDetail.css';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
@@ -66,9 +66,13 @@ export default function OrderDetail() {
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
 
   const loadOrder = useCallback(async () => {
+    if (!user?.userId) {
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await orderService.getById(orderId);
+      const data = await orderService.getById(orderId, { sellerId: user.userId });
       setOrder(data);
       setForm({
         status: data?.status || 'Pending',
@@ -81,7 +85,7 @@ export default function OrderDetail() {
     } finally {
       setLoading(false);
     }
-  }, [orderId, showToast]);
+  }, [orderId, showToast, user?.userId]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -144,6 +148,11 @@ export default function OrderDetail() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    if (!user?.userId) {
+      showToast('SellerId is missing. Please sign in again.', 'error');
+      return;
+    }
+
     try {
       setSaving(true);
       const payload = {
@@ -152,7 +161,7 @@ export default function OrderDetail() {
         shippingProvider: form.shippingProvider || null,
         expectedDeliveryTime: form.expectedDeliveryTime ? new Date(form.expectedDeliveryTime).toISOString() : null,
       };
-      const updated = await orderService.updateStatus(orderId, payload);
+      const updated = await orderService.updateStatus(orderId, payload, { sellerId: user.userId });
       setOrder(updated);
       setForm({
         status: updated?.status || form.status,
@@ -176,40 +185,40 @@ export default function OrderDetail() {
   if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
   return (
-    <div className="seller-order-detail-page animate-fade-in">
-      <div className="seller-order-breadcrumb">
+    <div className="sod-page animate-fade-in">
+      <div className="sod-breadcrumb">
         <Link to="/seller-dashboard/orders">Orders</Link>
         <strong>{order?.orderCode || orderId}</strong>
       </div>
 
       {loading ? (
-        <div className="seller-orders-empty">Loading order detail...</div>
+        <div className="sod-empty">Loading order detail...</div>
       ) : !order ? (
-        <div className="seller-orders-empty">Order not found.</div>
+        <div className="sod-empty">Order not found.</div>
       ) : (
         <>
-          <header className="seller-order-detail-header">
+          <header className="sod-header">
             <div>
-              <div className="seller-order-title-line">
+              <div className="sod-title-line">
                 <h1>Order #{order.orderCode || order.orderId}</h1>
-                <em className={`seller-order-status ${statusClass[order.status] || 'default'}`}>
+                <em className={`sod-status ${statusClass[order.status] || 'default'}`}>
                   {statusLabels[order.status] || order.status}
                 </em>
               </div>
               <p>Created {formatDateTime(order.createdAt)} • Buyer {order.buyerName || 'Unknown Buyer'}</p>
             </div>
-            <Link className="seller-order-back-btn" to="/seller-dashboard/orders">
+            <Link className="sod-back-btn" to="/seller-dashboard/orders">
               <span className="material-symbols-outlined">arrow_back</span>
               Back to Orders
             </Link>
           </header>
 
-          <div className="seller-order-detail-layout">
-            <section className="seller-order-detail-main">
-              <article className="seller-order-detail-card">
+          <div className="sod-layout">
+            <section className="sod-main">
+              <article className="sod-card">
                 <h2><span className="material-symbols-outlined">inventory_2</span>Order Item</h2>
-                <div className="seller-order-item-row">
-                  <div className="seller-order-detail-product">
+                <div className="sod-item-row">
+                  <div className="sod-product">
                     <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
                     <div>
                       <strong>{order.productName || 'Untitled product'}</strong>
@@ -222,9 +231,9 @@ export default function OrderDetail() {
                 </div>
               </article>
 
-              <article className="seller-order-detail-card">
+              <article className="sod-card">
                 <h2><span className="material-symbols-outlined">published_with_changes</span>Update Status</h2>
-                <form className="seller-order-status-form" onSubmit={handleSubmit}>
+                <form className="sod-status-form" onSubmit={handleSubmit}>
                   <label>
                     <span>Status</span>
                     <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}>
@@ -269,15 +278,15 @@ export default function OrderDetail() {
               </article>
             </section>
 
-            <aside className="seller-order-detail-side">
-              <article className="seller-order-side-card">
+            <aside className="sod-side">
+              <article className="sod-side-card">
                 <h3><span className="material-symbols-outlined">person</span>Buyer</h3>
                 <strong>{order.buyerName || 'Unknown Buyer'}</strong>
                 <p><span className="material-symbols-outlined">mail</span>{order.buyerEmail || '-'}</p>
                 <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || '-'}</p>
               </article>
 
-              <article className="seller-order-side-card">
+              <article className="sod-side-card">
                 <h3><span className="material-symbols-outlined">local_shipping</span>Shipping</h3>
                 <dl>
                   <div><dt>Provider</dt><dd>{order.shippingProvider || '-'}</dd></div>
@@ -286,7 +295,7 @@ export default function OrderDetail() {
                 </dl>
               </article>
 
-              <article className="seller-order-summary-card">
+              <article className="sod-summary-card">
                 <h3>Payment Summary</h3>
                 <div><span>Subtotal</span><strong>{formatVnd(totals.subtotal)}</strong></div>
                 <div><span>Shipping</span><strong>{formatVnd(totals.shipping)}</strong></div>

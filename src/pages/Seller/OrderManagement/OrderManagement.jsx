@@ -4,7 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
-import '../../../styles/SellerDashboard.css';
+import './OrderManagement.css';
 
 const pageSize = 10;
 const numberFormatter = new Intl.NumberFormat('vi-VN');
@@ -60,9 +60,14 @@ export default function OrderManagement() {
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
 
   const fetchOrders = useCallback(async () => {
+    if (!user?.userId) {
+      return;
+    }
+
     try {
       setLoading(true);
       const data = await orderService.getSellerOrders({
+        sellerId: user.userId,
         status: activeStatus || undefined,
         searchTerm: appliedSearchTerm || undefined,
         page,
@@ -77,7 +82,7 @@ export default function OrderManagement() {
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, appliedSearchTerm, page, showToast]);
+  }, [activeStatus, appliedSearchTerm, page, showToast, user?.userId]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -130,14 +135,12 @@ export default function OrderManagement() {
     const awaiting = orders.filter((order) => order.status === 'AwaitingPayment' || order.status === 'Pending').length;
     const confirmed = orders.filter((order) => order.status === 'Confirmed').length;
     const shipping = orders.filter((order) => order.status === 'Shipping').length;
-    const revenue = orders.reduce((sum, order) => sum + Number(order.finalAmount || 0), 0);
 
     return [
       { label: 'Total Orders', icon: 'shopping_cart', value: totalItems, note: 'All matched orders' },
       { label: 'Need Confirm', icon: 'fact_check', value: awaiting, note: 'Waiting seller action', hot: true },
       { label: 'Confirmed', icon: 'inventory', value: confirmed, note: 'Ready to ship' },
       { label: 'Shipping', icon: 'local_shipping', value: shipping, note: 'In transit' },
-      { label: 'Revenue', icon: 'payments', value: compactMoney(revenue), note: 'Current page', dark: true },
     ];
   }, [orders, totalItems]);
 
@@ -150,9 +153,14 @@ export default function OrderManagement() {
   const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
 
   const updateOrderStatus = async (order, status) => {
+    if (!user?.userId) {
+      showToast('SellerId is missing. Please sign in again.', 'error');
+      return;
+    }
+
     try {
       setUpdatingId(order.orderId);
-      await orderService.updateStatus(order.orderId, { status });
+      await orderService.updateStatus(order.orderId, { status }, { sellerId: user.userId });
       showToast(`Order ${order.orderCode || order.orderId} updated to ${status}.`, 'success');
       fetchOrders();
     } catch (error) {
@@ -170,13 +178,14 @@ export default function OrderManagement() {
   if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
   return (
-    <div className="seller-orders-page animate-fade-in">
-      <header className="seller-orders-hero">
-        <div>
+    <div className="om-page animate-fade-in">
+      <header className="om-header">
+        <div className="om-header-copy">
+          <span className="om-eyebrow">Seller Orders</span>
           <h1>Order Management</h1>
-          <p>Track and fulfill your ReTrade sales performance.</p>
+          <p>Review buyer orders, confirm processing, and keep fulfillment status current.</p>
         </div>
-        <form className="seller-orders-search" onSubmit={handleSearch}>
+        <form className="om-search" onSubmit={handleSearch}>
           <span className="material-symbols-outlined">search</span>
           <input
             value={searchTerm}
@@ -186,21 +195,21 @@ export default function OrderManagement() {
         </form>
       </header>
 
-      <section className="seller-order-stats">
+      <section className="om-stats">
         {stats.map((stat) => (
-          <article key={stat.label} className={`seller-order-stat ${stat.dark ? 'dark' : ''}`}>
+          <article key={stat.label} className={`om-stat ${stat.hot ? 'hot' : ''}`}>
             <div>
-              <span>{stat.label}</span>
               <span className="material-symbols-outlined">{stat.icon}</span>
+              <span>{stat.label}</span>
             </div>
             <strong>{typeof stat.value === 'number' ? String(stat.value).padStart(2, '0') : stat.value}</strong>
-            <p className={stat.hot ? 'hot' : ''}>{stat.note}</p>
+            <p>{stat.note}</p>
           </article>
         ))}
       </section>
 
-      <section className="seller-orders-panel">
-        <div className="seller-order-tabs">
+      <section className="om-panel">
+        <div className="om-tabs">
           <div>
             {tabs.map((tab) => (
               <button
@@ -218,8 +227,8 @@ export default function OrderManagement() {
           </div>
         </div>
 
-        <div className="seller-orders-table-wrap">
-          <table className="seller-orders-table">
+        <div className="om-table-wrap">
+          <table className="om-table">
             <thead>
               <tr>
                 <th>Order ID & Date</th>
@@ -233,11 +242,11 @@ export default function OrderManagement() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6"><div className="seller-orders-empty">Loading orders...</div></td>
+                  <td colSpan="6"><div className="om-empty">Loading orders...</div></td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan="6"><div className="seller-orders-empty">No seller orders found.</div></td>
+                  <td colSpan="6"><div className="om-empty">No seller orders found.</div></td>
                 </tr>
               ) : (
                 orders.map((order) => {
@@ -255,7 +264,7 @@ export default function OrderManagement() {
                         <span>{order.buyerEmail || order.buyerId || '-'}</span>
                       </td>
                       <td>
-                        <div className="seller-order-product">
+                        <div className="om-product">
                           <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
                           <div>
                             <strong>{order.productName || 'Untitled product'}</strong>
@@ -267,23 +276,23 @@ export default function OrderManagement() {
                         <strong>{formatVnd(order.finalAmount || 0)}</strong>
                         <span>VND</span>
                       </td>
-                      <td><em className={`seller-order-status ${meta.className}`}>{meta.label}</em></td>
+                      <td><em className={`om-status ${meta.className}`}>{meta.label}</em></td>
                       <td>
-                        <div className="seller-order-actions">
+                        <div className="om-actions">
                           <button type="button" aria-label="View order" onClick={() => openDetail(order.orderId)}>
                             <span className="material-symbols-outlined">visibility</span>
                           </button>
                           {action ? (
                             <button
                               type="button"
-                              className="primary-action"
+                              className="om-primary-action"
                               disabled={updatingId === order.orderId}
                               onClick={() => updateOrderStatus(order, action.status)}
                             >
                               {updatingId === order.orderId ? 'Updating...' : action.label}
                             </button>
                           ) : (
-                            <button type="button" className="primary-action muted" onClick={() => openDetail(order.orderId)}>
+                            <button type="button" className="om-primary-action muted" onClick={() => openDetail(order.orderId)}>
                               Details
                             </button>
                           )}
@@ -297,15 +306,15 @@ export default function OrderManagement() {
           </table>
         </div>
 
-        <footer className="seller-orders-footer">
+        <footer className="om-footer">
           <span>Showing {firstVisibleItem}-{lastVisibleItem} of {totalItems} orders</span>
-          <nav className="seller-orders-pagination" aria-label="Order list pagination">
+          <nav className="om-pagination" aria-label="Order list pagination">
             <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} aria-label="Previous page">
               <span className="material-symbols-outlined">chevron_left</span>
             </button>
             {paginationItems.map((item, index) => (
               item === 'ellipsis' ? (
-                <span key={`${item}-${index}`} className="seller-orders-pagination-ellipsis">...</span>
+                <span key={`${item}-${index}`} className="om-pagination-ellipsis">...</span>
               ) : (
                 <button
                   key={item}
@@ -331,13 +340,6 @@ export default function OrderManagement() {
 function formatDate(value) {
   if (!value) return '-';
   return dateFormatter.format(new Date(value));
-}
-
-function compactMoney(value) {
-  if (value >= 1000000000) return `${(value / 1000000000).toFixed(1)}B`;
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `${Math.round(value / 1000)}K`;
-  return String(value || 0);
 }
 
 function formatVnd(value) {
