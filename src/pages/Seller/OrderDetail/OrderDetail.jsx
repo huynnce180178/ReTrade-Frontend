@@ -1,215 +1,305 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, Navigate, useParams } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
+import { createOrderHubConnection } from '../../../services/orderRealtimeService';
+import '../../../styles/SellerDashboard.css';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-
-const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
-  month: 'long',
+  month: '2-digit',
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
 });
 
-const statusOrder = ['Pending', 'Confirmed', 'Shipping', 'Delivered'];
+const statusOptions = [
+  'AwaitingPayment',
+  'Pending',
+  'Confirmed',
+  'Shipping',
+  'Delivered',
+  'Returned',
+  'Cancelled',
+];
 
-const statusMeta = {
-  Pending: { label: 'Pending', className: 'pending' },
-  Confirmed: { label: 'Confirmed', className: 'confirmed' },
-  Shipping: { label: 'Shipping', className: 'shipping' },
-  Delivered: { label: 'Delivered', className: 'delivered' },
-  Returned: { label: 'Returned', className: 'returned' },
-  Cancelled: { label: 'Cancelled', className: 'cancelled' },
+const statusLabels = {
+  AwaitingPayment: 'Awaiting Payment',
+  Pending: 'Pending',
+  Confirmed: 'Confirmed',
+  Shipping: 'Shipping',
+  Delivered: 'Delivered',
+  Returned: 'Returned',
+  Cancelled: 'Cancelled',
 };
+
+const statusClass = {
+  AwaitingPayment: 'awaiting',
+  Pending: 'pending',
+  Confirmed: 'confirmed',
+  Shipping: 'shipping',
+  Delivered: 'delivered',
+  Returned: 'returned',
+  Cancelled: 'cancelled',
+};
+
+const statusOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered'];
 
 export default function OrderDetail() {
   const { orderId } = useParams();
+  const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+
   const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    status: 'Pending',
+    trackingCode: '',
+    shippingProvider: '',
+    expectedDeliveryTime: '',
+  });
+
+  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
+  const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
+
+  const loadOrder = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await orderService.getById(orderId);
+      setOrder(data);
+      setForm({
+        status: data?.status || 'Pending',
+        trackingCode: data?.trackingCode || '',
+        shippingProvider: data?.shippingProvider || '',
+        expectedDeliveryTime: toDateTimeInputValue(data?.expectedDeliveryTime),
+      });
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to load order detail.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId, showToast]);
 
   useEffect(() => {
-    const fetchOrder = async () => {
+    if (user && (isSeller || isAdmin)) {
+      loadOrder();
+    }
+  }, [isAdmin, isSeller, loadOrder, user]);
+
+  useEffect(() => {
+    if (!user?.userId || !isSeller) {
+      return undefined;
+    }
+
+    const connection = createOrderHubConnection();
+    let disposed = false;
+
+    const handleOrderStatusChanged = (payload) => {
+      if (payload?.orderId && payload.orderId !== orderId) {
+        return;
+      }
+
+      setOrder((value) => (value ? { ...value, ...payload } : value));
+      loadOrder();
+    };
+
+    connection.on('SellerOrderStatusChanged', handleOrderStatusChanged);
+
+    const startConnection = async () => {
       try {
-        setLoading(true);
-        const data = await orderService.getById(orderId);
-        setOrder(data);
+        await connection.start();
+        if (!disposed) {
+          await connection.invoke('JoinSellerOrderGroup', user.userId);
+        }
       } catch (error) {
-        showToast(error?.response?.data || 'Failed to load order detail.', 'error');
-      } finally {
-        setLoading(false);
+        console.error('Failed to connect seller order hub:', error);
       }
     };
 
-    fetchOrder();
-  }, [orderId]);
+    startConnection();
 
-  const payment = order?.payments?.[0];
-  const subtotal = Number(order?.totalAmount || 0);
-  const shippingFee = Number(order?.shippingFee || 0);
-  const discount = Number(order?.discountAmount || 0);
-  const finalAmount = Number(order?.finalAmount || 0);
-  const status = order?.status || 'Pending';
-  const meta = statusMeta[status] || { label: status, className: 'default' };
+    return () => {
+      disposed = true;
+      connection.off('SellerOrderStatusChanged', handleOrderStatusChanged);
+      if (connection.state === 'Connected') {
+        connection.invoke('LeaveSellerOrderGroup', user.userId).catch(() => {});
+      }
+      connection.stop().catch(() => {});
+    };
+  }, [isSeller, loadOrder, orderId, user?.userId]);
 
-  const timeline = useMemo(() => buildTimeline(order), [order]);
+  const totals = useMemo(
+    () => ({
+      subtotal: Number(order?.totalAmount || 0),
+      shipping: Number(order?.shippingFee || 0),
+      discount: Number(order?.discountAmount || 0),
+      final: Number(order?.finalAmount || 0),
+    }),
+    [order]
+  );
 
-  if (loading) {
-    return (
-      <div className="seller-order-detail-page">
-        <div className="seller-orders-empty">Loading order detail...</div>
-      </div>
-    );
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    try {
+      setSaving(true);
+      const payload = {
+        status: form.status,
+        trackingCode: form.trackingCode || null,
+        shippingProvider: form.shippingProvider || null,
+        expectedDeliveryTime: form.expectedDeliveryTime ? new Date(form.expectedDeliveryTime).toISOString() : null,
+      };
+      const updated = await orderService.updateStatus(orderId, payload);
+      setOrder(updated);
+      setForm({
+        status: updated?.status || form.status,
+        trackingCode: updated?.trackingCode || '',
+        shippingProvider: updated?.shippingProvider || '',
+        expectedDeliveryTime: toDateTimeInputValue(updated?.expectedDeliveryTime),
+      });
+      showToast('Order status updated successfully.', 'success');
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to update order status.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (authLoading) {
+    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading order...</p></div>;
   }
 
-  if (!order) {
-    return (
-      <div className="seller-order-detail-page">
-        <div className="seller-orders-empty">Order not found.</div>
-      </div>
-    );
-  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
   return (
     <div className="seller-order-detail-page animate-fade-in">
       <div className="seller-order-breadcrumb">
-        <Link to="/seller-dashboard">Home</Link>
-        <span>Order Management</span>
-        <strong>Order #{order.orderCode || order.orderId}</strong>
+        <Link to="/seller-dashboard/orders">Orders</Link>
+        <strong>{order?.orderCode || orderId}</strong>
       </div>
 
-      <header className="seller-order-detail-header">
-        <div>
-          <div className="seller-order-title-line">
-            <h1>Order #{order.orderCode || order.orderId}</h1>
-            <em className={`seller-order-status ${meta.className}`}>{meta.label}</em>
-          </div>
-          <p>
-            Ordered on {formatDateTime(order.createdAt)}
-          </p>
-        </div>
-        <div className="seller-order-detail-actions">
-          <button type="button">
-            <span className="material-symbols-outlined">download</span>
-            Download Invoice
-          </button>
-          <a href={order.buyerEmail ? `mailto:${order.buyerEmail}` : undefined}>
-            <span className="material-symbols-outlined">mail</span>
-            Contact Buyer
-          </a>
-          <button type="button" className="primary">Update Status</button>
-        </div>
-      </header>
-
-      <div className="seller-order-detail-layout">
-        <main className="seller-order-detail-main">
-          <section className="seller-order-detail-card">
-            <h2><span className="material-symbols-outlined">inventory_2</span> Items Summary</h2>
-            <div className="seller-order-item-head">
-              <span>Product</span>
-              <span>SKU</span>
-              <span>Price Qty</span>
-              <span>Total</span>
-            </div>
-            <div className="seller-order-item-row">
-              <div className="seller-order-detail-product">
-                <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
-                <div>
-                  <strong>{order.productName || 'Untitled product'}</strong>
-                  <small>{order.productId}</small>
-                </div>
+      {loading ? (
+        <div className="seller-orders-empty">Loading order detail...</div>
+      ) : !order ? (
+        <div className="seller-orders-empty">Order not found.</div>
+      ) : (
+        <>
+          <header className="seller-order-detail-header">
+            <div>
+              <div className="seller-order-title-line">
+                <h1>Order #{order.orderCode || order.orderId}</h1>
+                <em className={`seller-order-status ${statusClass[order.status] || 'default'}`}>
+                  {statusLabels[order.status] || order.status}
+                </em>
               </div>
-              <span>{order.productId || 'N/A'}</span>
-              <strong>{formatVnd(order.unitPrice || 0)} <small>x {order.quantity || 0}</small></strong>
-              <strong className="amount">{formatVnd(order.totalAmount || 0)}</strong>
+              <p>Created {formatDateTime(order.createdAt)} • Buyer {order.buyerName || 'Unknown Buyer'}</p>
             </div>
-          </section>
+            <Link className="seller-order-back-btn" to="/seller-dashboard/orders">
+              <span className="material-symbols-outlined">arrow_back</span>
+              Back to Orders
+            </Link>
+          </header>
 
-          <section className="seller-order-detail-card">
-            <h2><span className="material-symbols-outlined">timeline</span> Order Timeline</h2>
-            <div className="seller-order-timeline">
-              {timeline.map((item) => (
-                <div key={item.label} className={`timeline-row ${item.done ? 'done' : ''} ${item.current ? 'current' : ''}`}>
-                  <span className="timeline-dot">
-                    <span className="material-symbols-outlined">{item.done ? 'check' : item.current ? 'local_shipping' : 'circle'}</span>
-                  </span>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <p>{item.text}</p>
+          <div className="seller-order-detail-layout">
+            <section className="seller-order-detail-main">
+              <article className="seller-order-detail-card">
+                <h2><span className="material-symbols-outlined">inventory_2</span>Order Item</h2>
+                <div className="seller-order-item-row">
+                  <div className="seller-order-detail-product">
+                    <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
+                    <div>
+                      <strong>{order.productName || 'Untitled product'}</strong>
+                      <small>{order.productId}</small>
+                    </div>
                   </div>
+                  <span>Qty {order.quantity || 0}</span>
+                  <strong>{formatVnd(order.unitPrice || 0)}</strong>
+                  <strong className="amount">{formatVnd(order.finalAmount || 0)}</strong>
                 </div>
-              ))}
-            </div>
-          </section>
-        </main>
+              </article>
 
-        <aside className="seller-order-detail-side">
-          <section className="seller-order-side-card buyer">
-            <h3>Buyer Details <span className="material-symbols-outlined">person</span></h3>
-            <div className="buyer-mini">
-              <div>{getInitials(order.buyerName || order.buyerId)}</div>
-              <strong>{order.buyerName || order.buyerId}</strong>
-            </div>
-            <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || 'No phone'}</p>
-            <p><span className="material-symbols-outlined">mail</span>{order.buyerEmail || 'No email'}</p>
-          </section>
+              <article className="seller-order-detail-card">
+                <h2><span className="material-symbols-outlined">published_with_changes</span>Update Status</h2>
+                <form className="seller-order-status-form" onSubmit={handleSubmit}>
+                  <label>
+                    <span>Status</span>
+                    <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}>
+                      {statusOptions.map((status) => (
+                        <option key={status} value={status}>{statusLabels[status]}</option>
+                      ))}
+                    </select>
+                  </label>
 
-          <section className="seller-order-side-card">
-            <h3>Shipping Address <span className="material-symbols-outlined">location_on</span></h3>
-            <strong>{order.addressSnapshot || 'No address snapshot'}</strong>
-            <p className="map-line"><span className="material-symbols-outlined">map</span>View on Map</p>
-          </section>
+                  <label>
+                    <span>Tracking Code</span>
+                    <input
+                      value={form.trackingCode}
+                      onChange={(event) => setForm((value) => ({ ...value, trackingCode: event.target.value }))}
+                      placeholder="VD: GHN-123456"
+                    />
+                  </label>
 
-          <section className="seller-order-side-card">
-            <h3>Payment Info <span className="material-symbols-outlined">payments</span></h3>
-            <dl>
-              <div><dt>Method</dt><dd>{payment?.paymentMethod || 'N/A'}</dd></div>
-              <div><dt>Status</dt><dd><em className="paid-pill">{payment?.status || 'N/A'}</em></dd></div>
-              <div><dt>Trans ID</dt><dd>{payment?.providerTransactionId || payment?.paymentId || 'N/A'}</dd></div>
-            </dl>
-          </section>
+                  <label>
+                    <span>Shipping Provider</span>
+                    <input
+                      value={form.shippingProvider}
+                      onChange={(event) => setForm((value) => ({ ...value, shippingProvider: event.target.value }))}
+                      placeholder="VD: GHN, GHTK, Viettel Post"
+                    />
+                  </label>
 
-          <section className="seller-order-summary-card">
-            <h3>Financial Summary</h3>
-            <div><span>Subtotal</span><strong>{formatVnd(subtotal)}</strong></div>
-            <div><span>Shipping</span><strong>{formatVnd(shippingFee)}</strong></div>
-            <div><span>Voucher Discount</span><strong>-{formatVnd(discount)}</strong></div>
-            <hr />
-            <div className="total"><span>Total Amount</span><strong>{formatVnd(finalAmount)}</strong></div>
-            <button type="button">Print Full Statement</button>
-          </section>
-        </aside>
-      </div>
+                  <label>
+                    <span>Expected Delivery</span>
+                    <input
+                      type="datetime-local"
+                      value={form.expectedDeliveryTime}
+                      onChange={(event) => setForm((value) => ({ ...value, expectedDeliveryTime: event.target.value }))}
+                    />
+                  </label>
+
+                  <button type="submit" disabled={saving}>
+                    <span className="material-symbols-outlined">save</span>
+                    {saving ? 'Saving...' : 'Save Status'}
+                  </button>
+                </form>
+              </article>
+            </section>
+
+            <aside className="seller-order-detail-side">
+              <article className="seller-order-side-card">
+                <h3><span className="material-symbols-outlined">person</span>Buyer</h3>
+                <strong>{order.buyerName || 'Unknown Buyer'}</strong>
+                <p><span className="material-symbols-outlined">mail</span>{order.buyerEmail || '-'}</p>
+                <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || '-'}</p>
+              </article>
+
+              <article className="seller-order-side-card">
+                <h3><span className="material-symbols-outlined">local_shipping</span>Shipping</h3>
+                <dl>
+                  <div><dt>Provider</dt><dd>{order.shippingProvider || '-'}</dd></div>
+                  <div><dt>Tracking</dt><dd>{order.trackingCode || '-'}</dd></div>
+                  <div><dt>Expected</dt><dd>{formatDateTime(order.expectedDeliveryTime)}</dd></div>
+                </dl>
+              </article>
+
+              <article className="seller-order-summary-card">
+                <h3>Payment Summary</h3>
+                <div><span>Subtotal</span><strong>{formatVnd(totals.subtotal)}</strong></div>
+                <div><span>Shipping</span><strong>{formatVnd(totals.shipping)}</strong></div>
+                <div><span>Discount</span><strong>-{formatVnd(totals.discount)}</strong></div>
+                <hr />
+                <div className="total"><span>Total</span><strong>{formatVnd(totals.final)}</strong></div>
+              </article>
+            </aside>
+          </div>
+        </>
+      )}
     </div>
   );
-}
-
-function buildTimeline(order) {
-  if (!order) return [];
-  const status = order.status || 'Pending';
-  const statusIndex = statusOrder.indexOf(status);
-  const terminal = status === 'Returned' || status === 'Cancelled';
-  const base = [
-    { key: 'Pending', label: 'Order Placed', text: `Placed ${formatDateTime(order.createdAt)}` },
-    { key: 'Confirmed', label: 'Payment Confirmed', text: order.payments?.[0]?.updatedAt ? formatDateTime(order.payments[0].updatedAt) : 'Waiting for confirmation' },
-    { key: 'Shipping', label: 'In Transit', text: order.trackingCode ? `Tracking ${order.trackingCode}` : 'Waiting for shipment' },
-    { key: 'Delivered', label: 'Delivered', text: order.expectedDeliveryTime ? `Estimated delivery: ${formatDateTime(order.expectedDeliveryTime)}` : 'Pending delivery' },
-  ];
-
-  if (terminal) {
-    return [
-      ...base.slice(0, 2).map((item) => ({ ...item, done: true })),
-      { key: status, label: status, text: `Order ${status.toLowerCase()}`, done: true, current: true },
-    ];
-  }
-
-  return base.map((item, index) => ({
-    ...item,
-    done: statusIndex >= index,
-    current: statusIndex === index,
-  }));
 }
 
 function formatDateTime(value) {
@@ -217,16 +307,16 @@ function formatDateTime(value) {
   return dateTimeFormatter.format(new Date(value));
 }
 
-function getInitials(value = '') {
-  return value
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase() || 'RT';
-}
-
 function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
+}
+
+function toDateTimeInputValue(value) {
+  if (!value) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 16);
 }

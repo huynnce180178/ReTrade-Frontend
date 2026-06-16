@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
+import { createOrderHubConnection } from '../../../services/orderRealtimeService';
+import '../../../styles/SellerDashboard.css';
 
+const pageSize = 10;
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
+const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
@@ -13,7 +16,8 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const tabs = [
   { key: '', label: 'All Orders' },
-  { key: 'Pending', label: 'To Confirm' },
+  { key: 'AwaitingPayment', label: 'Awaiting Payment' },
+  { key: 'Pending', label: 'Pending' },
   { key: 'Confirmed', label: 'Confirmed' },
   { key: 'Shipping', label: 'Shipping' },
   { key: 'Delivered', label: 'Delivered' },
@@ -22,6 +26,7 @@ const tabs = [
 ];
 
 const statusMeta = {
+  AwaitingPayment: { label: 'Awaiting Payment', className: 'awaiting' },
   Pending: { label: 'Pending', className: 'pending' },
   Confirmed: { label: 'Confirmed', className: 'confirmed' },
   Shipping: { label: 'Shipping', className: 'shipping' },
@@ -30,19 +35,29 @@ const statusMeta = {
   Cancelled: { label: 'Cancelled', className: 'cancelled' },
 };
 
+const nextAction = {
+  Pending: { label: 'Confirm', status: 'Confirmed' },
+  Confirmed: { label: 'Ship', status: 'Shipping' },
+  Shipping: { label: 'Deliver', status: 'Delivered' },
+};
+
 export default function OrderManagement() {
+  const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [updatingId, setUpdatingId] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
+  const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -65,25 +80,64 @@ export default function OrderManagement() {
   }, [activeStatus, appliedSearchTerm, page, showToast]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (user && (isSeller || isAdmin)) {
+      fetchOrders();
+    }
+  }, [fetchOrders, isAdmin, isSeller, user]);
+
+  useEffect(() => {
+    if (!user?.userId || !isSeller) {
+      return undefined;
+    }
+
+    const connection = createOrderHubConnection();
+    let disposed = false;
+
+    const handleOrderStatusChanged = () => {
+      fetchOrders();
+    };
+
+    connection.on('SellerOrderStatusChanged', handleOrderStatusChanged);
+
+    const startConnection = async () => {
+      try {
+        await connection.start();
+        if (!disposed) {
+          await connection.invoke('JoinSellerOrderGroup', user.userId);
+        }
+      } catch (error) {
+        console.error('Failed to connect seller order hub:', error);
+      }
+    };
+
+    startConnection();
+
+    return () => {
+      disposed = true;
+      connection.off('SellerOrderStatusChanged', handleOrderStatusChanged);
+      if (connection.state === 'Connected') {
+        connection.invoke('LeaveSellerOrderGroup', user.userId).catch(() => {});
+      }
+      connection.stop().catch(() => {});
+    };
+  }, [fetchOrders, isSeller, user?.userId]);
 
   const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
   const firstVisibleItem = orders.length ? (page - 1) * pageSize + 1 : 0;
   const lastVisibleItem = orders.length ? firstVisibleItem + orders.length - 1 : 0;
 
   const stats = useMemo(() => {
-    const awaiting = orders.filter((order) => order.status === 'Pending').length;
+    const awaiting = orders.filter((order) => order.status === 'AwaitingPayment' || order.status === 'Pending').length;
     const confirmed = orders.filter((order) => order.status === 'Confirmed').length;
-    const delivered = orders.filter((order) => order.status === 'Delivered').length;
-    const totalRevenue = orders.reduce((sum, order) => sum + Number(order.finalAmount || 0), 0);
+    const shipping = orders.filter((order) => order.status === 'Shipping').length;
+    const revenue = orders.reduce((sum, order) => sum + Number(order.finalAmount || 0), 0);
 
     return [
-      { label: 'Total Orders', icon: 'shopping_cart', value: String(totalItems).padStart(2, '0'), note: '+12%' },
-      { label: 'Awaiting Confirmation', icon: 'inventory', value: String(awaiting).padStart(2, '0'), note: 'Require attention', hot: true },
-      { label: 'Confirmed Orders', icon: 'fact_check', value: String(confirmed).padStart(2, '0'), note: 'Ready to ship' },
-      { label: 'Delivered Sales', icon: 'check_circle', value: String(delivered).padStart(2, '0'), note: 'Success' },
-      { label: 'Total Revenue', icon: 'payments', value: compactMoney(totalRevenue), note: 'VND', dark: true },
+      { label: 'Total Orders', icon: 'shopping_cart', value: totalItems, note: 'All matched orders' },
+      { label: 'Need Confirm', icon: 'fact_check', value: awaiting, note: 'Waiting seller action', hot: true },
+      { label: 'Confirmed', icon: 'inventory', value: confirmed, note: 'Ready to ship' },
+      { label: 'Shipping', icon: 'local_shipping', value: shipping, note: 'In transit' },
+      { label: 'Revenue', icon: 'payments', value: compactMoney(revenue), note: 'Current page', dark: true },
     ];
   }, [orders, totalItems]);
 
@@ -94,6 +148,26 @@ export default function OrderManagement() {
   };
 
   const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
+
+  const updateOrderStatus = async (order, status) => {
+    try {
+      setUpdatingId(order.orderId);
+      await orderService.updateStatus(order.orderId, { status });
+      showToast(`Order ${order.orderCode || order.orderId} updated to ${status}.`, 'success');
+      fetchOrders();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to update order status.', 'error');
+    } finally {
+      setUpdatingId('');
+    }
+  };
+
+  if (authLoading) {
+    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading orders...</p></div>;
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
   return (
     <div className="seller-orders-page animate-fade-in">
@@ -119,7 +193,7 @@ export default function OrderManagement() {
               <span>{stat.label}</span>
               <span className="material-symbols-outlined">{stat.icon}</span>
             </div>
-            <strong>{stat.value}</strong>
+            <strong>{typeof stat.value === 'number' ? String(stat.value).padStart(2, '0') : stat.value}</strong>
             <p className={stat.hot ? 'hot' : ''}>{stat.note}</p>
           </article>
         ))}
@@ -142,10 +216,6 @@ export default function OrderManagement() {
               </button>
             ))}
           </div>
-          <button type="button" className="advanced-filter-btn">
-            <span className="material-symbols-outlined">filter_list</span>
-            Advanced Filters
-          </button>
         </div>
 
         <div className="seller-orders-table-wrap">
@@ -163,19 +233,17 @@ export default function OrderManagement() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6">
-                    <div className="seller-orders-empty">Loading orders...</div>
-                  </td>
+                  <td colSpan="6"><div className="seller-orders-empty">Loading orders...</div></td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan="6">
-                    <div className="seller-orders-empty">No seller orders found.</div>
-                  </td>
+                  <td colSpan="6"><div className="seller-orders-empty">No seller orders found.</div></td>
                 </tr>
               ) : (
                 orders.map((order) => {
                   const meta = statusMeta[order.status] || { label: order.status || 'Unknown', className: 'default' };
+                  const action = nextAction[order.status];
+
                   return (
                     <tr key={order.orderId}>
                       <td>
@@ -184,7 +252,7 @@ export default function OrderManagement() {
                       </td>
                       <td>
                         <strong>{order.buyerName || 'Unknown Buyer'}</strong>
-                        <span>{order.buyerId}</span>
+                        <span>{order.buyerEmail || order.buyerId || '-'}</span>
                       </td>
                       <td>
                         <div className="seller-order-product">
@@ -199,17 +267,26 @@ export default function OrderManagement() {
                         <strong>{formatVnd(order.finalAmount || 0)}</strong>
                         <span>VND</span>
                       </td>
-                      <td>
-                        <em className={`seller-order-status ${meta.className}`}>{meta.label}</em>
-                      </td>
+                      <td><em className={`seller-order-status ${meta.className}`}>{meta.label}</em></td>
                       <td>
                         <div className="seller-order-actions">
-                          <button type="button" onClick={() => openDetail(order.orderId)}>
+                          <button type="button" aria-label="View order" onClick={() => openDetail(order.orderId)}>
                             <span className="material-symbols-outlined">visibility</span>
                           </button>
-                          <button type="button" className="primary-action" onClick={() => openDetail(order.orderId)}>
-                            View Details
-                          </button>
+                          {action ? (
+                            <button
+                              type="button"
+                              className="primary-action"
+                              disabled={updatingId === order.orderId}
+                              onClick={() => updateOrderStatus(order, action.status)}
+                            >
+                              {updatingId === order.orderId ? 'Updating...' : action.label}
+                            </button>
+                          ) : (
+                            <button type="button" className="primary-action muted" onClick={() => openDetail(order.orderId)}>
+                              Details
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -221,18 +298,14 @@ export default function OrderManagement() {
         </div>
 
         <footer className="seller-orders-footer">
-          <span>
-            Showing {firstVisibleItem}-{lastVisibleItem} of {totalItems} orders
-          </span>
+          <span>Showing {firstVisibleItem}-{lastVisibleItem} of {totalItems} orders</span>
           <nav className="seller-orders-pagination" aria-label="Order list pagination">
             <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} aria-label="Previous page">
               <span className="material-symbols-outlined">chevron_left</span>
             </button>
             {paginationItems.map((item, index) => (
               item === 'ellipsis' ? (
-                <span key={`${item}-${index}`} className="seller-orders-pagination-ellipsis">
-                  ...
-                </span>
+                <span key={`${item}-${index}`} className="seller-orders-pagination-ellipsis">...</span>
               ) : (
                 <button
                   key={item}
