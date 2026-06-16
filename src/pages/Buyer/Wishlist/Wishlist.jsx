@@ -305,16 +305,21 @@ export default function Wishlist() {
                   </div>
                   <button
                     className="wl-checkout-btn"
-                    disabled={selectedItems.size === 0}
+                    disabled={selectedItems.size !== 1}
                     onClick={() => {
                       const firstSelected = items.find(i => selectedItems.has(i.wishlistItemId));
                       if (firstSelected) {
-                        navigate('/checkout', { state: { product: firstSelected } });
+                        navigate(`/checkout/${firstSelected.productId}`, { state: { product: firstSelected } });
                       }
                     }}
                   >
                     Proceed to Checkout
                   </button>
+                  {selectedItems.size > 1 && (
+                    <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '8px', textAlign: 'center', fontWeight: '500' }}>
+                      ⚠️ Please select only 1 item to checkout.
+                    </p>
+                  )}
                 </div>
 
                 <div className="wl-auth-protocol-box">

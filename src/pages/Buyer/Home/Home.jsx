@@ -263,6 +263,8 @@ export default function Home() {
 }
 
 function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) {
+  const isOutOfStock = product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || product.stockQuantity <= 0;
+
   return (
     <div className="home-product-card glass-card">
       <div className="home-product-img-wrap">
@@ -271,19 +273,21 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
         ) : (
           <div className="home-product-img-placeholder">🛍️</div>
         )}
-        <button
-          className={`home-wishlist-btn${isWishlisted ? ' active' : ''}`}
-          onClick={() => onToggleWishlist(product)}
-          disabled={toggling}
-          title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-        >
-          {toggling
-            ? <span className="home-wl-spinner" />
-            : <span className="material-symbols-outlined home-wishlist-heart">
-                {isWishlisted ? 'favorite' : 'favorite'}
-              </span>
-          }
-        </button>
+        {!isOutOfStock && (
+          <button
+            className={`home-wishlist-btn${isWishlisted ? ' active' : ''}`}
+            onClick={() => onToggleWishlist(product)}
+            disabled={toggling}
+            title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+          >
+            {toggling
+              ? <span className="home-wl-spinner" />
+              : <span className="material-symbols-outlined home-wishlist-heart">
+                  {isWishlisted ? 'favorite' : 'favorite'}
+                </span>
+            }
+          </button>
+        )}
         {product.condition && (
           <span className="home-product-condition">{product.condition}</span>
         )}
