@@ -24,10 +24,14 @@ import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Support from './pages/Buyer/Support/Support';
 import Category from './pages/Buyer/Category/Category';
 import AdminLayout from './layouts/AdminLayout/AdminLayout';
+import SellerLayout from './layouts/SellerLayout/SellerLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
+import OrderManagement from './pages/Seller/OrderManagement/OrderManagement';
+import OrderDetail from './pages/Seller/OrderDetail/OrderDetail';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
+import Listings from './pages/Admin/Listings/Listings';
 
 function App() {
   return (
@@ -44,7 +48,11 @@ function App() {
                 <Route path="support" element={<Support />} />
                 <Route path="users/:userId" element={<UserProfile />} />
                 <Route path="sellers/:sellerId" element={<SellerProfile />} />
-                <Route path="seller-dashboard" element={<SellerDashboard />} />
+                <Route path="seller-dashboard" element={<SellerLayout />}>
+                  <Route index element={<SellerDashboard />} />
+                  <Route path="orders" element={<OrderManagement />} />
+                  <Route path="orders/:orderId" element={<OrderDetail />} />
+                </Route>
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
                 <Route path="forgot-password" element={<ForgotPassword />} />
@@ -65,6 +73,7 @@ function App() {
                 <Route index element={<Navigate to="/admin/category" replace />} />
                 <Route path="category" element={<Category />} />
                 <Route path="users" element={<UserAccounts />} />
+                <Route path="listings" element={<Listings />} />
                 <Route path="*" element={
                   <div className="admin-placeholder-page">
                     <span className="material-symbols-outlined admin-placeholder-icon">construction</span>

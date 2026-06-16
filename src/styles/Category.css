@@ -339,15 +339,113 @@
   padding: 16px;
   background: rgba(2, 36, 27, 0.01);
   margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.attribute-row-input {
-  display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr auto;
-  gap: 12px;
+.attribute-card-item {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.attribute-card-item.dragging {
+  opacity: 0.4;
+  border: 1px dashed var(--accent);
+  background: rgba(6, 95, 70, 0.05);
+}
+
+.attribute-card-header {
+  display: flex;
   align-items: center;
-  margin-bottom: 12px;
-  animation: fadeIn 0.3s ease;
+  gap: 10px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  transition: color 0.2s ease;
+}
+
+.drag-handle:hover {
+  color: var(--text-primary);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.attr-name-input {
+  flex: 2;
+}
+
+.attr-type-select {
+  flex: 1.2;
+}
+
+.attribute-card-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  background: rgba(2, 36, 27, 0.02);
+  border-radius: var(--border-radius-sm);
+  padding: 8px 12px;
+  border: 1px solid rgba(2, 36, 27, 0.04);
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 100px;
+}
+
+.settings-field label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.settings-field .input-sm {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.checkboxes-group {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  height: 38px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--primary);
+  cursor: pointer;
 }
 
 .attr-action-btn {
@@ -355,6 +453,11 @@
   transition: var(--transition-smooth);
   padding: 8px;
   border-radius: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 
 .attr-action-btn:hover {
@@ -371,6 +474,9 @@
   color: var(--accent);
   margin-top: 8px;
   transition: var(--transition-smooth);
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
 
 .add-attr-trigger:hover {

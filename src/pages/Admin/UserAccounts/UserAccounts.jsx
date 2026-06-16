@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import accountService from '../../../services/accountService';
+import accountRoleService from '../../../services/accountRoleService';
 import profileService from '../../../services/profileService';
 import { useToast } from '../../../context/ToastContext';
 import './UserAccounts.css';
@@ -23,6 +24,23 @@ const statusTone = (status) => statusPalette[status] || 'neutral';
 
 const normalizeText = (value) => (value || '').toString().trim().toLowerCase();
 
+const isInactiveStatus = (status) => {
+  const s = (status || '').toString().toLowerCase();
+  return s === 'inactive' || s === 'ban' || s === 'banned' || s.includes('inactive') || s.includes('ban') || s.includes('banned');
+};
+
+const extractErrorMessage = (error) => {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  const data = error?.response?.data ?? error?.data ?? error;
+  if (!data) return error?.message || String(error);
+  if (typeof data === 'string') return data;
+  if (data?.message) return data.message;
+  if (data?.Message) return data.Message;
+  if (error?.message) return error.message;
+  try { return JSON.stringify(data); } catch (e) { return String(data); }
+};
+
 export default function UserAccounts() {
   const { showToast } = useToast();
   const [users, setUsers] = useState([]);
@@ -37,6 +55,9 @@ export default function UserAccounts() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [pendingActionUser, setPendingActionUser] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleModalLoading, setRoleModalLoading] = useState(false);
+  const [roleItems, setRoleItems] = useState([]); // { roleId, name, isAssigned, loading }
 
   useEffect(() => {
     fetchUsers();
@@ -142,6 +163,112 @@ export default function UserAccounts() {
     showToast(`${label} will be connected after the backend action is ready.`, 'info');
   };
 
+  const openRoleModal = async (user) => {
+    if (!user?.accountId) {
+      showToast('No account selected for role management.', 'warning');
+      return;
+    }
+
+    setSelectedUserId(user.accountId);
+    setShowRoleModal(true);
+    setRoleModalLoading(true);
+    setRoleItems([]);
+
+    try {
+      const res = await accountRoleService.getManageRoles(user.accountId);
+
+      // try to fetch profile roles as fallback/source of truth
+      let profileRoles = [];
+      try {
+        const prof = await profileService.getUserProfile(user.userId);
+        profileRoles = prof?.roles || prof?.assignedRoles || [];
+      } catch (e) {
+        // ignore profile fetch errors
+        profileRoles = [];
+      }
+
+      // Normalize common response shapes
+      let items = [];
+
+      if (Array.isArray(res)) {
+        // array of { roleId, name, isAssigned }
+        items = res.map((r) => ({ roleId: r.roleId ?? r.id, name: r.name ?? r.roleName ?? r.displayName, isAssigned: !!r.isAssigned, loading: false }));
+      } else {
+        const roles = res.roles || res.allRoles || res.availableRoles || [];
+        const assignedFromRes = new Set((res.assignedRoleIds || res.assignedRoles || res.assigned || []).map((a) => (typeof a === 'object' ? a.roleId ?? a.id : a)));
+
+        items = (roles || []).map((r) => ({ roleId: r.roleId ?? r.id, name: r.name ?? r.roleName ?? r.displayName, isAssigned: assignedFromRes.has(r.roleId ?? r.id), loading: false }));
+      }
+
+      // If profileRoles exist, use them to mark assignments too (match by id or by name)
+      if (profileRoles && profileRoles.length > 0 && items.length > 0) {
+        const profileIds = new Set(profileRoles.map((p) => (typeof p === 'object' ? p.roleId ?? p.id ?? p.name : p)));
+        const profileNames = new Set(profileRoles.map((p) => (typeof p === 'object' ? (p.name || p.roleName || '').toString().toLowerCase() : String(p).toLowerCase())));
+
+        items = items.map((it) => {
+          const idMatch = profileIds.has(it.roleId) || profileIds.has(String(it.roleId));
+          const nameMatch = profileNames.has((it.name || '').toString().toLowerCase());
+          return { ...it, isAssigned: !!it.isAssigned || idMatch || nameMatch };
+        });
+      }
+
+      // Final fallback: if none marked assigned but selectedUser.primaryRole matches any role name, mark it
+      if (items.length > 0 && !items.some((i) => i.isAssigned) && selectedUser?.primaryRole) {
+        const primary = (selectedUser.primaryRole || '').toString().toLowerCase();
+        items = items.map((it) => ({ ...it, isAssigned: it.isAssigned || (it.name || '').toString().toLowerCase() === primary }));
+      }
+
+      setRoleItems(items);
+    } catch (error) {
+      showToast(extractErrorMessage(error) || 'Failed to load roles.', 'error');
+      setShowRoleModal(false);
+    } finally {
+      setRoleModalLoading(false);
+    }
+  };
+
+  const closeRoleModal = () => {
+    if (roleModalLoading) return;
+    setShowRoleModal(false);
+    setRoleItems([]);
+  };
+
+  const toggleRoleAssignment = async (role) => {
+    if (!selectedUserId) return;
+    // prevent double actions
+    if (role.loading) return;
+
+    setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, loading: true } : r)));
+
+    try {
+      if (role.isAssigned) {
+        await accountRoleService.removeRole(selectedUserId, role.roleId);
+        showToast('Role removed.', 'success');
+        setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, isAssigned: false, loading: false } : r)));
+      } else {
+        await accountRoleService.assignRole(selectedUserId, role.roleId);
+        showToast('Role assigned.', 'success');
+        setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, isAssigned: true, loading: false } : r)));
+      }
+      // refresh users list to reflect role changes in table if necessary
+      await fetchUsers();
+    } catch (error) {
+      const msg = extractErrorMessage(error).toLowerCase();
+      // If backend says role already assigned, update UI to assigned
+      if (msg.includes('already assigned')) {
+        setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, isAssigned: true, loading: false } : r)));
+        showToast('Role is already assigned to this account.', 'warning');
+      } else if (msg.includes('not found') || msg.includes('assignment not found')) {
+        // If backend says assignment not found when removing, mark as not assigned
+        setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, isAssigned: false, loading: false } : r)));
+        showToast('Role assignment not found (already removed).', 'warning');
+      } else {
+        showToast(extractErrorMessage(error) || 'Failed to update role.', 'error');
+        setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, loading: false } : r)));
+      }
+    }
+  };
+
   const openUserDetail = async (user) => {
     if (!user?.userId) {
       showToast('No user profile found for this account.', 'warning');
@@ -158,7 +285,7 @@ export default function UserAccounts() {
       const detail = await profileService.getUserProfile(user.userId);
       setSelectedUserDetail(detail);
     } catch (error) {
-      setDetailError(error?.response?.data || 'Failed to load user detail.');
+      setDetailError(extractErrorMessage(error) || 'Failed to load user detail.');
     } finally {
       setDetailLoading(false);
     }
@@ -184,23 +311,31 @@ export default function UserAccounts() {
   const confirmStatusAction = async () => {
     if (!pendingActionUser?.accountId) return;
 
-    const isInactive = pendingActionUser.status === 'Inactive';
+    const isInactive = isInactiveStatus(pendingActionUser?.status);
     const actionLabel = isInactive ? 'activate' : 'ban';
+    const pastTense = isInactive ? 'activated' : 'banned';
 
     try {
       setActionLoading(true);
+      // Backend exposes a ban endpoint that toggles status between Active <-> Inactive.
       await accountService.banUser(pendingActionUser.accountId);
-      showToast(`User ${actionLabel}d successfully.`, 'success');
+      showToast(`User ${pastTense} successfully.`, 'success');
       setPendingActionUser(null);
       await fetchUsers();
     } catch (error) {
-      showToast(error?.response?.data || `Failed to ${actionLabel} user.`, 'error');
+      showToast(extractErrorMessage(error) || `Failed to ${actionLabel} user.`, 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const pendingIsInactive = pendingActionUser?.status === 'Inactive';
+  const pendingIsInactive = (() => {
+    const statusFromPending = pendingActionUser?.status;
+    if (statusFromPending) return isInactiveStatus(statusFromPending);
+    // fallback: find the user in current users list by accountId
+    const found = users.find((u) => u.accountId === pendingActionUser?.accountId);
+    return isInactiveStatus(found?.status);
+  })();
 
   return (
     <div className="admin-user-list-page animate-fade-in">
@@ -357,13 +492,17 @@ export default function UserAccounts() {
                             <button type="button" className="admin-action-btn outline" onClick={(e) => { e.stopPropagation(); handleActionStub('Edit account'); }}>
                               <span className="material-symbols-outlined">edit</span>
                             </button>
+                            <button type="button" className="admin-action-btn outline" onClick={(e) => { e.stopPropagation(); openRoleModal(user); }}>
+                              <span className="material-symbols-outlined">manage_accounts</span>
+                              Manage Roles
+                            </button>
                             <button
                               type="button"
-                              className={`admin-action-btn ${user.status === 'Inactive' ? 'outline' : 'danger'}`}
+                              className={`admin-action-btn ${isInactiveStatus(user.status) ? 'outline' : 'danger'}`}
                               onClick={(e) => { e.stopPropagation(); openStatusActionModal(user); }}
                             >
                               <span className="material-symbols-outlined">block</span>
-                              {user.status === 'Inactive' ? 'Activate' : 'Inactive User'}
+                              {isInactiveStatus(user.status) ? 'Unban' : 'Ban'}
                             </button>
                           </div>
                         </td>
@@ -443,11 +582,14 @@ export default function UserAccounts() {
                 <button type="button" className="admin-action-btn outline" onClick={() => openUserDetail(selectedUser)}>
                   View Detail
                 </button>
+                <button type="button" className="admin-action-btn outline" onClick={() => openRoleModal(selectedUser)}>
+                  Manage Roles
+                </button>
                 <button type="button" className="admin-action-btn outline" onClick={() => handleActionStub('Open audit log')}>
                   Audit Log
                 </button>
-                <button type="button" className={`admin-action-btn ${selectedUser.status === 'Inactive' ? 'outline' : 'danger'}`} onClick={() => openStatusActionModal(selectedUser)}>
-                  {selectedUser.status === 'Inactive' ? 'Activate User' : 'Inactive User'}
+                <button type="button" className={`admin-action-btn ${isInactiveStatus(selectedUser.status) ? 'outline' : 'danger'}`} onClick={() => openStatusActionModal(selectedUser)}>
+                  {isInactiveStatus(selectedUser.status) ? 'Unban User' : 'Ban'}
                 </button>
               </div>
             </>
@@ -466,8 +608,8 @@ export default function UserAccounts() {
           <div className="admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="admin-confirm-modal-header">
               <div>
-                <p className="admin-confirm-kicker">Inactive User</p>
-                <h3>{pendingIsInactive ? 'Activate this account?' : 'Vô hiệu hóa tài khoản này?'}</h3>
+                <p className="admin-confirm-kicker">{pendingIsInactive ? 'Unban User' : 'Ban User'}</p>
+                <h3>{pendingIsInactive ? 'Unban this account?' : 'Ban this account?'}</h3>
               </div>
               <button type="button" className="admin-confirm-close" onClick={closeStatusActionModal} disabled={actionLoading}>
                 <span className="material-symbols-outlined">close</span>
@@ -477,9 +619,9 @@ export default function UserAccounts() {
             <div className="admin-confirm-modal-body">
               <p>
                 {pendingIsInactive
-                  ? 'Tài khoản này đang ở trạng thái Inactive. Khi kích hoạt lại, người dùng sẽ có thể đăng nhập và thực hiện giao dịch.'
-                  : 'Tài khoản sẽ bị chuyển sang Inactive, không được phép đăng nhập hoặc thực hiện giao dịch. Hệ thống cũng sẽ gửi email thông báo đến địa chỉ đã đăng ký.'}
-              </p>
+                  ? 'This account is currently Banned. Unbanning will allow the user to sign in and transact.'
+                  : 'This account will be set to Banned, preventing sign in or transactions. The system will send an email notification to the registered address.'}
+                </p>
 
               <div className="admin-confirm-target-card">
                 <span>Account</span>
@@ -489,7 +631,7 @@ export default function UserAccounts() {
 
               {!pendingIsInactive && (
                 <div className="admin-confirm-note">
-                  Người dùng sẽ cần kiểm tra email để xem thông báo vô hiệu hóa tài khoản.
+                  The user will receive an email notification about the ban.
                 </div>
               )}
             </div>
@@ -504,7 +646,62 @@ export default function UserAccounts() {
                 onClick={confirmStatusAction}
                 disabled={actionLoading}
               >
-                {actionLoading ? 'Processing...' : pendingIsInactive ? 'Activate' : 'Inactive User'}
+                {actionLoading ? 'Processing...' : pendingIsInactive ? 'Unban' : 'Ban'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRoleModal && (
+        <div className="admin-role-modal-overlay" onClick={closeRoleModal}>
+          <div className="admin-role-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-role-modal-header">
+              <div>
+                <p className="admin-detail-kicker">Manage Roles</p>
+                <h3>{selectedUser ? `${selectedUser.username || selectedUser.accountId}` : selectedUserId}</h3>
+              </div>
+              <button type="button" className="admin-detail-close" onClick={closeRoleModal} disabled={roleModalLoading}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="admin-role-modal-body">
+              {roleModalLoading ? (
+                <div className="admin-detail-loading">
+                  <span className="btn-spinner"></span>
+                  <p>Loading roles...</p>
+                </div>
+              ) : (
+                <div className="admin-role-list">
+                  {roleItems.length === 0 ? (
+                    <p className="admin-detail-muted">No roles available for this account.</p>
+                  ) : (
+                    roleItems.map((role) => (
+                      <div key={role.roleId} className="role-item">
+                        <div>
+                          <strong>{role.name || `Role ${role.roleId}`}</strong>
+                        </div>
+                        <div>
+                          <button
+                            type="button"
+                            className={`admin-action-btn ${role.isAssigned ? 'danger' : 'ghost'}`}
+                            onClick={() => toggleRoleAssignment(role)}
+                            disabled={role.loading}
+                          >
+                            {role.loading ? 'Processing...' : role.isAssigned ? 'Remove' : 'Assign'}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="admin-detail-modal-footer">
+              <button type="button" className="admin-action-btn outline" onClick={closeRoleModal} disabled={roleModalLoading}>
+                Close
               </button>
             </div>
           </div>
