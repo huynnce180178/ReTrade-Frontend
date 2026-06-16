@@ -67,7 +67,7 @@ export default function OrderManagement() {
     try {
       setLoading(true);
       const data = await orderService.getSellerOrders({
-        sellerId: user.userId,
+        sellerId: user?.userId || user?.id,
         status: activeStatus || undefined,
         searchTerm: appliedSearchTerm || undefined,
         page,
@@ -82,7 +82,7 @@ export default function OrderManagement() {
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, appliedSearchTerm, page, showToast, user?.userId]);
+  }, [activeStatus, appliedSearchTerm, page, showToast, user]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -160,7 +160,7 @@ export default function OrderManagement() {
 
     try {
       setUpdatingId(order.orderId);
-      await orderService.updateStatus(order.orderId, { status }, { sellerId: user.userId });
+      await orderService.updateStatus(order.orderId, { status }, { sellerId: user?.userId || user?.id });
       showToast(`Order ${order.orderCode || order.orderId} updated to ${status}.`, 'success');
       fetchOrders();
     } catch (error) {
