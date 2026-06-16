@@ -54,19 +54,11 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch search history
+  // Fetch search history (Local Storage)
   useEffect(() => {
-    if (!user) return;
-    const fetchHistory = async () => {
-      try {
-        const data = await userSearchService.getHistory(10);
-        setSearchHistory(Array.isArray(data) ? data : []);
-      } catch {
-        // Silently fail
-      }
-    };
-    fetchHistory();
-  }, [user]);
+    const history = JSON.parse(localStorage.getItem('retrade_search_history') || '[]');
+    setSearchHistory(history);
+  }, []);
 
   useEffect(() => {
     if (!subscriptionModalOpen) {
@@ -200,15 +192,23 @@ export default function Header() {
     }
   };
 
+  const saveSearchToHistory = (keyword) => {
+    if (!keyword) return;
+    const history = JSON.parse(localStorage.getItem('retrade_search_history') || '[]');
+    const newHistory = [keyword, ...history.filter(item => item !== keyword)].slice(0, 6);
+    localStorage.setItem('retrade_search_history', JSON.stringify(newHistory));
+    setSearchHistory(newHistory);
+  };
+
   const handleSearchSubmit = async (e) => {
     e.preventDefault();
     if (!searchTerm.trim()) return;
 
+    saveSearchToHistory(searchTerm.trim());
+
     if (user) {
       try {
         await userSearchService.addSearch(searchTerm.trim());
-        const data = await userSearchService.getHistory(10);
-        setSearchHistory(Array.isArray(data) ? data : []);
       } catch {
         // Ignore
       }
@@ -220,27 +220,28 @@ export default function Header() {
 
   const handleHistoryClick = (keyword) => {
     setSearchTerm(keyword);
+    saveSearchToHistory(keyword);
     setShowHistory(false);
     navigate(`/product?search=${encodeURIComponent(keyword)}`);
   };
 
-  const handleDeleteHistory = async (e, searchId) => {
+  const handleDeleteHistory = async (e, keyword) => {
     e.stopPropagation();
-    try {
-      await userSearchService.deleteSearch(searchId);
-      setSearchHistory(prev => prev.filter(h => h.searchId !== searchId));
-    } catch {
-      showToast('Failed to delete search history.', 'error');
-    }
+    const newHistory = searchHistory.filter(item => item !== keyword);
+    localStorage.setItem('retrade_search_history', JSON.stringify(newHistory));
+    setSearchHistory(newHistory);
   };
 
   const handleClearAllHistory = async (e) => {
     e.stopPropagation();
-    try {
-      await userSearchService.clearAll();
-      setSearchHistory([]);
-    } catch {
-      showToast('Failed to clear search history.', 'error');
+    localStorage.removeItem('retrade_search_history');
+    setSearchHistory([]);
+    if (user) {
+      try {
+        await userSearchService.clearAll();
+      } catch {
+        // Ignore
+      }
     }
   };
 
@@ -248,62 +249,64 @@ export default function Header() {
     <>
       <header className="site-header glass-panel">
         <div className="header-container">
-          <Link to="/" className="header-logo" style={{ textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>
-            <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-primary, #02241B)', letterSpacing: '1px' }}>RETRADE</span>
-          </Link>
+          <div className="header-left">
+            <Link to="/" className="header-logo" style={{ textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>
+              <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-primary, #02241B)', letterSpacing: '1px' }}>RETRADE</span>
+            </Link>
 
-          <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
-          </button>
+            <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
+            </button>
 
-          <nav className={`header-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-            <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-              Home
-            </NavLink>
-            <NavLink to="/product" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-              Product
-            </NavLink>
-            <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-              Auction
-            </NavLink>
-            <NavLink to="/category" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-              Category
-            </NavLink>
-            <NavLink to="/wishlist" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-              Wishlist
-            </NavLink>
+            <nav className={`header-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+              <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+                Home
+              </NavLink>
+              <NavLink to="/product" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+                Product
+              </NavLink>
+              <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+                Auction
+              </NavLink>
+              <NavLink to="/category" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+                Category
+              </NavLink>
+              <NavLink to="/wishlist" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+                Wishlist
+              </NavLink>
 
-            <div className="mobile-only-menu-items">
-              <div className="search-input-wrapper mobile-search-wrapper">
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+              <div className="mobile-only-menu-items">
+                <div className="search-input-wrapper mobile-search-wrapper">
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                <button className="btn-subscription mobile-sub-btn" onClick={() => { setSubscriptionModalOpen(true); setMobileMenuOpen(false); }}>
+                  Subscription
+                </button>
+                {!user ? (
+                  <div className="mobile-auth-links">
+                    <Link to="/login" className="btn-login-link nav-link" onClick={() => setMobileMenuOpen(false)}>Login</Link>
+                    <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>Register</Link>
+                  </div>
+                ) : (
+                  <div className="mobile-auth-links">
+                    <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
+                    {isSeller && <Link to="/seller-dashboard" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Seller Dashboard</Link>}
+                    <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
+                  </div>
+                )}
               </div>
-
-              <button className="btn-subscription mobile-sub-btn" onClick={() => { setSubscriptionModalOpen(true); setMobileMenuOpen(false); }}>
-                Subscription
-              </button>
-              {!user ? (
-                <div className="mobile-auth-links">
-                  <Link to="/login" className="btn-login-link nav-link" onClick={() => setMobileMenuOpen(false)}>Login</Link>
-                  <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>Register</Link>
-                </div>
-              ) : (
-                <div className="mobile-auth-links">
-                  <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
-                  {isSeller && <Link to="/seller-dashboard" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Seller Dashboard</Link>}
-                  <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
-                </div>
-              )}
-            </div>
-          </nav>
+            </nav>
+          </div>
 
           <form className="header-search desktop-only-search" onSubmit={handleSearchSubmit} ref={searchRef} style={{ position: 'relative' }}>
             <div className="search-input-wrapper">
@@ -312,11 +315,11 @@ export default function Header() {
                 className="search-input"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onFocus={() => user && searchHistory.length > 0 && setShowHistory(true)}
+                onFocus={() => searchHistory.length > 0 && setShowHistory(true)}
                 placeholder="Search products..."
               />
-              <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
-                <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <button type="submit" className="search-btn-inside">
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </button>
@@ -329,22 +332,23 @@ export default function Header() {
                   <span>Recent Searches</span>
                   <button type="button" className="search-history-clear-all" onClick={handleClearAllHistory}>Clear All</button>
                 </div>
-                {searchHistory.map(item => (
+                {searchHistory.map((item, index) => (
                   <div
-                    key={item.searchId}
+                    key={index}
                     className="search-history-item"
-                    onClick={() => handleHistoryClick(item.keyword)}
+                    onClick={() => handleHistoryClick(item)}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: 'var(--text-muted)' }}>
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <span className="search-history-keyword">{item.keyword}</span>
+                    <span className="search-history-keyword">{item}</span>
                     <button
                       type="button"
                       className="search-history-delete"
-                      onClick={(e) => handleDeleteHistory(e, item.searchId)}
+                      onClick={(e) => handleDeleteHistory(e, item)}
                     >
-                      &times;
+                      ×
                     </button>
                   </div>
                 ))}
