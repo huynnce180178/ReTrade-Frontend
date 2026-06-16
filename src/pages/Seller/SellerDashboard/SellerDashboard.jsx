@@ -141,23 +141,40 @@ export default function SellerDashboard() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (user && activeTab === 'products') {
-      fetchMyProducts();
-    }
-  }, [activeTab, user]);
+  const [sellerSearch, setSellerSearch] = useState('');
+  const [sellerStatus, setSellerStatus] = useState('');
+  const [sellerSort, setSellerSort] = useState('newest');
 
   const fetchMyProducts = async () => {
     if (!user?.userId) return;
     try {
       setProductsLoading(true);
-      const res = await productService.getAll({ sellerId: user.userId });
+      const params = { 
+        sellerId: user.userId,
+        SortBy: sellerSort,
+        PageSize: 50 // Retrieve up to 50 for dashboard simplicity
+      };
+      if (sellerSearch.trim()) params.SearchTerm = sellerSearch.trim();
+      if (sellerStatus) params.Status = sellerStatus;
+
+      const res = await productService.getAll(params);
       setMyProducts(res?.items || []);
     } catch (e) {
       showToast('Failed to load your product list.', 'error');
     } finally {
       setProductsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (user && activeTab === 'products') {
+      fetchMyProducts();
+    }
+  }, [activeTab, user, sellerStatus, sellerSort]); // Search is handled by explicit button or can be added to deps
+
+  const handleSellerSearchSubmit = (e) => {
+    e.preventDefault();
+    fetchMyProducts();
   };
 
   const fetchCategories = async () => {
@@ -564,12 +581,56 @@ export default function SellerDashboard() {
             </header>
 
             <section className="seller-panel">
+              <div className="seller-dash-filter-bar" style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <form onSubmit={handleSellerSearchSubmit} style={{ display: 'flex', flex: 1, minWidth: '250px', position: 'relative' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Search by product name..." 
+                    value={sellerSearch}
+                    onChange={(e) => setSellerSearch(e.target.value)}
+                    style={{ width: '100%', padding: '10px 40px 10px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)' }}
+                  />
+                  <button type="submit" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    <span className="material-symbols-outlined">search</span>
+                  </button>
+                </form>
+                
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <select 
+                    value={sellerStatus} 
+                    onChange={(e) => setSellerStatus(e.target.value)}
+                    style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="Pending">Pending Approval</option>
+                    <option value="Accepted">Approved (Sale)</option>
+                    <option value="Waiting">Pending Auction</option>
+                    <option value="Ready">Ready for Auction</option>
+                    <option value="SaleRejected">Sale Rejected</option>
+                    <option value="AuctionRejected">Auction Rejected</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+
+                  <select 
+                    value={sellerSort} 
+                    onChange={(e) => setSellerSort(e.target.value)}
+                    style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="seller-products-table-wrap">
                 {myProducts.length === 0 ? (
                   <div className="seller-empty-products">
                     <span className="material-symbols-outlined">inventory</span>
-                    <h3>You have not posted any products yet</h3>
-                    <p>Start increasing sales by posting your first product.</p>
+                    <h3>No products found</h3>
+                    <p>Try adjusting your filters or post a new product.</p>
                     <button className="seller-list-btn" style={{ marginTop: '16px' }} onClick={initNewProductForm}>Post Now</button>
                   </div>
                 ) : (

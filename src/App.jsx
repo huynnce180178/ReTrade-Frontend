@@ -1,4 +1,6 @@
 import React from 'react';
+import CategoryList from './pages/Buyer/Category/CategoryList';
+import CategoryProductList from './pages/Buyer/Category/CategoryProductList';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
@@ -18,6 +20,7 @@ import AddressBook from './pages/Buyer/AddressBook/AddressBook';
 import PurchaseHistory from './pages/Buyer/PurchaseHistory/PurchaseHistory';
 import BidHistory from './pages/Buyer/BidHistory/BidHistory';
 import Product from './pages/Buyer/Product/Product';
+import ProductDetail from './pages/Buyer/ProductDetail/ProductDetail';
 import Auction from './pages/Buyer/Auction/Auction';
 import PaymentResult from './pages/Buyer/PaymentResult/PaymentResult';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
@@ -43,6 +46,7 @@ function App() {
               <Route path="/" element={<MainLayout />}>
                 <Route index element={<Home />} />
                 <Route path="product" element={<Product />} />
+                <Route path="product/:productId" element={<ProductDetail />} />
                 <Route path="auction" element={<Auction />} />
                 <Route path="wishlist" element={<Wishlist />} />
                 <Route path="support" element={<Support />} />
@@ -64,7 +68,8 @@ function App() {
                 <Route path="purchase-history" element={<PurchaseHistory />} />
                 <Route path="bid-history" element={<BidHistory />} />
                 <Route path="payment/vnpay-return" element={<PaymentResult />} />
-                <Route path="category" element={<Category />} />
+                <Route path="category" element={<CategoryList />} />
+                <Route path="category/:categoryId" element={<CategoryProductList />} />
                 {/* Profile page removed */}
               </Route>
 
