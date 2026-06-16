@@ -1,10 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Link, Navigate } from 'react-router-dom';
-import { useAuth } from '../../../context/AuthContext';
+import { useOutletContext } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
-import './SellerDashboard.css';
 
 const moneyFormatter = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
@@ -34,10 +32,9 @@ const revenueBars = [
 ];
 
 export default function SellerDashboard() {
-  const { user, loading } = useAuth();
+  const { user, activeTab, setActiveTab } = useOutletContext();
   const { showToast } = useToast();
   
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'new-product', 'edit-product'
   const [myProducts, setMyProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -66,8 +63,6 @@ export default function SellerDashboard() {
   const [dynamicAttributes, setDynamicAttributes] = useState({});
   // Validation errors (dictionary of field/attribute ID -> error message)
   const [validationErrors, setValidationErrors] = useState({});
-
-  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
   // Validate single dynamic attribute
   const validateAttribute = (attr, val) => {
@@ -143,11 +138,17 @@ export default function SellerDashboard() {
   };
 
   useEffect(() => {
-    if (user && isSeller) {
+    if (user) {
       fetchMyProducts();
       fetchCategories();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && activeTab === 'products') {
+      fetchMyProducts();
+    }
+  }, [activeTab, user]);
 
   const fetchMyProducts = async () => {
     if (!user?.userId) return;
@@ -472,57 +473,8 @@ export default function SellerDashboard() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="seller-dashboard-loading">
-        <span className="btn-spinner"></span>
-        <p>Loading Seller Info...</p>
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/login" replace />;
-  if (!isSeller) return <Navigate to="/profile" replace />;
-
-  const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username;
-  const initials = displayName.slice(0, 2).toUpperCase();
-
   return (
-    <div className="seller-dashboard-page">
-      <aside className="seller-dash-sidebar">
-        <div className="seller-dash-profile">
-          <div className="seller-dash-avatar">
-            {user.avatarUrl ? <img src={user.avatarUrl} alt={displayName} /> : initials}
-          </div>
-          <h3>{displayName}</h3>
-          <span>Pro Seller</span>
-        </div>
-
-        <nav className="seller-dash-menu">
-          <p>Dashboard</p>
-          <button
-            className={`seller-menu-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-          >
-            <span className="material-symbols-outlined">dashboard</span>Overview
-          </button>
-          <button
-            className={`seller-menu-btn ${activeTab === 'products' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('products');
-              fetchMyProducts();
-            }}
-          >
-            <span className="material-symbols-outlined">inventory_2</span>My Products
-          </button>
-          <Link to="/auction"><span className="material-symbols-outlined">gavel</span>Auction Room</Link>
-          <Link to="/purchase-history"><span className="material-symbols-outlined">orders</span>Order Management</Link>
-          <p>Personal</p>
-          <Link to="/profile"><span className="material-symbols-outlined">person</span>My Profile</Link>
-        </nav>
-      </aside>
-
-      <main className="seller-dash-main">
+    <>
         {productsLoading && (
           <div className="seller-loader-overlay">
             <span className="btn-spinner"></span>
@@ -952,7 +904,6 @@ export default function SellerDashboard() {
             </form>
           </div>
         )}
-      </main>
-    </div>
+    </>
   );
 }
