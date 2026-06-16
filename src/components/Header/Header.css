@@ -12,8 +12,8 @@
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
-  box-shadow: 0 8px 32px rgba(2, 36, 27, 0.08), 
-              inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(2, 36, 27, 0.08),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.6);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -30,7 +30,8 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 32px;
-  gap: 40px; /* Thêm khoảng cách đều giữa các block để không bị chật */
+  gap: 40px;
+  /* Thêm khoảng cách đều giữa các block để không bị chật */
 }
 
 .header-logo {
@@ -42,7 +43,8 @@
   font-size: 26px;
   letter-spacing: -0.6px;
   color: var(--text-primary);
-  margin-right: 16px; /* Cách xa Menu một chút */
+  margin-right: 16px;
+  /* Cách xa Menu một chút */
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -51,16 +53,19 @@
 }
 
 .project-logo-img {
-  height: 48px; /* Tăng xíu để bù trừ */
+  height: 48px;
+  /* Tăng xíu để bù trừ */
   width: auto;
   /* filter: drop-shadow(...) -> Bỏ cái này vì nó tạo ra cái viền bóng đen bao quanh nền trắng của ảnh */
-  mix-blend-mode: multiply; /* Xoá nền trắng */
+  mix-blend-mode: multiply;
+  /* Xoá nền trắng */
 }
 
 /* Search Bar */
 .header-search {
   flex: 1;
-  max-width: 380px; /* Thu gọn thanh search lại một chút để các phần khác có không gian thở */
+  max-width: 380px;
+  /* Thu gọn thanh search lại một chút để các phần khác có không gian thở */
   position: relative;
 }
 
@@ -72,8 +77,8 @@
   width: 100%;
   padding: 10px 20px 10px 48px;
   border-radius: 50px;
-  border: 1px solid rgba(255,255,255,0.6);
-  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.85);
   font-size: 15px;
   color: var(--text-primary);
   transition: all 0.3s ease;
@@ -96,7 +101,7 @@
   transition: color 0.3s ease;
 }
 
-.search-input:focus + .search-icon {
+.search-input:focus+.search-icon {
   color: var(--primary);
 }
 
@@ -159,7 +164,7 @@
   text-transform: uppercase;
   overflow: hidden;
   box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3),
-              inset 0 1px 0 rgba(255,255,255,0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
   border: none;
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -764,7 +769,8 @@
   color: #717975;
 }
 
-.featured-card .price-period, .dark-card .price-period {
+.featured-card .price-period,
+.dark-card .price-period {
   color: #c1c8c4;
 }
 
@@ -1021,6 +1027,107 @@
   }
 }
 
+
+.mobile-menu-toggle:hover {
+  background: rgba(2, 36, 27, 0.1);
+}
+
+@media (max-width: 1024px) {
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  .header-nav {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: var(--header-height);
+    left: 0;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border-bottom: 1px solid rgba(2, 36, 27, 0.1);
+    box-shadow: 0 10px 30px rgba(2, 36, 27, 0.08);
+    padding: 24px;
+    gap: 20px;
+    z-index: 1000;
+    align-items: flex-start;
+  }
+
+  .header-nav.mobile-open {
+    display: flex;
+  }
+
+  .desktop-only-search {
+    display: none !important;
+  }
+
+  .mobile-search-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .mobile-search-wrapper .search-input {
+    width: 100%;
+    padding: 10px 20px 10px 48px;
+    border-radius: 50px;
+    border: 1px solid rgba(2, 36, 27, 0.15);
+    background: #f4f4f3;
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+
+  .mobile-search-wrapper .search-icon {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+  }
+
+  .header-container {
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  .username-text {
+    display: none;
+  }
+
+  /* Hide header actions elements on mobile to prevent overflow */
+  .header-actions .btn-subscription,
+  .header-actions .auth-buttons {
+    display: none !important;
+  }
+
+  .mobile-only-menu-items {
+    display: flex !important;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(2, 36, 27, 0.1);
+  }
+
+  .mobile-sub-btn {
+    align-self: flex-start;
+  }
+
+  .mobile-auth-links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .mobile-auth-links .btn {
+    align-self: flex-start;
+  }
+}
+
 .mobile-only-menu-items {
   display: none;
 }
@@ -1029,4 +1136,94 @@
   .header-logo span {
     font-size: 20px !important;
   }
+}
+
+/* ============================================
+   Search History Dropdown
+   ============================================ */
+.search-history-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: var(--border-radius-sm, 8px);
+  box-shadow: 0 15px 40px rgba(2, 36, 27, 0.12);
+  z-index: 1100;
+  overflow: hidden;
+  animation: fadeIn 0.2s ease;
+}
+
+.search-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #6b7280);
+}
+
+.search-history-clear-all {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent, #10b981);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: var(--transition-smooth, all 0.3s ease);
+}
+
+.search-history-clear-all:hover {
+  background: rgba(11, 148, 133, 0.1);
+}
+
+.search-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: var(--transition-smooth, all 0.3s ease);
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+}
+
+.search-history-item:hover {
+  background: rgba(2, 36, 27, 0.03);
+}
+
+.search-history-keyword {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-history-delete {
+  font-size: 16px;
+  color: var(--text-muted, #6b7280);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: var(--transition-smooth, all 0.3s ease);
+  opacity: 0;
+}
+
+.search-history-item:hover .search-history-delete {
+  opacity: 1;
+}
+
+.search-history-delete:hover {
+  color: var(--error, #ef4444);
+  background: rgba(220, 38, 38, 0.08);
 }

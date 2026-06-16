@@ -6,6 +6,11 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import '../../../styles/Home.css';
 
+function formatPrice(price) {
+  if (price == null) return null;
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+}
+
 export default function Home() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -16,10 +21,66 @@ export default function Home() {
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [togglingId, setTogglingId] = useState(null);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      alert(`Searching for: "${searchQuery}"`);
+  // Fetch all root categories for the horizontal list
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await categoryService.getAllActive("?$filter=Status eq 'Active'&$orderby=Name asc");
+        const arr = Array.isArray(data) ? data : (data?.value || []);
+        setCategories(arr.filter(c => !c.parentId));
+      } catch {
+        // Silently fail
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Fetch favorites
+  useEffect(() => {
+    if (!isLoggedIn) {
+      fetchLatestProducts();
+      return;
+    }
+    fetchFavorites();
+  }, [isLoggedIn]);
+
+  const fetchFavorites = async () => {
+    setLoadingFavorites(true);
+    try {
+      const data = await userFavoriteService.getFavorites();
+      const favs = Array.isArray(data) ? data : [];
+      setFavorites(favs);
+      if (favs.length === 0) {
+        fetchLatestProducts();
+        
+        // Show modal if no favorites
+        if (user && user.userId) {
+          setShowFavModal(true);
+        }
+      } else {
+        // Fetch products for each favorite category
+        const productMap = {};
+        await Promise.all(
+          favs.slice(0, 6).map(async (fav) => {
+            try {
+              const result = await productService.getAll({
+                CategoryId: fav.categoryId,
+                Status: 'Accepted',
+                Page: 1,
+                PageSize: 6,
+              });
+              productMap[fav.categoryId] = result.items || [];
+            } catch {
+              productMap[fav.categoryId] = [];
+            }
+          })
+        );
+        setFavoriteProducts(productMap);
+      }
+    } catch {
+      fetchLatestProducts();
+    } finally {
+      setLoadingFavorites(false);
     }
   };
 
@@ -119,10 +180,10 @@ export default function Home() {
 
             <div className="hero-tags">
               <span className="tag-label">Popular:</span>
-              <button className="tag-btn" onClick={() => setSearchQuery('iPhone')}>iPhone</button>
-              <button className="tag-btn" onClick={() => setSearchQuery('Motorcycle')}>Motorcycle</button>
-              <button className="tag-btn" onClick={() => setSearchQuery('Camera')}>Camera</button>
-              <button className="tag-btn" onClick={() => setSearchQuery('Laptop')}>Laptop</button>
+              <button className="tag-btn" onClick={() => handleTagClick('iPhone')}>iPhone</button>
+              <button className="tag-btn" onClick={() => handleTagClick('Motorcycle')}>Motorcycle</button>
+              <button className="tag-btn" onClick={() => handleTagClick('Camera')}>Camera</button>
+              <button className="tag-btn" onClick={() => handleTagClick('Laptop')}>Laptop</button>
             </div>
           </div>
 
@@ -160,7 +221,25 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="stats-section">
+      {/* Horizontal Category List */}
+      {categories.length > 0 && (
+        <section className="home-categories-section">
+          <div className="container">
+            <div className="home-categories-list">
+              {categories.map(cat => (
+                <Link to={`/category/${cat.categoryId}`} key={cat.categoryId} className="home-category-card">
+                  <div className="home-category-icon">
+                    {cat.imageUrl ? <img src={cat.imageUrl} alt={cat.name} /> : <span>🏷️</span>}
+                  </div>
+                  <span className="home-category-name">{cat.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="home-main-section">
         <div className="container stats-grid grid-4-col">
           <div className="stat-card glass-card">
             <h3>$3.5M+</h3>
@@ -258,6 +337,14 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Favorite Categories Modal */}
+      <FavoriteCategoriesModal
+        isOpen={showFavModal}
+        onClose={() => setShowFavModal(false)}
+        currentFavorites={favorites}
+        onUpdate={fetchFavorites}
+      />
     </div>
   );
 }

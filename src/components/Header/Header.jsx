@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import subscriptionService from '../../services/subscriptionService';
+import userSearchService from '../../services/userSearchService';
 
 import './Header.css';
 
@@ -13,6 +14,10 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchHistory, setSearchHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const searchRef = useRef(null);
+
   const [subscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [packages, setPackages] = useState([]);
@@ -41,10 +46,27 @@ export default function Header() {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setNotifOpen(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowHistory(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Fetch search history
+  useEffect(() => {
+    if (!user) return;
+    const fetchHistory = async () => {
+      try {
+        const data = await userSearchService.getHistory(10);
+        setSearchHistory(Array.isArray(data) ? data : []);
+      } catch {
+        // Silently fail
+      }
+    };
+    fetchHistory();
+  }, [user]);
 
   useEffect(() => {
     if (!subscriptionModalOpen) {
@@ -178,6 +200,50 @@ export default function Header() {
     }
   };
 
+  const handleSearchSubmit = async (e) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) return;
+
+    if (user) {
+      try {
+        await userSearchService.addSearch(searchTerm.trim());
+        const data = await userSearchService.getHistory(10);
+        setSearchHistory(Array.isArray(data) ? data : []);
+      } catch {
+        // Ignore
+      }
+    }
+    
+    setShowHistory(false);
+    navigate(`/product?search=${encodeURIComponent(searchTerm.trim())}`);
+  };
+
+  const handleHistoryClick = (keyword) => {
+    setSearchTerm(keyword);
+    setShowHistory(false);
+    navigate(`/product?search=${encodeURIComponent(keyword)}`);
+  };
+
+  const handleDeleteHistory = async (e, searchId) => {
+    e.stopPropagation();
+    try {
+      await userSearchService.deleteSearch(searchId);
+      setSearchHistory(prev => prev.filter(h => h.searchId !== searchId));
+    } catch {
+      showToast('Failed to delete search history.', 'error');
+    }
+  };
+
+  const handleClearAllHistory = async (e) => {
+    e.stopPropagation();
+    try {
+      await userSearchService.clearAll();
+      setSearchHistory([]);
+    } catch {
+      showToast('Failed to clear search history.', 'error');
+    }
+  };
+
   return (
     <>
       <header className="site-header glass-panel">
@@ -239,19 +305,52 @@ export default function Header() {
             </div>
           </nav>
 
-          <div className="header-search desktop-only-search">
+          <form className="header-search desktop-only-search" onSubmit={handleSearchSubmit} ref={searchRef} style={{ position: 'relative' }}>
             <div className="search-input-wrapper">
               <input
                 type="text"
                 className="search-input"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={() => user && searchHistory.length > 0 && setShowHistory(true)}
+                placeholder="Search products..."
               />
-              <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
+                <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
             </div>
-          </div>
+
+            {/* Search History Dropdown */}
+            {showHistory && searchHistory.length > 0 && (
+              <div className="search-history-dropdown">
+                <div className="search-history-header">
+                  <span>Recent Searches</span>
+                  <button type="button" className="search-history-clear-all" onClick={handleClearAllHistory}>Clear All</button>
+                </div>
+                {searchHistory.map(item => (
+                  <div
+                    key={item.searchId}
+                    className="search-history-item"
+                    onClick={() => handleHistoryClick(item.keyword)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <span className="search-history-keyword">{item.keyword}</span>
+                    <button
+                      type="button"
+                      className="search-history-delete"
+                      onClick={(e) => handleDeleteHistory(e, item.searchId)}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </form>
 
           <div className="header-actions">
             <button className="btn-subscription" onClick={() => setSubscriptionModalOpen(true)}>
