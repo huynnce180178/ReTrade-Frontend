@@ -1,15 +1,18 @@
-/* eslint-disable react/prop-types */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
-import '../SellerDashboard/SellerDashboard.css';
+import '../../../styles/SellerDashboard.css';
 
-const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateFormatter = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const pageSize = 10;
+const numberFormatter = new Intl.NumberFormat('vi-VN');
+const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
 
 const tabs = [
   { key: '', label: 'All Orders' },
@@ -124,14 +127,14 @@ export default function OrderManagement() {
   const lastVisibleItem = orders.length ? firstVisibleItem + orders.length - 1 : 0;
 
   const stats = useMemo(() => {
-    const pending = orders.filter((order) => order.status === 'Pending').length;
+    const awaiting = orders.filter((order) => order.status === 'AwaitingPayment' || order.status === 'Pending').length;
     const confirmed = orders.filter((order) => order.status === 'Confirmed').length;
     const shipping = orders.filter((order) => order.status === 'Shipping').length;
     const revenue = orders.reduce((sum, order) => sum + Number(order.finalAmount || 0), 0);
 
     return [
       { label: 'Total Orders', icon: 'shopping_cart', value: totalItems, note: 'All matched orders' },
-      { label: 'Need Confirm', icon: 'fact_check', value: pending, note: 'Waiting seller action', hot: true },
+      { label: 'Need Confirm', icon: 'fact_check', value: awaiting, note: 'Waiting seller action', hot: true },
       { label: 'Confirmed', icon: 'inventory', value: confirmed, note: 'Ready to ship' },
       { label: 'Shipping', icon: 'local_shipping', value: shipping, note: 'In transit' },
       { label: 'Revenue', icon: 'payments', value: compactMoney(revenue), note: 'Current page', dark: true },
@@ -143,6 +146,8 @@ export default function OrderManagement() {
     setAppliedSearchTerm(searchTerm.trim());
     setPage(1);
   };
+
+  const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
 
   const updateOrderStatus = async (order, status) => {
     try {
@@ -165,18 +170,18 @@ export default function OrderManagement() {
   if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
   return (
-    <SellerOrderShell user={user} activePath="/seller-dashboard/orders">
+    <div className="seller-orders-page animate-fade-in">
       <header className="seller-orders-hero">
         <div>
           <h1>Order Management</h1>
-          <p>Confirm orders, update fulfillment status, and keep buyers informed.</p>
+          <p>Track and fulfill your ReTrade sales performance.</p>
         </div>
         <form className="seller-orders-search" onSubmit={handleSearch}>
           <span className="material-symbols-outlined">search</span>
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search order code, tracking, or product..."
+            placeholder="Search orders, products, or customers..."
           />
         </form>
       </header>
@@ -199,7 +204,7 @@ export default function OrderManagement() {
           <div>
             {tabs.map((tab) => (
               <button
-                key={tab.key || 'all'}
+                key={tab.label}
                 type="button"
                 className={activeStatus === tab.key ? 'active' : ''}
                 onClick={() => {
@@ -217,19 +222,23 @@ export default function OrderManagement() {
           <table className="seller-orders-table">
             <thead>
               <tr>
-                <th>Order</th>
+                <th>Order ID & Date</th>
                 <th>Customer</th>
-                <th>Product</th>
-                <th>Total</th>
+                <th>Product Details</th>
+                <th>Total Amount</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="6"><div className="seller-orders-empty">Loading orders...</div></td></tr>
+                <tr>
+                  <td colSpan="6"><div className="seller-orders-empty">Loading orders...</div></td>
+                </tr>
               ) : orders.length === 0 ? (
-                <tr><td colSpan="6"><div className="seller-orders-empty">No orders found.</div></td></tr>
+                <tr>
+                  <td colSpan="6"><div className="seller-orders-empty">No seller orders found.</div></td>
+                </tr>
               ) : (
                 orders.map((order) => {
                   const meta = statusMeta[order.status] || { label: order.status || 'Unknown', className: 'default' };
@@ -261,7 +270,7 @@ export default function OrderManagement() {
                       <td><em className={`seller-order-status ${meta.className}`}>{meta.label}</em></td>
                       <td>
                         <div className="seller-order-actions">
-                          <button type="button" aria-label="View order" onClick={() => navigate(`/seller-dashboard/orders/${order.orderId}`)}>
+                          <button type="button" aria-label="View order" onClick={() => openDetail(order.orderId)}>
                             <span className="material-symbols-outlined">visibility</span>
                           </button>
                           {action ? (
@@ -274,7 +283,7 @@ export default function OrderManagement() {
                               {updatingId === order.orderId ? 'Updating...' : action.label}
                             </button>
                           ) : (
-                            <button type="button" className="primary-action muted" onClick={() => navigate(`/seller-dashboard/orders/${order.orderId}`)}>
+                            <button type="button" className="primary-action muted" onClick={() => openDetail(order.orderId)}>
                               Details
                             </button>
                           )}
@@ -315,58 +324,8 @@ export default function OrderManagement() {
           </nav>
         </footer>
       </section>
-    </SellerOrderShell>
-  );
-}
-
-export function SellerOrderShell({ user, activePath, children }) {
-  const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Seller';
-  const initials = displayName.slice(0, 2).toUpperCase();
-
-  return (
-    <div className="seller-dashboard-page">
-      <aside className="seller-dash-sidebar">
-        <div className="seller-dash-profile">
-          <div className="seller-dash-avatar">
-            {user.avatarUrl ? <img src={user.avatarUrl} alt={displayName} /> : initials}
-          </div>
-          <h3>{displayName}</h3>
-          <span>Pro Seller</span>
-        </div>
-
-        <nav className="seller-dash-menu">
-          <p>Main Menu</p>
-          <Link className={activePath === '/seller-dashboard' ? 'active' : ''} to="/seller-dashboard"><span className="material-symbols-outlined">dashboard</span>Dashboard</Link>
-          <Link to="/product"><span className="material-symbols-outlined">inventory_2</span>My Products</Link>
-          <Link to="/auction"><span className="material-symbols-outlined">gavel</span>Auction Manager</Link>
-          <Link className={activePath === '/seller-dashboard/orders' ? 'active' : ''} to="/seller-dashboard/orders"><span className="material-symbols-outlined">orders</span>Orders</Link>
-          <Link to="/support"><span className="material-symbols-outlined">mail</span>Messages</Link>
-          <p>Information</p>
-          <Link to="/profile"><span className="material-symbols-outlined">person</span>Personal Information</Link>
-          <Link to={`/sellers/${user.userId || user.accountId}`}><span className="material-symbols-outlined">store</span>Shop Manager</Link>
-          <Link to="/support"><span className="material-symbols-outlined">help</span>Help</Link>
-        </nav>
-      </aside>
-
-      <main className="seller-dash-main">{children}</main>
     </div>
   );
-}
-
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 4) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  if (currentPage <= 2) {
-    return [1, 2, 3, 'ellipsis'];
-  }
-
-  if (currentPage >= totalPages - 1) {
-    return ['ellipsis', totalPages - 2, totalPages - 1, totalPages];
-  }
-
-  return ['ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis'];
 }
 
 function formatDate(value) {
@@ -383,4 +342,20 @@ function compactMoney(value) {
 
 function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
+}
+
+function getPaginationItems(currentPage, totalPages) {
+  if (totalPages <= 4) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 2) {
+    return [1, 2, 3, 'ellipsis'];
+  }
+
+  if (currentPage >= totalPages - 1) {
+    return ['ellipsis', totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return ['ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis'];
 }

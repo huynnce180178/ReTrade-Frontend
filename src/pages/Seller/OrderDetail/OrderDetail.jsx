@@ -4,11 +4,10 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
-import { SellerOrderShell } from '../OrderManagement/OrderManagement';
-import '../SellerDashboard/SellerDashboard.css';
+import '../../../styles/SellerDashboard.css';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
+const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
@@ -45,6 +44,8 @@ const statusClass = {
   Returned: 'returned',
   Cancelled: 'cancelled',
 };
+
+const statusOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered'];
 
 export default function OrderDetail() {
   const { orderId } = useParams();
@@ -101,7 +102,7 @@ export default function OrderDetail() {
         return;
       }
 
-      setOrder((value) => value ? { ...value, ...payload } : value);
+      setOrder((value) => (value ? { ...value, ...payload } : value));
       loadOrder();
     };
 
@@ -130,12 +131,15 @@ export default function OrderDetail() {
     };
   }, [isSeller, loadOrder, orderId, user?.userId]);
 
-  const totals = useMemo(() => ({
-    subtotal: Number(order?.totalAmount || 0),
-    shipping: Number(order?.shippingFee || 0),
-    discount: Number(order?.discountAmount || 0),
-    final: Number(order?.finalAmount || 0),
-  }), [order]);
+  const totals = useMemo(
+    () => ({
+      subtotal: Number(order?.totalAmount || 0),
+      shipping: Number(order?.shippingFee || 0),
+      discount: Number(order?.discountAmount || 0),
+      final: Number(order?.finalAmount || 0),
+    }),
+    [order]
+  );
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -172,7 +176,7 @@ export default function OrderDetail() {
   if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
   return (
-    <SellerOrderShell user={user} activePath="/seller-dashboard/orders">
+    <div className="seller-order-detail-page animate-fade-in">
       <div className="seller-order-breadcrumb">
         <Link to="/seller-dashboard/orders">Orders</Link>
         <strong>{order?.orderCode || orderId}</strong>
@@ -192,7 +196,7 @@ export default function OrderDetail() {
                   {statusLabels[order.status] || order.status}
                 </em>
               </div>
-              <p>Created {formatDate(order.createdAt)} • Buyer {order.buyerName || 'Unknown Buyer'}</p>
+              <p>Created {formatDateTime(order.createdAt)} • Buyer {order.buyerName || 'Unknown Buyer'}</p>
             </div>
             <Link className="seller-order-back-btn" to="/seller-dashboard/orders">
               <span className="material-symbols-outlined">arrow_back</span>
@@ -278,7 +282,7 @@ export default function OrderDetail() {
                 <dl>
                   <div><dt>Provider</dt><dd>{order.shippingProvider || '-'}</dd></div>
                   <div><dt>Tracking</dt><dd>{order.trackingCode || '-'}</dd></div>
-                  <div><dt>Expected</dt><dd>{formatDate(order.expectedDeliveryTime)}</dd></div>
+                  <div><dt>Expected</dt><dd>{formatDateTime(order.expectedDeliveryTime)}</dd></div>
                 </dl>
               </article>
 
@@ -294,13 +298,13 @@ export default function OrderDetail() {
           </div>
         </>
       )}
-    </SellerOrderShell>
+    </div>
   );
 }
 
-function formatDate(value) {
+function formatDateTime(value) {
   if (!value) return '-';
-  return dateFormatter.format(new Date(value));
+  return dateTimeFormatter.format(new Date(value));
 }
 
 function formatVnd(value) {

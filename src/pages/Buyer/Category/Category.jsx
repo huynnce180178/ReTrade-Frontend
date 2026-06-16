@@ -41,6 +41,7 @@ export default function Category() {
   const [description, setDescription] = useState('');
   const [parentId, setParentId] = useState('');
   const [attributes, setAttributes] = useState([]); // Array of { attributeId, name, dataType, isRequired }
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
@@ -228,8 +229,15 @@ export default function Category() {
         attributeId: attr.attributeId,
         name: attr.name || '',
         dataType: attr.dataType || 'String',
-        isRequired: attr.isRequired || false
-      }));
+        isRequired: attr.isRequired || false,
+        minValue: attr.minValue !== undefined && attr.minValue !== null ? attr.minValue : null,
+        maxValue: attr.maxValue !== undefined && attr.maxValue !== null ? attr.maxValue : null,
+        unit: attr.unit || '',
+        displayOrder: attr.displayOrder || 0,
+        isFilterable: attr.isFilterable || false,
+        isSearchable: attr.isSearchable || false
+      }))
+      .sort((a, b) => a.displayOrder - b.displayOrder);
     setAttributes(activeAttrs);
     setSelectedImageFile(null);
     setImagePreview(category.imageUrl || '');
@@ -237,7 +245,18 @@ export default function Category() {
   };
 
   const handleAddAttributeRow = () => {
-    setAttributes([...attributes, { attributeId: '', name: '', dataType: 'String', isRequired: false }]);
+    setAttributes([...attributes, { 
+      attributeId: '', 
+      name: '', 
+      dataType: 'String', 
+      isRequired: false,
+      minValue: null,
+      maxValue: null,
+      unit: '',
+      displayOrder: attributes.length + 1,
+      isFilterable: false,
+      isSearchable: false
+    }]);
   };
 
   const handleAttributeChange = (index, field, value) => {
@@ -249,6 +268,32 @@ export default function Category() {
   const handleRemoveAttributeRow = (index) => {
     const updated = attributes.filter((_, i) => i !== index);
     setAttributes(updated);
+  };
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Add small visual delay or effect
+    e.currentTarget.classList.add('dragging');
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const updated = [...attributes];
+    const draggedItem = updated[draggedIndex];
+    
+    updated.splice(draggedIndex, 1);
+    updated.splice(index, 0, draggedItem);
+    
+    setDraggedIndex(index);
+    setAttributes(updated);
+  };
+
+  const handleDragEnd = (e) => {
+    e.currentTarget.classList.remove('dragging');
+    setDraggedIndex(null);
   };
 
   const handleSaveCategory = async (e) => {
@@ -270,11 +315,17 @@ export default function Category() {
       name: name.trim(),
       description: description.trim(),
       parentId: parentId || null,
-      attributes: attributes.map(a => ({
+      attributes: attributes.map((a, index) => ({
         attributeId: a.attributeId || null,
         name: a.name.trim(),
         dataType: a.dataType,
-        isRequired: a.isRequired
+        isRequired: a.isRequired,
+        minValue: a.dataType === 'Number' && a.minValue !== '' && a.minValue !== null ? parseFloat(a.minValue) : null,
+        maxValue: a.dataType === 'Number' && a.maxValue !== '' && a.maxValue !== null ? parseFloat(a.maxValue) : null,
+        unit: a.unit?.trim() || null,
+        displayOrder: index + 1,
+        isFilterable: a.isFilterable || false,
+        isSearchable: a.isSearchable || false
       }))
     };
 
@@ -422,7 +473,7 @@ export default function Category() {
                       <span className={`status-indicator ${cat.status?.toLowerCase() === 'active' ? 'active' : 'inactive'}`}></span>
                       <span className="category-item-name">{cat.name}</span>
                     </div>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{cat.categoryId}</span>
+                    {isAdminView && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{cat.categoryId}</span>}
                   </div>
                 ))}
               </div>
@@ -459,9 +510,11 @@ export default function Category() {
                     onChange={handleImageChange}
                   />
                   <div className="detail-title-block">
-                    <span className={`badge ${selectedCategory.status === 'Active' ? 'badge-success' : 'badge-danger'}`} style={{ marginBottom: '8px' }}>
-                      {selectedCategory.status}
-                    </span>
+                    {isAdminView && (
+                      <span className={`badge ${selectedCategory.status === 'Active' ? 'badge-success' : 'badge-danger'}`} style={{ marginBottom: '8px' }}>
+                        {selectedCategory.status}
+                      </span>
+                    )}
                     <h2>{selectedCategory.name}</h2>
                   </div>
                 </div>
@@ -484,59 +537,101 @@ export default function Category() {
                 )}
               </div>
 
-              <div className="detail-meta-grid">
-                <div className="meta-item">
-                  <span className="meta-label">Category ID</span>
-                  <span className="meta-value">{selectedCategory.categoryId}</span>
+              {isAdminView && (
+                <div className="detail-meta-grid">
+                  <div className="meta-item">
+                    <span className="meta-label">Category ID</span>
+                    <span className="meta-value">{selectedCategory.categoryId}</span>
+                  </div>
+                  <div className="meta-item">
+                    <span className="meta-label">Parent ID</span>
+                    <span className="meta-value">{selectedCategory.parentId || 'None (Root)'}</span>
+                  </div>
+                  <div className="meta-item">
+                    <span className="meta-label">Created At</span>
+                    <span className="meta-value">{selectedCategory.createdAt ? new Date(selectedCategory.createdAt).toLocaleString() : 'N/A'}</span>
+                  </div>
+                  <div className="meta-item">
+                    <span className="meta-label">Updated At</span>
+                    <span className="meta-value">{selectedCategory.updatedAt ? new Date(selectedCategory.updatedAt).toLocaleString() : 'N/A'}</span>
+                  </div>
                 </div>
-                <div className="meta-item">
-                  <span className="meta-label">Parent ID</span>
-                  <span className="meta-value">{selectedCategory.parentId || 'None (Root)'}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-label">Created At</span>
-                  <span className="meta-value">{selectedCategory.createdAt ? new Date(selectedCategory.createdAt).toLocaleString() : 'N/A'}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-label">Updated At</span>
-                  <span className="meta-value">{selectedCategory.updatedAt ? new Date(selectedCategory.updatedAt).toLocaleString() : 'N/A'}</span>
-                </div>
-              </div>
+              )}
 
               <div className="description-section">
                 <h4>Description</h4>
                 <p className="description-text">{selectedCategory.description || 'No description provided.'}</p>
               </div>
 
-              <div className="attributes-section">
-                <h4>Specifications & Attributes</h4>
-                {!selectedCategory.attributes || selectedCategory.attributes.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No attributes specified for this category.</p>
-                ) : (
-                  <div className="attributes-table-wrapper">
-                    <table className="attributes-table">
-                      <thead>
-                        <tr>
-                          <th>Attribute ID</th>
-                          <th>Name</th>
-                          <th>Data Type</th>
-                          <th>Required</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedCategory.attributes.map((attr) => (
-                          <tr key={attr.attributeId}>
-                            <td><code>{attr.attributeId}</code></td>
-                            <td style={{ fontWeight: 600 }}>{attr.name}</td>
-                            <td><span className="badge badge-success" style={{ background: 'rgba(11, 148, 133, 0.08)', color: 'var(--accent)', border: 'none' }}>{attr.dataType}</span></td>
-                            <td>{attr.isRequired ? 'Yes' : 'No'}</td>
+              {isAdminView && (
+                <div className="attributes-section">
+                  <h4>Specifications & Attributes</h4>
+                  {!selectedCategory.attributes || selectedCategory.attributes.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No attributes specified for this category.</p>
+                  ) : (
+                    <div className="attributes-table-wrapper" style={{ overflowX: 'auto' }}>
+                      <table className="attributes-table">
+                        <thead>
+                          <tr>
+                            <th>Order</th>
+                            <th>Attribute ID</th>
+                            <th>Name</th>
+                            <th>Data Type</th>
+                            <th>Required</th>
+                            <th>Unit</th>
+                            <th>Validation (Min/Max)</th>
+                            <th>UI Controls</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                        </thead>
+                        <tbody>
+                          {[...(selectedCategory.attributes || [])]
+                            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                            .map((attr) => (
+                              <tr key={attr.attributeId}>
+                                <td><strong>#{attr.displayOrder || '-'}</strong></td>
+                                <td><code>{attr.attributeId}</code></td>
+                                <td style={{ fontWeight: 600 }}>{attr.name}</td>
+                                <td>
+                                  <span className="badge badge-success" style={{ background: 'rgba(11, 148, 133, 0.08)', color: 'var(--accent)', border: 'none' }}>
+                                    {attr.dataType}
+                                  </span>
+                                </td>
+                                <td>{attr.isRequired ? 'Yes' : 'No'}</td>
+                                <td>{attr.unit || '-'}</td>
+                                <td>
+                                  {attr.dataType === 'Number' && (attr.minValue !== null || attr.maxValue !== null) ? (
+                                    <span style={{ fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                                      {attr.minValue !== null && `Min: ${attr.minValue}`}
+                                      {attr.minValue !== null && attr.maxValue !== null && <br />}
+                                      {attr.maxValue !== null && `Max: ${attr.maxValue}`}
+                                    </span>
+                                  ) : (
+                                    '-'
+                                  )}
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                    {attr.isFilterable && (
+                                      <span className="badge badge-info" style={{ fontSize: '10px', padding: '2px 6px', width: 'fit-content' }}>
+                                        Filterable
+                                      </span>
+                                    )}
+                                    {attr.isSearchable && (
+                                      <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', width: 'fit-content' }}>
+                                        Searchable
+                                      </span>
+                                    )}
+                                    {!attr.isFilterable && !attr.isSearchable && <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="no-selection-card">
@@ -643,36 +738,109 @@ export default function Category() {
                       </p>
                     ) : (
                       attributes.map((attr, idx) => (
-                        <div key={idx} className="attribute-row-input">
-                          <input 
-                            type="text" 
-                            className="form-input" 
-                            placeholder="Attribute Name (e.g. Size)" 
-                            value={attr.name}
-                            onChange={(e) => handleAttributeChange(idx, 'name', e.target.value)}
-                            required
-                          />
-                          <select 
-                            className="form-input" 
-                            value={attr.dataType}
-                            onChange={(e) => handleAttributeChange(idx, 'dataType', e.target.value)}
-                          >
-                            <option value="String">String</option>
-                            <option value="Number">Number</option>
-                            <option value="Boolean">Boolean</option>
-                            <option value="DateTime">DateTime</option>
-                          </select>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                        <div 
+                          key={idx} 
+                          className={`attribute-card-item ${draggedIndex === idx ? 'dragging' : ''}`}
+                          draggable="true"
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragOver={(e) => handleDragOver(e, idx)}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <div className="attribute-card-header">
+                            <div className="drag-handle" title="Drag to reorder">
+                              <span className="material-symbols-outlined">drag_indicator</span>
+                            </div>
                             <input 
-                              type="checkbox" 
-                              checked={attr.isRequired}
-                              onChange={(e) => handleAttributeChange(idx, 'isRequired', e.target.checked)}
+                              type="text" 
+                              className="form-input attr-name-input" 
+                              placeholder="Attribute Name (e.g. Size)" 
+                              value={attr.name}
+                              onChange={(e) => handleAttributeChange(idx, 'name', e.target.value)}
+                              required
                             />
-                            Required
-                          </label>
-                          <button type="button" className="attr-action-btn" onClick={() => handleRemoveAttributeRow(idx)}>
-                            <span className="material-symbols-outlined">delete</span>
-                          </button>
+                            <select 
+                              className="form-input attr-type-select" 
+                              value={attr.dataType}
+                              onChange={(e) => handleAttributeChange(idx, 'dataType', e.target.value)}
+                            >
+                              <option value="String">String</option>
+                              <option value="Number">Number</option>
+                              <option value="Boolean">Boolean</option>
+                              <option value="DateTime">DateTime</option>
+                            </select>
+                            <button type="button" className="attr-action-btn" onClick={() => handleRemoveAttributeRow(idx)} title="Delete attribute">
+                              <span className="material-symbols-outlined">delete</span>
+                            </button>
+                          </div>
+                          
+                          <div className="attribute-card-settings">
+                            <div className="settings-field">
+                              <label>Unit</label>
+                              <input 
+                                type="text" 
+                                className="form-input input-sm" 
+                                placeholder="e.g. kg, GB, px" 
+                                value={attr.unit || ''}
+                                onChange={(e) => handleAttributeChange(idx, 'unit', e.target.value)}
+                              />
+                            </div>
+                            
+                            {attr.dataType === 'Number' && (
+                              <>
+                                <div className="settings-field">
+                                  <label>Min Value</label>
+                                  <input 
+                                    type="number" 
+                                    step="any"
+                                    className="form-input input-sm" 
+                                    placeholder="Min" 
+                                    value={attr.minValue !== null && attr.minValue !== undefined ? attr.minValue : ''}
+                                    onChange={(e) => handleAttributeChange(idx, 'minValue', e.target.value === '' ? null : e.target.value)}
+                                  />
+                                </div>
+                                <div className="settings-field">
+                                  <label>Max Value</label>
+                                  <input 
+                                    type="number" 
+                                    step="any"
+                                    className="form-input input-sm" 
+                                    placeholder="Max" 
+                                    value={attr.maxValue !== null && attr.maxValue !== undefined ? attr.maxValue : ''}
+                                    onChange={(e) => handleAttributeChange(idx, 'maxValue', e.target.value === '' ? null : e.target.value)}
+                                  />
+                                </div>
+                              </>
+                            )}
+                            
+                            <div className="checkboxes-group">
+                              <label className="checkbox-label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={attr.isRequired || false}
+                                  onChange={(e) => handleAttributeChange(idx, 'isRequired', e.target.checked)}
+                                />
+                                <span>Required</span>
+                              </label>
+                              
+                              <label className="checkbox-label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={attr.isFilterable || false}
+                                  onChange={(e) => handleAttributeChange(idx, 'isFilterable', e.target.checked)}
+                                />
+                                <span>Filterable</span>
+                              </label>
+                              
+                              <label className="checkbox-label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={attr.isSearchable || false}
+                                  onChange={(e) => handleAttributeChange(idx, 'isSearchable', e.target.checked)}
+                                />
+                                <span>Searchable</span>
+                              </label>
+                            </div>
+                          </div>
                         </div>
                       ))
                     )}
