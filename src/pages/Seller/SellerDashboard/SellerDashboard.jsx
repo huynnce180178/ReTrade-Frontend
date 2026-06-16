@@ -4,10 +4,7 @@ import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 
-const moneyFormatter = new Intl.NumberFormat('vi-VN', {
-  style: 'currency',
-  currency: 'VND',
-});
+const numberFormatter = new Intl.NumberFormat('vi-VN');
 
 const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
   day: '2-digit',
@@ -609,7 +606,7 @@ export default function SellerDashboard() {
                               {isAuction ? (
                                 <span className="badge-auct">Auction</span>
                               ) : (
-                                <strong>{p.price ? moneyFormatter.format(p.price) : 'Contact'}</strong>
+                                <strong>{p.price ? formatVnd(p.price) : 'Contact'}</strong>
                               )}
                             </td>
                             <td>{p.stockQuantity}</td>
@@ -906,4 +903,8 @@ export default function SellerDashboard() {
         )}
     </>
   );
+}
+
+function formatVnd(value) {
+  return `${numberFormatter.format(Number(value || 0))} VND`;
 }

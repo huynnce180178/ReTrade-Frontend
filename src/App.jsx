@@ -28,6 +28,8 @@ import SellerLayout from './layouts/SellerLayout/SellerLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
+import OrderManagement from './pages/Seller/OrderManagement/OrderManagement';
+import OrderDetail from './pages/Seller/OrderDetail/OrderDetail';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 import Listings from './pages/Admin/Listings/Listings';
 
@@ -48,6 +50,8 @@ function App() {
                 <Route path="sellers/:sellerId" element={<SellerProfile />} />
                 <Route path="seller-dashboard" element={<SellerLayout />}>
                   <Route index element={<SellerDashboard />} />
+                  <Route path="orders" element={<OrderManagement />} />
+                  <Route path="orders/:orderId" element={<OrderDetail />} />
                 </Route>
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />

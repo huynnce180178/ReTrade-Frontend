@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Link, Navigate, Outlet } from 'react-router-dom';
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/SellerDashboard.css';
 
 export default function SellerLayout() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
@@ -39,20 +41,32 @@ export default function SellerLayout() {
           <p>Dashboard</p>
           <button
             type="button"
-            className={`seller-menu-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            className={`seller-menu-btn ${location.pathname === '/seller-dashboard' && activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('dashboard');
+              navigate('/seller-dashboard');
+            }}
           >
             <span className="material-symbols-outlined">dashboard</span>Overview
           </button>
           <button
             type="button"
-            className={`seller-menu-btn ${activeTab === 'products' ? 'active' : ''}`}
-            onClick={() => setActiveTab('products')}
+            className={`seller-menu-btn ${location.pathname === '/seller-dashboard' && activeTab === 'products' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('products');
+              navigate('/seller-dashboard');
+            }}
           >
             <span className="material-symbols-outlined">inventory_2</span>My Products
           </button>
           <Link to="/auction"><span className="material-symbols-outlined">gavel</span>Auction Room</Link>
-          <Link to="/purchase-history"><span className="material-symbols-outlined">orders</span>Order Management</Link>
+          <NavLink
+            to="/seller-dashboard/orders"
+            className={location.pathname.startsWith('/seller-dashboard/orders') ? 'active' : ''}
+            onClick={() => setActiveTab('orders')}
+          >
+            <span className="material-symbols-outlined">orders</span>Order Management
+          </NavLink>
           <p>Personal</p>
           <Link to="/profile"><span className="material-symbols-outlined">person</span>My Profile</Link>
         </nav>
