@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useAuth } from '../../../context/AuthContext';
 import productService from '../../../services/productService';
+import wishlistService from '../../../services/wishlistService';
 import '../../../styles/ProductDetail.css';
 
 function formatPrice(price) {
@@ -27,10 +29,58 @@ export default function ProductDetail() {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mainImageIndex, setMainImageIndex] = useState(0);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [togglingWishlist, setTogglingWishlist] = useState(false);
+
+  useEffect(() => {
+    const fetchWishlistStatus = async () => {
+      if (!user || !productId) return;
+      try {
+        const data = await wishlistService.getWishlist();
+        const item = (data.items ?? []).find(i => i.productId === productId);
+        setIsWishlisted(!!item);
+      } catch (err) {
+      }
+    };
+    fetchWishlistStatus();
+  }, [user, productId]);
+
+  const handleToggleWishlist = async () => {
+    if (!user) {
+      showToast('Please sign in to use the wishlist.', 'error');
+      return;
+    }
+    if (product?.sellerId === user.userId || product?.sellerId === user.id || product?.sellerId === user.accountId) {
+      showToast('You cannot add your own product to your wishlist.', 'error');
+      return;
+    }
+    setTogglingWishlist(true);
+    try {
+      if (isWishlisted) {
+        const data = await wishlistService.getWishlist();
+        const item = (data.items ?? []).find(i => i.productId === product.productId);
+        if (item) {
+          await wishlistService.removeItem(item.wishlistItemId);
+          setIsWishlisted(false);
+          showToast('Removed from wishlist.', 'success');
+        }
+      } else {
+        await wishlistService.addToWishlist(product.productId);
+        setIsWishlisted(true);
+        showToast('Added to wishlist!', 'success');
+      }
+    } catch (err) {
+      const msg = err.response?.data || err.message || 'Something went wrong.';
+      showToast(msg, 'error');
+    } finally {
+      setTogglingWishlist(false);
+    }
+  };
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -240,11 +290,19 @@ export default function ProductDetail() {
               </svg>
               Contact Seller
             </button>
-            <button className="btn btn-outline">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-              Wishlist
+            <button 
+              className={`btn ${isWishlisted ? 'btn-primary' : 'btn-outline'}`}
+              onClick={handleToggleWishlist}
+              disabled={togglingWishlist}
+            >
+              {togglingWishlist ? (
+                <span>⏳ </span>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={isWishlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              )}
+              {isWishlisted ? ' Wishlisted' : ' Wishlist'}
             </button>
           </div>
         </div>
