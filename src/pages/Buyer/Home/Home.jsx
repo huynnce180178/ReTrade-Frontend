@@ -1,14 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import productService from '../../../services/productService';
+import wishlistService from '../../../services/wishlistService';
+import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
 import '../../../styles/Home.css';
 
 export default function Home() {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [wishlistIds, setWishlistIds] = useState(new Set());
+  const [togglingId, setTogglingId] = useState(null);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       alert(`Searching for: "${searchQuery}"`);
+    }
+  };
+
+  const fetchProducts = useCallback(async () => {
+    setLoadingProducts(true);
+    try {
+      const res = await productService.getAll({ status: 'Accepted', pageSize: 8 });
+      setProducts(res.items ?? []);
+    } catch {
+      showToast('Failed to load products.', 'error');
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
+
+  const fetchWishlist = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await wishlistService.getWishlist();
+      const ids = new Set((data.items ?? []).map(i => i.productId));
+      setWishlistIds(ids);
+    } catch {
+    }
+  }, [user]);
+
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  useEffect(() => { fetchWishlist(); }, [fetchWishlist]);
+
+  const handleToggleWishlist = async (product) => {
+    if (!user) {
+      showToast('Please sign in to use the wishlist.', 'error');
+      return;
+    }
+    if (product.sellerId === user.userId || product.sellerId === user.id) {
+      showToast('You cannot add your own product to your wishlist.', 'error');
+      return;
+    }
+    setTogglingId(product.productId);
+    const isAdded = wishlistIds.has(product.productId);
+    try {
+      if (isAdded) {
+        const data = await wishlistService.getWishlist();
+        const item = (data.items ?? []).find(i => i.productId === product.productId);
+        if (item) {
+          await wishlistService.removeItem(item.wishlistItemId);
+          setWishlistIds(prev => { const n = new Set(prev); n.delete(product.productId); return n; });
+          showToast('Removed from wishlist.', 'success');
+        }
+      } else {
+        await wishlistService.addToWishlist(product.productId);
+        setWishlistIds(prev => new Set([...prev, product.productId]));
+        showToast('Added to wishlist!', 'success');
+      }
+    } catch (err) {
+      const msg = err.response?.data || err.message || 'Something went wrong.';
+      showToast(msg, 'error');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -40,6 +109,7 @@ export default function Home() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="search-input"
+                  placeholder="Search products…"
                 />
               </div>
               <button type="submit" className="btn btn-primary search-btn">
@@ -111,6 +181,44 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="products-section">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title">Latest <span className="gradient-primary-text">Products</span></h2>
+            <p className="section-subtitle">Fresh listings from verified sellers — save the ones you love.</p>
+          </div>
+
+          {loadingProducts ? (
+            <div className="home-products-loading">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="home-product-skeleton" />
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="home-products-empty">
+              <span>🛍️</span>
+              <p>No approved products yet. Check back soon!</p>
+            </div>
+          ) : (
+            <div className="home-products-grid">
+              {products.map(product => (
+                <HomeProductCard
+                  key={product.productId}
+                  product={product}
+                  isWishlisted={wishlistIds.has(product.productId)}
+                  toggling={togglingId === product.productId}
+                  onToggleWishlist={handleToggleWishlist}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="home-products-cta">
+            <Link to="/product" className="btn btn-outline">View All Products →</Link>
+          </div>
+        </div>
+      </section>
+
       <section className="features-section">
         <div className="container">
           <div className="section-header">
@@ -150,6 +258,48 @@ export default function Home() {
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) {
+  return (
+    <div className="home-product-card glass-card">
+      <div className="home-product-img-wrap">
+        {product.mainImageUrl ? (
+          <img src={product.mainImageUrl} alt={product.name} className="home-product-img" />
+        ) : (
+          <div className="home-product-img-placeholder">🛍️</div>
+        )}
+        <button
+          className={`home-wishlist-btn${isWishlisted ? ' active' : ''}`}
+          onClick={() => onToggleWishlist(product)}
+          disabled={toggling}
+          title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+        >
+          {toggling
+            ? <span className="home-wl-spinner" />
+            : <span className="material-symbols-outlined home-wishlist-heart">
+                {isWishlisted ? 'favorite' : 'favorite'}
+              </span>
+          }
+        </button>
+        {product.condition && (
+          <span className="home-product-condition">{product.condition}</span>
+        )}
+      </div>
+
+      <div className="home-product-body">
+        <p className="home-product-seller">{product.sellerName ?? 'Unknown Seller'}</p>
+        <h3 className="home-product-name">{product.name}</h3>
+        <div className="home-product-footer">
+          <span className="home-product-price">
+            {product.price != null
+              ? `${Number(product.price).toLocaleString('vi-VN')} ₫`
+              : 'Auction'}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import Product from './pages/Buyer/Product/Product';
 import Auction from './pages/Buyer/Auction/Auction';
 import PaymentResult from './pages/Buyer/PaymentResult/PaymentResult';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
+
 import Support from './pages/Buyer/Support/Support';
 import Category from './pages/Buyer/Category/Category';
 import AdminLayout from './layouts/AdminLayout/AdminLayout';
@@ -42,6 +43,7 @@ function App() {
                 <Route path="product" element={<Product />} />
                 <Route path="auction" element={<Auction />} />
                 <Route path="wishlist" element={<Wishlist />} />
+
                 <Route path="support" element={<Support />} />
                 <Route path="users/:userId" element={<UserProfile />} />
                 <Route path="sellers/:sellerId" element={<SellerProfile />} />
