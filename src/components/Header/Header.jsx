@@ -79,7 +79,7 @@ export default function Header() {
         }
       } catch (error) {
         console.error('Failed to load service packages:', error);
-        showToast('Không tải được danh sách gói dịch vụ.', 'error');
+        showToast('Failed to load subscription packages.', 'error');
       } finally {
         setLoadingPackages(false);
       }
@@ -127,7 +127,7 @@ export default function Header() {
           cardClass: 'sub-card featured-card',
           iconWrapClass: 'sub-icon-wrap member-bg',
           icon: 'storefront',
-          tagline: 'Mở khóa hành trình bán hàng trên ReTrade.',
+          tagline: 'Unlock your selling journey on ReTrade.',
           buttonClass: 'sub-card-btn white-btn',
           note: ''
         };
@@ -136,7 +136,7 @@ export default function Header() {
           cardClass: 'sub-card',
           iconWrapClass: 'sub-icon-wrap seller-bg',
           icon: 'local_offer',
-          tagline: 'Trải nghiệm tính năng voucher cho shop của bạn.',
+          tagline: 'Experience voucher features for your shop.',
           buttonClass: 'sub-card-btn primary-btn',
           note: ''
         };
@@ -145,7 +145,7 @@ export default function Header() {
           cardClass: 'sub-card dark-card',
           iconWrapClass: 'sub-icon-wrap featured-bg',
           icon: 'stars',
-          tagline: 'Tăng độ hiển thị và ưu tiên trên giao diện.',
+          tagline: 'Increase visibility and priority on the interface.',
           buttonClass: 'sub-card-btn green-btn',
           note: ''
         };
@@ -154,7 +154,7 @@ export default function Header() {
           cardClass: 'sub-card',
           iconWrapClass: 'sub-icon-wrap seller-bg',
           icon: 'workspace_premium',
-          tagline: 'Gói dịch vụ dành cho tài khoản của bạn.',
+          tagline: 'Subscription package for your account.',
           buttonClass: 'sub-card-btn primary-btn',
           note: ''
         };
@@ -169,7 +169,7 @@ export default function Header() {
 
   const handlePurchasePackage = async (serviceId) => {
     if (!user) {
-      showToast('Vui lòng đăng nhập để mua gói dịch vụ.', 'warning');
+      showToast('Please login to purchase a subscription package.', 'warning');
       setSubscriptionModalOpen(false);
       navigate('/login');
       return;
@@ -179,13 +179,13 @@ export default function Header() {
     try {
       const result = await subscriptionService.purchase(serviceId);
       if (!result?.paymentUrl) {
-        throw new Error('Không tạo được liên kết thanh toán.');
+        throw new Error('Failed to create payment link.');
       }
 
       window.location.href = result.paymentUrl;
     } catch (error) {
       console.error('Failed to create payment url:', error);
-      const message = error.response?.data?.message || error.response?.data || error.message || 'Không thể tạo thanh toán VNPAY.';
+      const message = error.response?.data?.message || error.response?.data || error.message || 'Failed to create VNPAY payment.';
       showToast(String(message), 'error');
     } finally {
       setPurchaseLoadingId('');
@@ -476,14 +476,14 @@ export default function Header() {
               <span className="material-symbols-outlined">close</span>
             </button>
             <div className="sub-modal-header">
-              <h2>Nâng tầm trải nghiệm của bạn</h2>
-              <p>Chọn gói dịch vụ phù hợp với vai trò của bạn và thanh toán ngay bằng VNPAY.</p>
+              <h2>Elevate your experience</h2>
+              <p>Choose a subscription package suitable for your role and pay immediately with VNPAY.</p>
             </div>
             <div className="sub-modal-grid">
               {loadingPackages ? (
-                <div className="sub-loading-state">Đang tải gói dịch vụ...</div>
+                <div className="sub-loading-state">Loading subscription packages...</div>
               ) : packages.length === 0 ? (
-                <div className="sub-empty-state">Chưa có gói dịch vụ nào để hiển thị.</div>
+                <div className="sub-empty-state">No subscription packages to display.</div>
               ) : (
                 packages.map((pkg, index) => {
                   const visual = getPackageVisual(pkg.serviceId);
@@ -498,7 +498,7 @@ export default function Header() {
 
                   return (
                     <div key={pkg.serviceId} className={visual.cardClass}>
-                      {pkg.serviceId === 'SERVICE_UPGRADE_SELLER' && <div className="popular-badge">PHỔ BIẾN</div>}
+                      {pkg.serviceId === 'SERVICE_UPGRADE_SELLER' && <div className="popular-badge">POPULAR</div>}
                       <div className="sub-card-header">
                         <div className={visual.iconWrapClass}>
                           <span className="material-symbols-outlined">{visual.icon}</span>
@@ -506,10 +506,10 @@ export default function Header() {
                         <h3>{pkg.name}</h3>
                         <p>{visual.tagline}</p>
                       </div>
-                      <div className="sub-role-badge">Đối tượng: {pkg.targetRole}</div>
+                      <div className="sub-role-badge">Target: {pkg.targetRole}</div>
                       <div className="sub-price">
                         <span className="price-num">{formatCurrency(pkg.price)}</span>
-                        <span className="price-period"> / {pkg.durationDays} ngày</span>
+                        <span className="price-period"> / {pkg.durationDays} days</span>
                       </div>
                       <ul className="sub-features">
                         {featureLines.map((feature, featureIndex) => (
@@ -526,7 +526,16 @@ export default function Header() {
                       {activePackage ? (
                         <button className="sub-card-btn white-btn active-package-btn" disabled>
                           <span className="material-symbols-outlined">verified</span>
-                          Đang kích hoạt (Còn {daysLeft} ngày)
+                          Activated ({daysLeft} days left)
+                        </button>
+                      ) : (user && user.roles && !user.roles.includes(pkg.targetRole)) ? (
+                        <button
+                          className={`${visual.buttonClass} role-blocked-btn`}
+                          disabled
+                          style={{ opacity: 0.5, cursor: 'not-allowed', padding: '10px' }}
+                          title={`This package is only available for ${pkg.targetRole} role`}
+                        >
+                          Requires purchasing {pkg.targetRole} package to buy this
                         </button>
                       ) : (
                         <button
@@ -534,7 +543,7 @@ export default function Header() {
                           disabled={purchaseLoadingId === pkg.serviceId}
                           onClick={() => handlePurchasePackage(pkg.serviceId)}
                         >
-                          {purchaseLoadingId === pkg.serviceId ? 'Đang chuyển đến VNPAY...' : 'Mua qua VNPAY'}
+                          {purchaseLoadingId === pkg.serviceId ? 'Redirecting to VNPAY...' : 'Buy via VNPAY'}
                         </button>
                       )}
                     </div>
