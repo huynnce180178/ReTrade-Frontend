@@ -75,14 +75,21 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px;
-  border: 1px solid rgba(113, 121, 117, 0.18);
-  border-radius: 4px;
-  background: #ffffff;
-  color: #36413d;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--secondary, #065f46) 0%, var(--primary, #02241b) 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.22);
   font-size: 13px;
   font-weight: 800;
   text-decoration: none;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.sod-back-btn:hover {
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.38);
+  transform: translateY(-2px);
 }
 
 .sod-back-btn .material-symbols-outlined {
@@ -185,6 +192,37 @@
   color: #0f7b5f;
 }
 
+.sod-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sod-snapshot-grid div {
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(113, 121, 117, 0.12);
+  border-radius: 6px;
+  background: rgba(2, 36, 27, 0.025);
+  padding: 14px 16px;
+}
+
+.sod-snapshot-grid span {
+  color: #7a8580;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sod-snapshot-grid strong {
+  color: #10251f;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .sod-status {
   display: inline-flex;
   align-items: center;
@@ -231,6 +269,109 @@
   color: #5c706b;
 }
 
+.sod-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: none;
+}
+
+.sod-timeline-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 74px;
+  padding-bottom: 20px;
+}
+
+.sod-timeline-step::before {
+  content: '';
+  position: absolute;
+  top: 32px;
+  left: 15px;
+  width: 2px;
+  height: calc(100% - 30px);
+  background: #dfe8e4;
+}
+
+.sod-timeline-step:last-child {
+  min-height: 38px;
+  padding-bottom: 0;
+}
+
+.sod-timeline-step:last-child::before {
+  display: none;
+}
+
+.sod-timeline-marker {
+  position: relative;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid #dfe8e4;
+  background: #ffffff;
+  color: #9ca9a3;
+}
+
+.sod-timeline-marker .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.sod-timeline-step.done .sod-timeline-marker,
+.sod-timeline-step.current .sod-timeline-marker {
+  border-color: #0f7b5f;
+  background: #0f7b5f;
+  color: #ffffff;
+}
+
+.sod-timeline-step.warning .sod-timeline-marker {
+  border-color: #d97706;
+  background: #fff7ed;
+  color: #a16207;
+}
+
+.sod-timeline-step.danger .sod-timeline-marker {
+  border-color: #b91c1c;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sod-timeline-step strong {
+  display: block;
+  margin-top: 1px;
+  color: #10251f;
+  font-family: var(--font-title, 'Playfair Display', serif);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.sod-timeline-step p {
+  margin: 4px 0 0;
+  color: #7a8580;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sod-timeline-step.current strong {
+  color: #0f7b5f;
+}
+
+.sod-timeline-step.pending {
+  opacity: 0.52;
+}
+
+.sod-timeline-step.pending strong {
+  color: #9ca9a3;
+}
+
 .sod-status-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -250,6 +391,12 @@
   text-transform: uppercase;
 }
 
+.sod-status-form label small {
+  color: #7a8580;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .sod-status-form input,
 .sod-status-form select {
   min-height: 42px;
@@ -259,6 +406,19 @@
   background: #ffffff;
   color: #10251f;
   font-family: var(--font-main, 'Manrope', sans-serif);
+  padding: 0 12px;
+}
+
+.sod-static-field {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(15, 123, 95, 0.16);
+  border-radius: 4px;
+  background: rgba(15, 123, 95, 0.06);
+  color: #0b5f49;
+  font-size: 13px;
+  font-weight: 900;
   padding: 0 12px;
 }
 
@@ -281,6 +441,18 @@
 .sod-status-form button:disabled {
   opacity: 0.7;
   cursor: wait;
+}
+
+.sod-locked-note {
+  margin: 0;
+  border: 1px solid rgba(113, 121, 117, 0.14);
+  border-radius: 6px;
+  background: rgba(2, 36, 27, 0.03);
+  color: #60736c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 14px 16px;
 }
 
 .sod-side-card > strong {
@@ -375,6 +547,7 @@
   .sod-header,
   .sod-layout,
   .sod-item-row,
+  .sod-snapshot-grid,
   .sod-status-form {
     grid-template-columns: 1fr;
   }

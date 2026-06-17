@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
+import addressService from '../../../services/addressService';
+import AddressPopup from '../../../components/AddressPopup/AddressPopup';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 
@@ -11,22 +13,6 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
   month: '2-digit',
   year: 'numeric',
 });
-
-const metrics = [
-  { icon: 'payments', label: 'Revenue', value: 'VND 142.5M', trend: '+12%' },
-  { icon: 'groups', label: 'Views', value: '12,840', trend: '+8.2%' },
-  { icon: 'shopping_cart', label: 'Orders', value: '342', trend: '+5.4%' },
-  { icon: 'conversion_path', label: 'Conversion Rate', value: '2.68%', trend: '-0.4%', down: true },
-];
-
-const revenueBars = [
-  ['Jan', 48, 58],
-  ['Feb', 38, 54],
-  ['Mar', 66, 62],
-  ['Apr', 55, 60],
-  ['May', 70, 65],
-  ['Jun', 44, 61],
-];
 
 export default function SellerDashboard() {
   const { user, activeTab, setActiveTab } = useOutletContext();
@@ -60,6 +46,7 @@ export default function SellerDashboard() {
   const [dynamicAttributes, setDynamicAttributes] = useState({});
   // Validation errors (dictionary of field/attribute ID -> error message)
   const [validationErrors, setValidationErrors] = useState({});
+  const [isAddressPopupOpen, setIsAddressPopupOpen] = useState(false);
 
   // Validate single dynamic attribute
   const validateAttribute = (attr, val) => {
@@ -141,23 +128,40 @@ export default function SellerDashboard() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (user && activeTab === 'products') {
-      fetchMyProducts();
-    }
-  }, [activeTab, user]);
+  const [sellerSearch, setSellerSearch] = useState('');
+  const [sellerStatus, setSellerStatus] = useState('');
+  const [sellerSort, setSellerSort] = useState('newest');
 
   const fetchMyProducts = async () => {
     if (!user?.userId) return;
     try {
       setProductsLoading(true);
-      const res = await productService.getAll({ sellerId: user.userId });
+      const params = { 
+        sellerId: user.userId,
+        SortBy: sellerSort,
+        PageSize: 50 // Retrieve up to 50 for dashboard simplicity
+      };
+      if (sellerSearch.trim()) params.SearchTerm = sellerSearch.trim();
+      if (sellerStatus) params.Status = sellerStatus;
+
+      const res = await productService.getAll(params);
       setMyProducts(res?.items || []);
     } catch (e) {
       showToast('Failed to load your product list.', 'error');
     } finally {
       setProductsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (user && activeTab === 'products') {
+      fetchMyProducts();
+    }
+  }, [activeTab, user, sellerStatus, sellerSort]); // Search is handled by explicit button or can be added to deps
+
+  const handleSellerSearchSubmit = (e) => {
+    e.preventDefault();
+    fetchMyProducts();
   };
 
   const fetchCategories = async () => {
@@ -286,8 +290,7 @@ export default function SellerDashboard() {
     );
   };
 
-  // Setup form for New Product
-  const initNewProductForm = () => {
+  const openNewProductFormDirectly = () => {
     setFormData({
       name: '',
       categoryId: '',
@@ -306,6 +309,25 @@ export default function SellerDashboard() {
     setValidationErrors({});
     setSelectedProductId(null);
     setActiveTab('new-product');
+  };
+
+  // Setup form for New Product
+  const initNewProductForm = async () => {
+    try {
+      setProductsLoading(true);
+      const data = await addressService.getMyAddresses();
+      const addrList = Array.isArray(data) ? data : (data?.data || []);
+      if (addrList.length === 0) {
+        showToast('Bạn cần thêm địa chỉ trước khi tạo sản phẩm!', 'warning');
+        setIsAddressPopupOpen(true);
+        return;
+      }
+      openNewProductFormDirectly();
+    } catch (error) {
+      showToast('Không thể xác thực thông tin địa chỉ giao hàng.', 'error');
+    } finally {
+      setProductsLoading(false);
+    }
   };
 
   // Setup form for Edit Product
@@ -470,6 +492,36 @@ export default function SellerDashboard() {
     }
   };
 
+  const productStats = useMemo(() => {
+    const total = myProducts.length;
+    const approved = myProducts.filter((product) => product.status === 'Accepted').length;
+    const pending = myProducts.filter((product) => product.status === 'Pending' || product.status === 'Waiting').length;
+    const auctionReady = myProducts.filter((product) => product.status === 'Ready').length;
+    const sold = myProducts.filter((product) => product.status === 'Sold').length;
+    const rejected = myProducts.filter((product) => product.status === 'SaleRejected' || product.status === 'AuctionRejected').length;
+    const lowStock = myProducts.filter((product) => Number(product.stockQuantity || 0) <= 2 && product.status !== 'Sold').length;
+
+    return {
+      total,
+      approved,
+      pending,
+      auctionReady,
+      sold,
+      rejected,
+      lowStock,
+      approvalRate: total ? Math.round((approved / total) * 100) : 0,
+    };
+  }, [myProducts]);
+
+  const overviewMetrics = [
+    { icon: 'inventory_2', label: 'Total Listings', value: productStats.total, note: 'Products in your shop' },
+    { icon: 'verified', label: 'Approved', value: productStats.approved, note: 'Ready for buyers' },
+    { icon: 'hourglass_top', label: 'In Review', value: productStats.pending, note: 'Waiting platform action' },
+    { icon: 'priority_high', label: 'Low Stock', value: productStats.lowStock, note: 'Needs attention', hot: productStats.lowStock > 0 },
+  ];
+
+  const recentProducts = myProducts.slice(0, 4);
+
   return (
     <>
         {productsLoading && (
@@ -481,72 +533,127 @@ export default function SellerDashboard() {
         {/* VIEW 1: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
           <div className="tab-dashboard animate-fade-in">
-            <header className="seller-dash-header">
-              <div>
-                <h1>Seller Dashboard</h1>
-                <p>Manage your shop and track your sales growth.</p>
+            <header className="seller-overview-hero">
+              <div className="seller-overview-copy">
+                <span>Seller Overview</span>
+                <h1>Good to see you, {user?.firstName || user?.username || 'Seller'}.</h1>
+                <p>Keep listings healthy, prepare orders, and move quickly on products that need attention.</p>
               </div>
-              <button className="seller-list-btn" onClick={initNewProductForm}>
-                <span className="material-symbols-outlined">add</span>Add New Product
-              </button>
+              <div className="seller-overview-actions">
+                <button type="button" className="seller-list-btn" onClick={initNewProductForm}>
+                  <span className="material-symbols-outlined">add</span>Add New Product
+                </button>
+                <Link to="/seller-dashboard/orders">
+                  <span className="material-symbols-outlined">orders</span>Manage Orders
+                </Link>
+                <Link to="/seller-dashboard/sales-statistics">
+                  <span className="material-symbols-outlined">monitoring</span>Sales Statistics
+                </Link>
+              </div>
             </header>
 
             <section className="seller-metric-grid">
-              {metrics.map((metric) => (
-                <article key={metric.label} className="seller-metric-card">
+              {overviewMetrics.map((metric) => (
+                <article key={metric.label} className={`seller-metric-card ${metric.hot ? 'attention' : ''}`}>
                   <div className="seller-metric-top">
                     <span className="material-symbols-outlined">{metric.icon}</span>
-                    <em className={metric.down ? 'down' : ''}>{metric.trend}</em>
+                    <em>{metric.note}</em>
                   </div>
                   <p>{metric.label}</p>
-                  <strong>{metric.value}</strong>
+                  <strong>{String(metric.value).padStart(2, '0')}</strong>
                 </article>
               ))}
             </section>
 
-            <div className="seller-dashboard-grid">
-              <section className="seller-panel revenue-panel">
+            <div className="seller-overview-grid">
+              <section className="seller-panel seller-health-panel">
                 <div className="seller-panel-header">
                   <div>
-                    <h2>Revenue Chart</h2>
-                    <p>Analysis of actual revenue performance</p>
+                    <h2>Listing Health</h2>
+                    <p>Track approval, stock, and auction readiness from your current catalog.</p>
                   </div>
                 </div>
-                <div className="seller-chart">
-                  {revenueBars.map(([month, revenue, target]) => (
-                    <div className="seller-chart-month" key={month}>
-                      <div className="seller-bars">
-                        <span style={{ height: `${revenue}%` }}></span>
-                        <span className="target" style={{ height: `${target}%` }}></span>
-                      </div>
-                      <small>{month}</small>
+                <div className="seller-health-overview">
+                  <div className="seller-health-score">
+                    <strong>{productStats.approvalRate}%</strong>
+                    <span>Approval Rate</span>
+                  </div>
+                  <div className="seller-health-lines">
+                    <div>
+                      <span>Approved listings</span>
+                      <b>{productStats.approved}/{productStats.total || 0}</b>
+                      <i><em style={{ width: `${productStats.approvalRate}%` }} /></i>
                     </div>
-                  ))}
+                    <div>
+                      <span>Auction ready</span>
+                      <b>{productStats.auctionReady}</b>
+                      <i><em style={{ width: `${Math.min(100, productStats.auctionReady * 20)}%` }} /></i>
+                    </div>
+                    <div>
+                      <span>Needs fix</span>
+                      <b>{productStats.rejected + productStats.lowStock}</b>
+                      <i><em className="warning" style={{ width: `${Math.min(100, (productStats.rejected + productStats.lowStock) * 18)}%` }} /></i>
+                    </div>
+                  </div>
                 </div>
               </section>
 
-              <aside className="seller-side-stack">
-                <section className="seller-panel compact">
-                  <h2>Shipping Status</h2>
-                  <div className="seller-shipping-grid">
-                    <div><strong>03</strong><span>Pending Shipment</span></div>
-                    <div><strong>08</strong><span>Shipping</span></div>
-                    <div><strong>142</strong><span>Completed</span></div>
-                  </div>
-                </section>
-
-                <section className="seller-panel compact">
-                  <h2>Shop Performance</h2>
-                  <div className="seller-health">
-                    <strong>4.9<span>Rating</span></strong>
-                    <div>
-                      <p><span>Response Rate</span><b>98%</b></p>
-                      <p><span>On Time</span><b>94%</b></p>
-                    </div>
-                  </div>
-                </section>
-              </aside>
+              <section className="seller-panel seller-action-panel">
+                <h2>Today Focus</h2>
+                <div className="seller-focus-list">
+                  <button type="button" onClick={() => setActiveTab('products')}>
+                    <span className="material-symbols-outlined">inventory</span>
+                    <strong>Review product list</strong>
+                    <small>{productStats.pending} listing waiting for approval</small>
+                  </button>
+                  <Link to="/seller-dashboard/orders">
+                    <span className="material-symbols-outlined">local_shipping</span>
+                    <strong>Check fulfillment</strong>
+                    <small>Confirm and ship buyer orders</small>
+                  </Link>
+                  <button type="button" onClick={initNewProductForm}>
+                    <span className="material-symbols-outlined">add_box</span>
+                    <strong>Create new listing</strong>
+                    <small>Add photos, specs, and stock</small>
+                  </button>
+                </div>
+              </section>
             </div>
+
+            <section className="seller-panel seller-recent-panel">
+              <div className="seller-panel-header">
+                <div>
+                  <h2>Recent Listings</h2>
+                  <p>Newest products from your shop catalog.</p>
+                </div>
+                <button type="button" onClick={() => setActiveTab('products')}>View All</button>
+              </div>
+              {recentProducts.length === 0 ? (
+                <div className="seller-overview-empty">
+                  <span className="material-symbols-outlined">inventory</span>
+                  <strong>No listings yet</strong>
+                  <p>Start by creating your first product listing.</p>
+                </div>
+              ) : (
+                <div className="seller-recent-list">
+                  {recentProducts.map((product) => {
+                    const status = getStatusText(product.status);
+
+                    return (
+                      <article key={product.productId}>
+                        <img src={product.mainImageUrl || 'https://placehold.co/100'} alt={product.name} />
+                        <div>
+                          <strong>{product.name}</strong>
+                          <span>{product.categoryName || 'Uncategorized'} · Stock {product.stockQuantity ?? 0}</span>
+                        </div>
+                        <em className={`seller-status-chip ${status.cls}`}>{status.text}</em>
+                        <b>{product.price ? formatVnd(product.price) : 'Contact'}</b>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           </div>
         )}
 
@@ -564,12 +671,56 @@ export default function SellerDashboard() {
             </header>
 
             <section className="seller-panel">
+              <div className="seller-dash-filter-bar" style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <form onSubmit={handleSellerSearchSubmit} style={{ display: 'flex', flex: 1, minWidth: '250px', position: 'relative' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Search by product name..." 
+                    value={sellerSearch}
+                    onChange={(e) => setSellerSearch(e.target.value)}
+                    style={{ width: '100%', padding: '10px 40px 10px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)' }}
+                  />
+                  <button type="submit" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    <span className="material-symbols-outlined">search</span>
+                  </button>
+                </form>
+                
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <select 
+                    value={sellerStatus} 
+                    onChange={(e) => setSellerStatus(e.target.value)}
+                    style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="Pending">Pending Approval</option>
+                    <option value="Accepted">Approved (Sale)</option>
+                    <option value="Waiting">Pending Auction</option>
+                    <option value="Ready">Ready for Auction</option>
+                    <option value="SaleRejected">Sale Rejected</option>
+                    <option value="AuctionRejected">Auction Rejected</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+
+                  <select 
+                    value={sellerSort} 
+                    onChange={(e) => setSellerSort(e.target.value)}
+                    style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="seller-products-table-wrap">
                 {myProducts.length === 0 ? (
                   <div className="seller-empty-products">
                     <span className="material-symbols-outlined">inventory</span>
-                    <h3>You have not posted any products yet</h3>
-                    <p>Start increasing sales by posting your first product.</p>
+                    <h3>No products found</h3>
+                    <p>Try adjusting your filters or post a new product.</p>
                     <button className="seller-list-btn" style={{ marginTop: '16px' }} onClick={initNewProductForm}>Post Now</button>
                   </div>
                 ) : (
@@ -900,6 +1051,17 @@ export default function SellerDashboard() {
               </div>
             </form>
           </div>
+        )}
+
+        {isAddressPopupOpen && (
+          <AddressPopup 
+            onClose={() => setIsAddressPopupOpen(false)} 
+            onSelect={(selectedAddr) => {
+              setIsAddressPopupOpen(false);
+              showToast('Đã thêm địa chỉ thành công! Giờ bạn có thể tạo sản phẩm.', 'success');
+              openNewProductFormDirectly();
+            }} 
+          />
         )}
     </>
   );

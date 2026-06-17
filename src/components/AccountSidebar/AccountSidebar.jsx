@@ -30,6 +30,10 @@ export default function AccountSidebar() {
     return location.pathname === path ? 'active' : '';
   };
 
+  const isActiveSection = (path) => {
+    return location.pathname === path || location.pathname.startsWith(`${path}/`) ? 'active' : '';
+  };
+
   return (
     <aside className="profile-sidebar glass-panel">
       <div className="profile-avatar-section">
@@ -76,7 +80,7 @@ export default function AccountSidebar() {
         )}
 
         <p className="sidebar-group-title mt-4">Activity</p>
-        <Link to="/purchase-history" className={`menu-item ${isActive('/purchase-history')}`}>
+        <Link to="/purchase-history" className={`menu-item ${isActiveSection('/purchase-history')}`}>
           <span className="material-symbols-outlined">receipt_long</span>
           Purchase History
         </Link>

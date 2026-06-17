@@ -15,15 +15,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   minute: '2-digit',
 });
 
-const statusOptions = [
-  'AwaitingPayment',
-  'Pending',
-  'Confirmed',
-  'Shipping',
-  'Delivered',
-  'Returned',
-  'Cancelled',
-];
+const SHIPPING_PROVIDER = 'GHN';
 
 const statusLabels = {
   AwaitingPayment: 'Awaiting Payment',
@@ -45,8 +37,6 @@ const statusClass = {
   Cancelled: 'cancelled',
 };
 
-const statusOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered'];
-
 export default function OrderDetail() {
   const { orderId } = useParams();
   const { user, loading: authLoading } = useAuth();
@@ -54,13 +44,6 @@ export default function OrderDetail() {
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    status: 'Pending',
-    trackingCode: '',
-    shippingProvider: '',
-    expectedDeliveryTime: '',
-  });
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
@@ -74,12 +57,6 @@ export default function OrderDetail() {
       setLoading(true);
       const data = await orderService.getById(orderId, { sellerId: user.userId });
       setOrder(data);
-      setForm({
-        status: data?.status || 'Pending',
-        trackingCode: data?.trackingCode || '',
-        shippingProvider: data?.shippingProvider || '',
-        expectedDeliveryTime: toDateTimeInputValue(data?.expectedDeliveryTime),
-      });
     } catch (error) {
       showToast(error?.response?.data || 'Failed to load order detail.', 'error');
     } finally {
@@ -144,38 +121,7 @@ export default function OrderDetail() {
     }),
     [order]
   );
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!user?.userId) {
-      showToast('SellerId is missing. Please sign in again.', 'error');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const payload = {
-        status: form.status,
-        trackingCode: form.trackingCode || null,
-        shippingProvider: form.shippingProvider || null,
-        expectedDeliveryTime: form.expectedDeliveryTime ? new Date(form.expectedDeliveryTime).toISOString() : null,
-      };
-      const updated = await orderService.updateStatus(orderId, payload, { sellerId: user.userId });
-      setOrder(updated);
-      setForm({
-        status: updated?.status || form.status,
-        trackingCode: updated?.trackingCode || '',
-        shippingProvider: updated?.shippingProvider || '',
-        expectedDeliveryTime: toDateTimeInputValue(updated?.expectedDeliveryTime),
-      });
-      showToast('Order status updated successfully.', 'success');
-    } catch (error) {
-      showToast(error?.response?.data || 'Failed to update order status.', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const timeline = useMemo(() => getOrderTimeline(order), [order]);
 
   if (authLoading) {
     return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading order...</p></div>;
@@ -232,49 +178,42 @@ export default function OrderDetail() {
               </article>
 
               <article className="sod-card">
-                <h2><span className="material-symbols-outlined">published_with_changes</span>Update Status</h2>
-                <form className="sod-status-form" onSubmit={handleSubmit}>
-                  <label>
+                <h2><span className="material-symbols-outlined">receipt_long</span>Order Snapshot</h2>
+                <div className="sod-snapshot-grid">
+                  <div>
                     <span>Status</span>
-                    <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}>
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>{statusLabels[status]}</option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span>Tracking Code</span>
-                    <input
-                      value={form.trackingCode}
-                      onChange={(event) => setForm((value) => ({ ...value, trackingCode: event.target.value }))}
-                      placeholder="VD: GHN-123456"
-                    />
-                  </label>
-
-                  <label>
-                    <span>Shipping Provider</span>
-                    <input
-                      value={form.shippingProvider}
-                      onChange={(event) => setForm((value) => ({ ...value, shippingProvider: event.target.value }))}
-                      placeholder="VD: GHN, GHTK, Viettel Post"
-                    />
-                  </label>
-
-                  <label>
+                    <strong>{statusLabels[order.status] || order.status || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>Provider</span>
+                    <strong>{order.shippingProvider || SHIPPING_PROVIDER}</strong>
+                  </div>
+                  <div>
                     <span>Expected Delivery</span>
-                    <input
-                      type="datetime-local"
-                      value={form.expectedDeliveryTime}
-                      onChange={(event) => setForm((value) => ({ ...value, expectedDeliveryTime: event.target.value }))}
-                    />
-                  </label>
+                    <strong>{formatDateTime(order.expectedDeliveryTime)}</strong>
+                  </div>
+                  <div>
+                    <span>Updated</span>
+                    <strong>{formatDateTime(order.updatedAt)}</strong>
+                  </div>
+                </div>
+              </article>
 
-                  <button type="submit" disabled={saving}>
-                    <span className="material-symbols-outlined">save</span>
-                    {saving ? 'Saving...' : 'Save Status'}
-                  </button>
-                </form>
+              <article className="sod-card">
+                <h2><span className="material-symbols-outlined">local_shipping</span>Order Timeline</h2>
+                <ol className="sod-timeline">
+                  {timeline.map((step) => (
+                    <li key={step.key} className={`sod-timeline-step ${step.state}`}>
+                      <span className="sod-timeline-marker">
+                        <span className="material-symbols-outlined">{step.icon}</span>
+                      </span>
+                      <div>
+                        <strong>{step.title}</strong>
+                        <p>{step.detail}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               </article>
             </section>
 
@@ -283,14 +222,14 @@ export default function OrderDetail() {
                 <h3><span className="material-symbols-outlined">person</span>Buyer</h3>
                 <strong>{order.buyerName || 'Unknown Buyer'}</strong>
                 <p><span className="material-symbols-outlined">mail</span>{order.buyerEmail || '-'}</p>
-                <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || '-'}</p>
+                <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || getPhoneFromAddressSnapshot(order.addressSnapshot) || '-'}</p>
               </article>
 
               <article className="sod-side-card">
                 <h3><span className="material-symbols-outlined">local_shipping</span>Shipping</h3>
                 <dl>
-                  <div><dt>Provider</dt><dd>{order.shippingProvider || '-'}</dd></div>
-                  <div><dt>Tracking</dt><dd>{order.trackingCode || '-'}</dd></div>
+                  <div><dt>Provider</dt><dd>{order.shippingProvider || SHIPPING_PROVIDER}</dd></div>
+                  {order.trackingCode && <div><dt>Tracking</dt><dd>{order.trackingCode}</dd></div>}
                   <div><dt>Expected</dt><dd>{formatDateTime(order.expectedDeliveryTime)}</dd></div>
                 </dl>
               </article>
@@ -320,12 +259,84 @@ function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
-function toDateTimeInputValue(value) {
-  if (!value) return '';
+function getOrderTimeline(order) {
+  if (!order) return [];
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  if (order.status === 'Cancelled') {
+    return [
+      timelineStep('placed', 'Order Placed', formatDateTime(order.createdAt), 'done', 'check'),
+      timelineStep('cancelled', 'Order Cancelled', formatDateTime(order.updatedAt), 'danger', 'close'),
+    ];
+  }
 
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 16);
+  const rank = getStatusRank(order.status);
+  const steps = [
+    timelineStep('placed', 'Order Placed', formatDateTime(order.createdAt), 'done', 'check'),
+    timelineStep(
+      'payment',
+      'Payment Confirmed',
+      order.status === 'AwaitingPayment' ? 'Waiting for buyer payment' : formatDateTime(order.updatedAt || order.createdAt),
+      order.status === 'AwaitingPayment' ? 'current' : 'done',
+      order.status === 'AwaitingPayment' ? 'schedule' : 'check'
+    ),
+    timelineStep(
+      'confirmed',
+      'Seller Confirmed',
+      rank >= getStatusRank('Confirmed') ? formatDateTime(order.updatedAt) : 'Waiting for seller confirmation',
+      rank >= getStatusRank('Confirmed') ? 'done' : rank === getStatusRank('Pending') ? 'current' : 'pending',
+      rank >= getStatusRank('Confirmed') ? 'check' : 'inventory'
+    ),
+    timelineStep(
+      'shipping',
+      'In Transit',
+      rank >= getStatusRank('Shipping')
+        ? `Provider: ${order.shippingProvider || SHIPPING_PROVIDER}`
+        : 'Waiting for GHN handoff',
+      rank >= getStatusRank('Shipping') ? 'done' : rank === getStatusRank('Confirmed') ? 'current' : 'pending',
+      'local_shipping'
+    ),
+    timelineStep(
+      'delivered',
+      'Delivered',
+      rank >= getStatusRank('Delivered')
+        ? formatDateTime(order.updatedAt)
+        : `Estimated Delivery: ${formatDateTime(order.expectedDeliveryTime)}`,
+      rank >= getStatusRank('Delivered') ? 'done' : rank === getStatusRank('Shipping') ? 'current' : 'pending',
+      rank >= getStatusRank('Delivered') ? 'check' : 'radio_button_unchecked'
+    ),
+  ];
+
+  if (order.status === 'Returned') {
+    steps.push(timelineStep('returned', 'Returned', formatDateTime(order.updatedAt), 'warning', 'assignment_return'));
+  }
+
+  return steps;
+}
+
+function timelineStep(key, title, detail, state, icon) {
+  return { key, title, detail, state, icon };
+}
+
+function getStatusRank(status) {
+  const ranks = {
+    AwaitingPayment: 0,
+    Pending: 1,
+    Confirmed: 2,
+    Shipping: 3,
+    Delivered: 4,
+    Returned: 5,
+  };
+
+  return ranks[status] ?? 0;
+}
+
+function getPhoneFromAddressSnapshot(snapshot) {
+  if (!snapshot) return null;
+
+  const parts = String(snapshot)
+    .split(' - ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.find((part) => /^\d{9,12}$/.test(part)) || null;
 }

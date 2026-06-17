@@ -6,7 +6,7 @@
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 32px;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 992px) {
@@ -19,6 +19,7 @@
 .profile-sidebar {
   padding: 30px 20px;
   background: rgba(22, 28, 45, 0.4);
+  align-self: start;
 }
 
 .profile-avatar-section {
@@ -131,6 +132,7 @@
   border-radius: var(--border-radius-lg);
   font-family: var(--font-body, 'Manrope', sans-serif);
   color: #1a1c1c;
+  margin-top: 15px;
 }
 
 .ma-grid {

@@ -1,38 +1,31 @@
-const API_BASE = 'https://provinces.open-api.vn/api';
-
-const normalizeCode = (code) => String(code ?? '').padStart(2, '0');
-const normalizeWardCode = (code) => String(code ?? '').padStart(5, '0');
-
-const request = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to load Vietnam address data.');
-  }
-  return response.json();
-};
+import api from './api';
 
 const vietnamAddressService = {
   getProvinces: async () => {
-    const provinces = await request(`${API_BASE}/p/`);
-    return provinces.map((province) => ({
-      code: normalizeCode(province.code),
-      name: province.name,
+    const response = await api.get('/Address/provinces');
+    return (response.data || []).map((province) => ({
+      code: province.ProvinceID || province.provinceId || province.provinceID || province.ProvinceId || province.province_id,
+      name: province.ProvinceName || province.provinceName || province.ProvinceName || province.province_name,
     }));
   },
 
   getDistricts: async (provinceCode) => {
-    const province = await request(`${API_BASE}/p/${provinceCode}?depth=2`);
-    return (province.districts || []).map((district) => ({
-      code: normalizeCode(district.code),
-      name: district.name,
+    const response = await api.get('/Address/districts', {
+      params: { provinceId: Number(provinceCode) },
+    });
+    return (response.data || []).map((district) => ({
+      code: district.DistrictID || district.districtId || district.districtID || district.DistrictId || district.district_id,
+      name: district.DistrictName || district.districtName || district.DistrictName || district.district_name,
     }));
   },
 
   getWards: async (districtCode) => {
-    const district = await request(`${API_BASE}/d/${districtCode}?depth=2`);
-    return (district.wards || []).map((ward) => ({
-      code: normalizeWardCode(ward.code),
-      name: ward.name,
+    const response = await api.get('/Address/wards', {
+      params: { districtId: Number(districtCode) },
+    });
+    return (response.data || []).map((ward) => ({
+      code: ward.WardCode || ward.wardCode || ward.ward_code,
+      name: ward.WardName || ward.wardName || ward.ward_name,
     }));
   },
 };

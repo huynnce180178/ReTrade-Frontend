@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link, useParams } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
@@ -47,8 +47,9 @@ function SkeletonCard() {
   );
 }
 
-export default function Product() {
+export default function CategoryProductList() {
   const navigate = useNavigate();
+  const { categoryId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
 
@@ -95,15 +96,27 @@ export default function Product() {
     fetchCategories();
   }, []);
 
+  // Resolve category name from ID
+  useEffect(() => {
+    if (categoryId && categories.length > 0) {
+      const found = categories.find(c => c.categoryId === categoryId);
+      setCategoryName(found?.name || '');
+    } else {
+      setCategoryName('');
+    }
+  }, [categoryId, categories]);
+
   // Fetch products
   useEffect(() => {
     const fetchProducts = async () => {
+      if (!categoryId) return;
       setLoading(true);
       try {
         const params = {
           Status: 'Accepted',
           Page: currentPage,
           PageSize: 12,
+          CategoryId: categoryId
         };
         if (searchTerm) params.SearchTerm = searchTerm;
         if (condition) params.Condition = condition;
@@ -122,7 +135,7 @@ export default function Product() {
       }
     };
     fetchProducts();
-  }, [currentPage, searchTerm, condition, sortBy, minPriceParam, maxPriceParam]);
+  }, [currentPage, searchTerm, categoryId, condition, sortBy, minPriceParam, maxPriceParam]);
 
   // Update URL search params helper
   const updateParams = useCallback((updates) => {
@@ -221,15 +234,19 @@ export default function Product() {
       {/* Page Header */}
       <div className="product-page-header">
         <div className="product-page-header-left">
-          {searchTerm && (
-            <div className="product-breadcrumb">
-              <Link to="/">Home</Link>
-              <span className="breadcrumb-sep">›</span>
-              <span>Products</span>
-            </div>
-          )}
-          <h1>All Products</h1>
-          <p>Discover quality pre-owned goods from verified sellers</p>
+          <div className="product-breadcrumb">
+            <Link to="/">Home</Link>
+            <span className="breadcrumb-sep">›</span>
+            <Link to="/product">Products</Link>
+            {categoryName && (
+              <>
+                <span className="breadcrumb-sep">›</span>
+                <span>{categoryName}</span>
+              </>
+            )}
+          </div>
+          <h1>{categoryName || 'Category Products'}</h1>
+          <p>Discover quality pre-owned goods in this category</p>
         </div>
         <button className="mobile-filter-toggle" onClick={() => setShowMobileFilter(!showMobileFilter)}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -249,6 +266,39 @@ export default function Product() {
             Filters
           </div>
 
+          {/* Category Filter */}
+          <div className="filter-section">
+            <div className="filter-section-title">Category</div>
+            <div className="filter-category-list">
+              <div
+                className={`filter-category-item`}
+                onClick={() => navigate('/product')}
+              >
+                All Categories
+              </div>
+              {rootCategories.map(cat => (
+                <React.Fragment key={cat.categoryId}>
+                  <div
+                    className={`filter-category-item ${categoryId === cat.categoryId ? 'active' : ''}`}
+                    onClick={() => navigate(`/category/${cat.categoryId}`)}
+                  >
+                    {cat.imageUrl && <img src={cat.imageUrl} alt={cat.name} />}
+                    {cat.name}
+                  </div>
+                  {getCategoryChildren(cat.categoryId).map(child => (
+                    <div
+                      key={child.categoryId}
+                      className={`filter-category-item ${categoryId === child.categoryId ? 'active' : ''}`}
+                      style={{ paddingLeft: '32px', fontSize: '12px' }}
+                      onClick={() => navigate(`/category/${child.categoryId}`)}
+                    >
+                      {child.name}
+                    </div>
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
 
           {/* Price Range */}
           <div className="filter-section">
@@ -301,7 +351,7 @@ export default function Product() {
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </svg>
-              Reset All Filters
+              Reset Filters
             </button>
           )}
         </aside>
