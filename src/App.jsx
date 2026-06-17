@@ -35,6 +35,8 @@ import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
 import OrderManagement from './pages/Seller/OrderManagement/OrderManagement';
 import OrderDetail from './pages/Seller/OrderDetail/OrderDetail';
+import OrderStatusUpdate from './pages/Seller/OrderStatusUpdate/OrderStatusUpdate';
+import SalesStatistics from './pages/Seller/SalesStatistics/SalesStatistics';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 import Listings from './pages/Admin/Listings/Listings';
 
@@ -59,7 +61,9 @@ function App() {
                 <Route path="sellers/:sellerId" element={<SellerProfile />} />
                 <Route path="seller-dashboard" element={<SellerLayout />}>
                   <Route index element={<SellerDashboard />} />
+                  <Route path="sales-statistics" element={<SalesStatistics />} />
                   <Route path="orders" element={<OrderManagement />} />
+                  <Route path="orders/:orderId/status" element={<OrderStatusUpdate />} />
                   <Route path="orders/:orderId" element={<OrderDetail />} />
                 </Route>
                 <Route path="login" element={<Login />} />

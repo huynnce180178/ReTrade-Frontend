@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
@@ -11,22 +11,6 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
   month: '2-digit',
   year: 'numeric',
 });
-
-const metrics = [
-  { icon: 'payments', label: 'Revenue', value: 'VND 142.5M', trend: '+12%' },
-  { icon: 'groups', label: 'Views', value: '12,840', trend: '+8.2%' },
-  { icon: 'shopping_cart', label: 'Orders', value: '342', trend: '+5.4%' },
-  { icon: 'conversion_path', label: 'Conversion Rate', value: '2.68%', trend: '-0.4%', down: true },
-];
-
-const revenueBars = [
-  ['Jan', 48, 58],
-  ['Feb', 38, 54],
-  ['Mar', 66, 62],
-  ['Apr', 55, 60],
-  ['May', 70, 65],
-  ['Jun', 44, 61],
-];
 
 export default function SellerDashboard() {
   const { user, activeTab, setActiveTab } = useOutletContext();
@@ -487,6 +471,36 @@ export default function SellerDashboard() {
     }
   };
 
+  const productStats = useMemo(() => {
+    const total = myProducts.length;
+    const approved = myProducts.filter((product) => product.status === 'Accepted').length;
+    const pending = myProducts.filter((product) => product.status === 'Pending' || product.status === 'Waiting').length;
+    const auctionReady = myProducts.filter((product) => product.status === 'Ready').length;
+    const sold = myProducts.filter((product) => product.status === 'Sold').length;
+    const rejected = myProducts.filter((product) => product.status === 'SaleRejected' || product.status === 'AuctionRejected').length;
+    const lowStock = myProducts.filter((product) => Number(product.stockQuantity || 0) <= 2 && product.status !== 'Sold').length;
+
+    return {
+      total,
+      approved,
+      pending,
+      auctionReady,
+      sold,
+      rejected,
+      lowStock,
+      approvalRate: total ? Math.round((approved / total) * 100) : 0,
+    };
+  }, [myProducts]);
+
+  const overviewMetrics = [
+    { icon: 'inventory_2', label: 'Total Listings', value: productStats.total, note: 'Products in your shop' },
+    { icon: 'verified', label: 'Approved', value: productStats.approved, note: 'Ready for buyers' },
+    { icon: 'hourglass_top', label: 'In Review', value: productStats.pending, note: 'Waiting platform action' },
+    { icon: 'priority_high', label: 'Low Stock', value: productStats.lowStock, note: 'Needs attention', hot: productStats.lowStock > 0 },
+  ];
+
+  const recentProducts = myProducts.slice(0, 4);
+
   return (
     <>
         {productsLoading && (
@@ -498,72 +512,127 @@ export default function SellerDashboard() {
         {/* VIEW 1: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
           <div className="tab-dashboard animate-fade-in">
-            <header className="seller-dash-header">
-              <div>
-                <h1>Seller Dashboard</h1>
-                <p>Manage your shop and track your sales growth.</p>
+            <header className="seller-overview-hero">
+              <div className="seller-overview-copy">
+                <span>Seller Overview</span>
+                <h1>Good to see you, {user?.firstName || user?.username || 'Seller'}.</h1>
+                <p>Keep listings healthy, prepare orders, and move quickly on products that need attention.</p>
               </div>
-              <button className="seller-list-btn" onClick={initNewProductForm}>
-                <span className="material-symbols-outlined">add</span>Add New Product
-              </button>
+              <div className="seller-overview-actions">
+                <button type="button" className="seller-list-btn" onClick={initNewProductForm}>
+                  <span className="material-symbols-outlined">add</span>Add New Product
+                </button>
+                <Link to="/seller-dashboard/orders">
+                  <span className="material-symbols-outlined">orders</span>Manage Orders
+                </Link>
+                <Link to="/seller-dashboard/sales-statistics">
+                  <span className="material-symbols-outlined">monitoring</span>Sales Statistics
+                </Link>
+              </div>
             </header>
 
             <section className="seller-metric-grid">
-              {metrics.map((metric) => (
-                <article key={metric.label} className="seller-metric-card">
+              {overviewMetrics.map((metric) => (
+                <article key={metric.label} className={`seller-metric-card ${metric.hot ? 'attention' : ''}`}>
                   <div className="seller-metric-top">
                     <span className="material-symbols-outlined">{metric.icon}</span>
-                    <em className={metric.down ? 'down' : ''}>{metric.trend}</em>
+                    <em>{metric.note}</em>
                   </div>
                   <p>{metric.label}</p>
-                  <strong>{metric.value}</strong>
+                  <strong>{String(metric.value).padStart(2, '0')}</strong>
                 </article>
               ))}
             </section>
 
-            <div className="seller-dashboard-grid">
-              <section className="seller-panel revenue-panel">
+            <div className="seller-overview-grid">
+              <section className="seller-panel seller-health-panel">
                 <div className="seller-panel-header">
                   <div>
-                    <h2>Revenue Chart</h2>
-                    <p>Analysis of actual revenue performance</p>
+                    <h2>Listing Health</h2>
+                    <p>Track approval, stock, and auction readiness from your current catalog.</p>
                   </div>
                 </div>
-                <div className="seller-chart">
-                  {revenueBars.map(([month, revenue, target]) => (
-                    <div className="seller-chart-month" key={month}>
-                      <div className="seller-bars">
-                        <span style={{ height: `${revenue}%` }}></span>
-                        <span className="target" style={{ height: `${target}%` }}></span>
-                      </div>
-                      <small>{month}</small>
+                <div className="seller-health-overview">
+                  <div className="seller-health-score">
+                    <strong>{productStats.approvalRate}%</strong>
+                    <span>Approval Rate</span>
+                  </div>
+                  <div className="seller-health-lines">
+                    <div>
+                      <span>Approved listings</span>
+                      <b>{productStats.approved}/{productStats.total || 0}</b>
+                      <i><em style={{ width: `${productStats.approvalRate}%` }} /></i>
                     </div>
-                  ))}
+                    <div>
+                      <span>Auction ready</span>
+                      <b>{productStats.auctionReady}</b>
+                      <i><em style={{ width: `${Math.min(100, productStats.auctionReady * 20)}%` }} /></i>
+                    </div>
+                    <div>
+                      <span>Needs fix</span>
+                      <b>{productStats.rejected + productStats.lowStock}</b>
+                      <i><em className="warning" style={{ width: `${Math.min(100, (productStats.rejected + productStats.lowStock) * 18)}%` }} /></i>
+                    </div>
+                  </div>
                 </div>
               </section>
 
-              <aside className="seller-side-stack">
-                <section className="seller-panel compact">
-                  <h2>Shipping Status</h2>
-                  <div className="seller-shipping-grid">
-                    <div><strong>03</strong><span>Pending Shipment</span></div>
-                    <div><strong>08</strong><span>Shipping</span></div>
-                    <div><strong>142</strong><span>Completed</span></div>
-                  </div>
-                </section>
-
-                <section className="seller-panel compact">
-                  <h2>Shop Performance</h2>
-                  <div className="seller-health">
-                    <strong>4.9<span>Rating</span></strong>
-                    <div>
-                      <p><span>Response Rate</span><b>98%</b></p>
-                      <p><span>On Time</span><b>94%</b></p>
-                    </div>
-                  </div>
-                </section>
-              </aside>
+              <section className="seller-panel seller-action-panel">
+                <h2>Today Focus</h2>
+                <div className="seller-focus-list">
+                  <button type="button" onClick={() => setActiveTab('products')}>
+                    <span className="material-symbols-outlined">inventory</span>
+                    <strong>Review product list</strong>
+                    <small>{productStats.pending} listing waiting for approval</small>
+                  </button>
+                  <Link to="/seller-dashboard/orders">
+                    <span className="material-symbols-outlined">local_shipping</span>
+                    <strong>Check fulfillment</strong>
+                    <small>Confirm and ship buyer orders</small>
+                  </Link>
+                  <button type="button" onClick={initNewProductForm}>
+                    <span className="material-symbols-outlined">add_box</span>
+                    <strong>Create new listing</strong>
+                    <small>Add photos, specs, and stock</small>
+                  </button>
+                </div>
+              </section>
             </div>
+
+            <section className="seller-panel seller-recent-panel">
+              <div className="seller-panel-header">
+                <div>
+                  <h2>Recent Listings</h2>
+                  <p>Newest products from your shop catalog.</p>
+                </div>
+                <button type="button" onClick={() => setActiveTab('products')}>View All</button>
+              </div>
+              {recentProducts.length === 0 ? (
+                <div className="seller-overview-empty">
+                  <span className="material-symbols-outlined">inventory</span>
+                  <strong>No listings yet</strong>
+                  <p>Start by creating your first product listing.</p>
+                </div>
+              ) : (
+                <div className="seller-recent-list">
+                  {recentProducts.map((product) => {
+                    const status = getStatusText(product.status);
+
+                    return (
+                      <article key={product.productId}>
+                        <img src={product.mainImageUrl || 'https://placehold.co/100'} alt={product.name} />
+                        <div>
+                          <strong>{product.name}</strong>
+                          <span>{product.categoryName || 'Uncategorized'} · Stock {product.stockQuantity ?? 0}</span>
+                        </div>
+                        <em className={`seller-status-chip ${status.cls}`}>{status.text}</em>
+                        <b>{product.price ? formatVnd(product.price) : 'Contact'}</b>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           </div>
         )}
 

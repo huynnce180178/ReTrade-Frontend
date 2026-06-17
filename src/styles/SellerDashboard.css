@@ -169,6 +169,90 @@
   font-size: 18px;
 }
 
+.seller-overview-hero {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(260px, 430px);
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+.seller-overview-copy,
+.seller-overview-actions,
+.seller-health-panel,
+.seller-action-panel,
+.seller-recent-panel {
+  border: 1px solid rgba(2, 36, 27, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 28px rgba(2, 36, 27, 0.045);
+}
+
+.seller-overview-copy {
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 28px;
+}
+
+.seller-overview-copy > span {
+  color: #0f7b5f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.seller-overview-copy h1 {
+  max-width: 720px;
+  margin: 10px 0 0;
+  color: #001b14;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.seller-overview-copy p {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: #66766f;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.seller-overview-actions {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  padding: 22px;
+}
+
+.seller-overview-actions a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(2, 36, 27, 0.1);
+  border-radius: 8px;
+  background: #f7faf9;
+  color: #10251f;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+  padding: 0 14px;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.seller-overview-actions a:hover {
+  background: #003d2f;
+  color: #ffffff;
+}
+
+.seller-overview-actions .seller-list-btn {
+  width: 100%;
+}
+
 .seller-metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -186,6 +270,11 @@
 
 .seller-metric-card {
   padding: 22px;
+}
+
+.seller-metric-card.attention {
+  border-color: rgba(217, 119, 6, 0.22);
+  background: #fffaf3;
 }
 
 .seller-metric-top {
@@ -233,8 +322,230 @@
   gap: 28px;
 }
 
+.seller-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
 .seller-panel {
   padding: 24px;
+}
+
+.seller-health-overview {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.seller-health-score {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #003d2f;
+  color: #ffffff;
+}
+
+.seller-health-score strong {
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.seller-health-score span {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.seller-health-lines {
+  display: grid;
+  gap: 16px;
+}
+
+.seller-health-lines div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.seller-health-lines span {
+  color: #66766f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.seller-health-lines b {
+  color: #10251f;
+  font-size: 12px;
+}
+
+.seller-health-lines i {
+  grid-column: 1 / -1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5ebe8;
+}
+
+.seller-health-lines em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f7b5f;
+}
+
+.seller-health-lines em.warning {
+  background: #d97706;
+}
+
+.seller-action-panel h2 {
+  margin-bottom: 16px;
+}
+
+.seller-focus-list {
+  display: grid;
+  gap: 10px;
+}
+
+.seller-focus-list a,
+.seller-focus-list button {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: center;
+  border: 1px solid rgba(2, 36, 27, 0.08);
+  border-radius: 8px;
+  background: #f7faf9;
+  color: #10251f;
+  font-family: var(--font-main, 'Manrope', sans-serif);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 12px;
+}
+
+.seller-focus-list a:hover,
+.seller-focus-list button:hover {
+  border-color: rgba(15, 123, 95, 0.28);
+  background: #eef8f4;
+}
+
+.seller-focus-list .material-symbols-outlined {
+  grid-row: span 2;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #dff7ea;
+  color: #0f7b5f;
+  font-size: 19px;
+}
+
+.seller-focus-list strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seller-focus-list small {
+  color: #66766f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.seller-recent-panel {
+  margin-bottom: 26px;
+}
+
+.seller-recent-list {
+  display: grid;
+  gap: 10px;
+}
+
+.seller-recent-list article {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(2, 36, 27, 0.07);
+  border-radius: 8px;
+  background: #fbfdfc;
+  padding: 10px 12px;
+}
+
+.seller-recent-list img {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #eef2f0;
+}
+
+.seller-recent-list strong,
+.seller-recent-list span {
+  display: block;
+}
+
+.seller-recent-list strong {
+  overflow: hidden;
+  color: #10251f;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seller-recent-list span {
+  margin-top: 4px;
+  color: #66766f;
+  font-size: 11px;
+}
+
+.seller-recent-list b {
+  color: #10251f;
+  font-size: 12px;
+  text-align: right;
+}
+
+.seller-overview-empty {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #66766f;
+  text-align: center;
+}
+
+.seller-overview-empty .material-symbols-outlined {
+  color: #0f7b5f;
+  font-size: 34px;
+}
+
+.seller-overview-empty strong {
+  color: #10251f;
+  font-size: 15px;
+}
+
+.seller-overview-empty p {
+  margin: 0;
+  font-size: 12px;
 }
 
 .product-form-layout {
@@ -1987,6 +2298,8 @@
 @media (max-width: 900px) {
   .seller-metric-grid,
   .seller-dashboard-grid,
+  .seller-overview-hero,
+  .seller-overview-grid,
   .seller-promo-row,
   .form-group-row,
   .form-group-triple,
@@ -2025,6 +2338,15 @@
 
   .seller-dash-header {
     flex-direction: column;
+  }
+
+  .seller-health-overview,
+  .seller-recent-list article {
+    grid-template-columns: 1fr;
+  }
+
+  .seller-recent-list b {
+    text-align: left;
   }
 
   .seller-product-row {
