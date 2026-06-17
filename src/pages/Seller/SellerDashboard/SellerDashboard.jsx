@@ -295,7 +295,7 @@ export default function SellerDashboard() {
       name: '',
       categoryId: '',
       description: '',
-      condition: 'Đã qua sử dụng',
+      condition: 'Used',
       price: '',
       stockQuantity: '1',
       weightGram: '',
@@ -343,7 +343,7 @@ export default function SellerDashboard() {
         name: product.name || '',
         categoryId: product.categoryId || '',
         description: product.description || '',
-        condition: product.condition || 'Đã qua sử dụng',
+        condition: product.condition || 'Used',
         price: product.price || '',
         stockQuantity: product.stockQuantity || '1',
         weightGram: product.weightGram || '',
@@ -834,10 +834,10 @@ export default function SellerDashboard() {
                     <div className="form-group">
                       <label>Product Condition</label>
                       <select name="condition" value={formData.condition} onChange={handleInputChange}>
-                        <option value="Mới nguyên seal">New (Sealed)</option>
+                        <option value="New (Sealed)">New (Sealed)</option>
                         <option value="Like New (99%)">Like New (99%)</option>
-                        <option value="Đã qua sử dụng">Used</option>
-                        <option value="Hao mòn nhiều">Heavily Used</option>
+                        <option value="Used">Used</option>
+                        <option value="Heavily Used">Heavily Used</option>
                       </select>
                     </div>
                   </div>
