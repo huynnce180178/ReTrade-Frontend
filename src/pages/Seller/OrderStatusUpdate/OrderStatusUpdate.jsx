@@ -22,7 +22,6 @@ const statusTransitions = {
   AwaitingPayment: ['Cancelled'],
   Pending: ['Confirmed', 'Cancelled'],
   Confirmed: ['Shipping', 'Cancelled'],
-  Shipping: ['Delivered'],
 };
 
 const statusLabels = {
@@ -54,12 +53,12 @@ const statusChoiceMeta = {
   Shipping: {
     icon: 'local_shipping',
     title: 'Ship with GHN',
-    description: 'Move the order into delivery and set the expected arrival time.',
+    description: 'Move the order into delivery. The carrier result is simulated automatically after 30 seconds.',
   },
   Delivered: {
     icon: 'task_alt',
     title: 'Delivered',
-    description: 'Use when GHN delivery has been completed.',
+    description: 'Carrier delivery completed successfully.',
   },
   Cancelled: {
     icon: 'cancel',
@@ -79,7 +78,6 @@ export default function OrderStatusUpdate() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [expectedDeliveryTime, setExpectedDeliveryTime] = useState('');
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
@@ -92,7 +90,6 @@ export default function OrderStatusUpdate() {
       const data = await orderService.getById(orderId, { sellerId: user.userId });
       setOrder(data);
       setSelectedStatus('');
-      setExpectedDeliveryTime(toDateTimeInputValue(data?.expectedDeliveryTime));
     } catch (error) {
       showToast(error?.response?.data || 'Failed to load order detail.', 'error');
     } finally {
@@ -152,7 +149,6 @@ export default function OrderStatusUpdate() {
   );
   const showShippingFields = selectedStatus === 'Shipping';
   const selectedChoice = statusChoiceMeta[selectedStatus] || {};
-  const minExpectedDelivery = useMemo(() => getMinDateTimeInputValue(), []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -167,19 +163,6 @@ export default function OrderStatusUpdate() {
       return;
     }
 
-    if (showShippingFields) {
-      const selectedDeliveryTime = new Date(expectedDeliveryTime);
-      if (!expectedDeliveryTime || Number.isNaN(selectedDeliveryTime.getTime())) {
-        showToast('Please choose a valid expected delivery time.', 'error');
-        return;
-      }
-
-      if (selectedDeliveryTime <= new Date()) {
-        showToast('Expected delivery time must be in the future.', 'error');
-        return;
-      }
-    }
-
     try {
       setSaving(true);
       const updated = await orderService.updateStatus(
@@ -188,9 +171,7 @@ export default function OrderStatusUpdate() {
           status: selectedStatus,
           trackingCode: order.trackingCode || null,
           shippingProvider: SHIPPING_PROVIDER,
-          expectedDeliveryTime: showShippingFields
-            ? new Date(expectedDeliveryTime).toISOString()
-            : null,
+          expectedDeliveryTime: null,
         },
         { sellerId: user.userId }
       );
@@ -280,14 +261,8 @@ export default function OrderStatusUpdate() {
                           <strong>{SHIPPING_PROVIDER}</strong>
                         </label>
                         <label>
-                          <span>Expected Delivery</span>
-                          <input
-                            type="datetime-local"
-                            value={expectedDeliveryTime}
-                            min={minExpectedDelivery}
-                            onChange={(event) => setExpectedDeliveryTime(event.target.value)}
-                            required
-                          />
+                          <span>Carrier Result</span>
+                          <strong>Auto after 30 seconds</strong>
                         </label>
                       </div>
                     )}
@@ -350,22 +325,6 @@ function formatDateTime(value) {
 
 function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
-}
-
-function toDateTimeInputValue(value) {
-  if (!value) return '';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 16);
-}
-
-function getMinDateTimeInputValue() {
-  const date = new Date(Date.now() + 60 * 60 * 1000);
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 16);
 }
 
 function isAwaitingPaymentExpired(order) {

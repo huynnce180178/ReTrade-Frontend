@@ -1,9 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
+import ReviewModal from '../../../components/ReviewModal/ReviewModal';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import purchaseService from '../../../services/purchaseService';
+import reviewService from '../../../services/reviewService';
+import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import '../../../styles/MyAccount.css';
 import './PurchaseHistory.css';
 
@@ -49,12 +52,15 @@ export default function PurchaseHistory() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(5);
   const [total, setTotal] = useState(0);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const buyerId = user?.userId;
 
   
 
-  const loadPurchases = async () => {
+  const loadPurchases = useCallback(async () => {
     if (!buyerId) return;
 
     try {
@@ -132,11 +138,48 @@ export default function PurchaseHistory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeStatus, buyerId, page, pageSize, searchTerm, showToast]);
 
   useEffect(() => {
     loadPurchases();
-  }, [buyerId, page, activeStatus, searchTerm]);
+  }, [loadPurchases]);
+
+  useEffect(() => {
+    if (!buyerId) return undefined;
+
+    const connection = createOrderHubConnection();
+    let disposed = false;
+
+    const handleBuyerOrderStatusChanged = (payload) => {
+      const payloadBuyerId = payload?.buyerId || payload?.BuyerId;
+      if (payloadBuyerId && payloadBuyerId !== buyerId) return;
+      loadPurchases();
+    };
+
+    connection.on('BuyerOrderStatusChanged', handleBuyerOrderStatusChanged);
+
+    const startConnection = async () => {
+      try {
+        await connection.start();
+        if (!disposed) {
+          await connection.invoke('JoinBuyerOrderGroup', buyerId);
+        }
+      } catch (error) {
+        console.error('Failed to connect buyer order hub:', error);
+      }
+    };
+
+    startConnection();
+
+    return () => {
+      disposed = true;
+      connection.off('BuyerOrderStatusChanged', handleBuyerOrderStatusChanged);
+      if (connection.state === 'Connected') {
+        connection.invoke('LeaveBuyerOrderGroup', buyerId).catch(() => {});
+      }
+      connection.stop().catch(() => {});
+    };
+  }, [buyerId, loadPurchases]);
 
   // Scroll to top when page or filter changes so user sees the refreshed list
   useEffect(() => {
@@ -201,18 +244,49 @@ export default function PurchaseHistory() {
 
     try {
       setUpdatingId(purchase.orderId);
+      let updated = null;
       if (action === 'complete') {
-        await purchaseService.complete(buyerId, purchase.orderId);
+        updated = await purchaseService.complete(buyerId, purchase.orderId);
         showToast('Purchase marked as completed.', 'success');
+        setReviewTarget(updated ? { ...purchase, ...updated } : purchase);
+        setReviewModalOpen(true);
       } else {
-        await purchaseService.cancel(buyerId, purchase.orderId);
+        updated = await purchaseService.cancel(buyerId, purchase.orderId);
         showToast('Purchase cancelled successfully.', 'success');
       }
       loadPurchases();
+      return updated;
     } catch (error) {
       showToast(error?.response?.data || `Failed to ${action} purchase.`, 'error');
+      return null;
     } finally {
       setUpdatingId('');
+    }
+  };
+
+  const handleOpenReview = (purchase) => {
+    setReviewTarget(purchase);
+    setReviewModalOpen(true);
+  };
+
+  const handleSubmitReview = async ({ rating, comment }) => {
+    if (!buyerId || !reviewTarget?.orderId) return;
+
+    try {
+      setReviewSubmitting(true);
+      await reviewService.create(buyerId, {
+        orderId: reviewTarget.orderId,
+        rating,
+        comment,
+      });
+      showToast('Review submitted successfully.', 'success');
+      setReviewModalOpen(false);
+      setReviewTarget(null);
+      loadPurchases();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to submit review.', 'error');
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
@@ -295,6 +369,7 @@ export default function PurchaseHistory() {
                       updating={updatingId === purchase.orderId}
                       onCancel={() => updatePurchase(purchase, 'cancel')}
                       onComplete={() => updatePurchase(purchase, 'complete')}
+                      onWriteReview={() => handleOpenReview(purchase)}
                     />
                   ))
                 )}
@@ -374,16 +449,29 @@ export default function PurchaseHistory() {
               </div>
             </aside>
           </div>
+
+          <ReviewModal
+            isOpen={reviewModalOpen}
+            title="Write a Review"
+            purchase={reviewTarget}
+            submitting={reviewSubmitting}
+            onClose={() => {
+              setReviewModalOpen(false);
+              setReviewTarget(null);
+            }}
+            onSubmit={handleSubmitReview}
+          />
         </main>
       </div>
     </div>
   );
 }
 
-function PurchaseCard({ purchase, updating, onCancel, onComplete }) {
+function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview }) {
   const meta = statusMeta[purchase.status] || { label: purchase.status || 'Unknown', className: 'default' };
   const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
   const canComplete = purchase.status === 'Delivered';
+  const canReview = purchase.status === 'Completed' && !purchase.hasReview;
 
   return (
     <article className="purchase-card">
@@ -412,6 +500,11 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete }) {
         {canCancel && (
           <button type="button" className="purchase-text-danger" disabled={updating} onClick={onCancel}>
             {updating ? 'Updating...' : 'Cancel'}
+          </button>
+        )}
+        {canReview && (
+          <button type="button" className="purchase-detail-btn" onClick={onWriteReview}>
+            Write Review
           </button>
         )}
         <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-detail-btn">

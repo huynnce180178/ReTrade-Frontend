@@ -23,6 +23,7 @@ const statusLabels = {
   Confirmed: 'Confirmed',
   Shipping: 'Shipping',
   Delivered: 'Delivered',
+  Completed: 'Completed',
   Returned: 'Returned',
   Cancelled: 'Cancelled',
 };
@@ -33,6 +34,7 @@ const statusClass = {
   Confirmed: 'confirmed',
   Shipping: 'shipping',
   Delivered: 'delivered',
+  Completed: 'completed',
   Returned: 'returned',
   Cancelled: 'cancelled',
 };
@@ -161,6 +163,23 @@ export default function OrderDetail() {
 
           <div className="sod-layout">
             <section className="sod-main">
+              <article className="sod-card sod-timeline-card">
+                <h2><span className="material-symbols-outlined">route</span>Order Timeline</h2>
+                <ol className="sod-timeline">
+                  {timeline.map((step) => (
+                    <li key={step.key} className={`sod-timeline-step ${step.state}`}>
+                      <span className="sod-timeline-marker">
+                        <span className="material-symbols-outlined">{step.icon}</span>
+                      </span>
+                      <div>
+                        <strong>{step.title}</strong>
+                        <p>{step.detail}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </article>
+
               <article className="sod-card">
                 <h2><span className="material-symbols-outlined">inventory_2</span>Order Item</h2>
                 <div className="sod-item-row">
@@ -171,9 +190,18 @@ export default function OrderDetail() {
                       <small>{order.productId}</small>
                     </div>
                   </div>
-                  <span>Qty {order.quantity || 0}</span>
-                  <strong>{formatVnd(order.unitPrice || 0)}</strong>
-                  <strong className="amount">{formatVnd(order.finalAmount || 0)}</strong>
+                  <div className="sod-qty-cell">
+                    <span>Quantity</span>
+                    <strong>{order.quantity || 0}</strong>
+                  </div>
+                  <div className="sod-price-cell">
+                    <span>Unit Price</span>
+                    <strong>{formatVnd(order.unitPrice || 0)}</strong>
+                  </div>
+                  <div className="sod-price-cell total">
+                    <span>Final Amount</span>
+                    <strong>{formatVnd(order.finalAmount || 0)}</strong>
+                  </div>
                 </div>
               </article>
 
@@ -197,23 +225,6 @@ export default function OrderDetail() {
                     <strong>{formatDateTime(order.updatedAt)}</strong>
                   </div>
                 </div>
-              </article>
-
-              <article className="sod-card">
-                <h2><span className="material-symbols-outlined">local_shipping</span>Order Timeline</h2>
-                <ol className="sod-timeline">
-                  {timeline.map((step) => (
-                    <li key={step.key} className={`sod-timeline-step ${step.state}`}>
-                      <span className="sod-timeline-marker">
-                        <span className="material-symbols-outlined">{step.icon}</span>
-                      </span>
-                      <div>
-                        <strong>{step.title}</strong>
-                        <p>{step.detail}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
               </article>
             </section>
 
@@ -270,21 +281,27 @@ function getOrderTimeline(order) {
   }
 
   const rank = getStatusRank(order.status);
+  const stateFor = (status) => {
+    const targetRank = getStatusRank(status);
+    if (order.status === status) return 'current';
+    return rank > targetRank ? 'done' : 'pending';
+  };
+
   const steps = [
     timelineStep('placed', 'Order Placed', formatDateTime(order.createdAt), 'done', 'check'),
     timelineStep(
       'payment',
       'Payment Confirmed',
       order.status === 'AwaitingPayment' ? 'Waiting for buyer payment' : formatDateTime(order.updatedAt || order.createdAt),
-      order.status === 'AwaitingPayment' ? 'current' : 'done',
-      order.status === 'AwaitingPayment' ? 'schedule' : 'check'
+      order.status === 'AwaitingPayment' ? 'current' : stateFor('Pending'),
+      rank > getStatusRank('Pending') ? 'check' : 'schedule'
     ),
     timelineStep(
       'confirmed',
       'Seller Confirmed',
       rank >= getStatusRank('Confirmed') ? formatDateTime(order.updatedAt) : 'Waiting for seller confirmation',
-      rank >= getStatusRank('Confirmed') ? 'done' : rank === getStatusRank('Pending') ? 'current' : 'pending',
-      rank >= getStatusRank('Confirmed') ? 'check' : 'inventory'
+      stateFor('Confirmed'),
+      rank > getStatusRank('Confirmed') ? 'check' : 'inventory'
     ),
     timelineStep(
       'shipping',
@@ -292,7 +309,7 @@ function getOrderTimeline(order) {
       rank >= getStatusRank('Shipping')
         ? `Provider: ${order.shippingProvider || SHIPPING_PROVIDER}`
         : 'Waiting for GHN handoff',
-      rank >= getStatusRank('Shipping') ? 'done' : rank === getStatusRank('Confirmed') ? 'current' : 'pending',
+      stateFor('Shipping'),
       'local_shipping'
     ),
     timelineStep(
@@ -301,8 +318,15 @@ function getOrderTimeline(order) {
       rank >= getStatusRank('Delivered')
         ? formatDateTime(order.updatedAt)
         : `Estimated Delivery: ${formatDateTime(order.expectedDeliveryTime)}`,
-      rank >= getStatusRank('Delivered') ? 'done' : rank === getStatusRank('Shipping') ? 'current' : 'pending',
-      rank >= getStatusRank('Delivered') ? 'check' : 'radio_button_unchecked'
+      stateFor('Delivered'),
+      rank > getStatusRank('Delivered') ? 'check' : 'radio_button_unchecked'
+    ),
+    timelineStep(
+      'completed',
+      'Completed',
+      order.status === 'Completed' ? formatDateTime(order.updatedAt) : 'Waiting for buyer confirmation',
+      stateFor('Completed'),
+      order.status === 'Completed' ? 'verified' : 'task_alt'
     ),
   ];
 
@@ -324,7 +348,8 @@ function getStatusRank(status) {
     Confirmed: 2,
     Shipping: 3,
     Delivered: 4,
-    Returned: 5,
+    Completed: 5,
+    Returned: 6,
   };
 
   return ranks[status] ?? 0;

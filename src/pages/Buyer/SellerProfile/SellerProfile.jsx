@@ -2,14 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import productService from '../../../services/productService';
 import profileService from '../../../services/profileService';
 import { createSellerHubConnection } from '../../../services/sellerRealtimeService';
 import '../../../styles/ProfileView.css';
-
-const formatDate = (date) => {
-  if (!date) return 'Not available';
-  return new Intl.DateTimeFormat('en', { month: 'short', day: '2-digit', year: 'numeric' }).format(new Date(date));
-};
 
 const getDisplayName = (seller) => {
   const fullName = `${seller?.firstName || ''} ${seller?.lastName || ''}`.trim();
@@ -17,6 +13,7 @@ const getDisplayName = (seller) => {
 };
 
 const getInitials = (seller) => getDisplayName(seller).slice(0, 2).toUpperCase();
+const currencyFormatter = new Intl.NumberFormat('vi-VN');
 
 const formatAddress = (address) => {
   if (!address) return 'No default address yet';
@@ -37,6 +34,9 @@ export default function SellerProfile() {
   const [error, setError] = useState('');
   const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('about');
+  const [sellerProducts, setSellerProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsTotal, setProductsTotal] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
@@ -101,6 +101,44 @@ export default function SellerProfile() {
     };
   }, [seller?.sellerId, user?.userId]);
 
+  useEffect(() => {
+    const resolvedSellerId = seller?.sellerId;
+    if (!resolvedSellerId) return undefined;
+
+    let cancelled = false;
+
+    const loadSellerProducts = async () => {
+      setProductsLoading(true);
+      try {
+        const data = await productService.getAll({
+          SellerId: resolvedSellerId,
+          Page: 1,
+          PageSize: 12,
+          SortBy: 'newest',
+        });
+
+        if (!cancelled) {
+          setSellerProducts(data?.items || []);
+          setProductsTotal(Number(data?.totalItems || 0));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSellerProducts([]);
+          setProductsTotal(0);
+          showToast(err?.response?.data || 'Failed to load seller products.', 'error');
+        }
+      } finally {
+        if (!cancelled) setProductsLoading(false);
+      }
+    };
+
+    loadSellerProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [seller?.sellerId, showToast]);
+
   const handleFollowToggle = async () => {
     if (!seller || followLoading || !canFollowSeller) return;
 
@@ -160,21 +198,19 @@ export default function SellerProfile() {
       user.accountId === seller.accountId
     ))
   );
-  const canFollowSeller = Boolean(seller.isSeller && seller.canFollow && !isOwnSellerPage);
-  const ratingText = seller.averageRating ? `${seller.averageRating.toFixed(1)} rating` : 'No rating yet';
+  const canFollowSeller = Boolean(user && seller.isSeller && !isOwnSellerPage && !hasRole(user, 'Admin'));
+  const reviewCount = Number(seller.reviewCount || 0);
+  const ratingValue = reviewCount && seller.averageRating ? seller.averageRating.toFixed(1) : '-';
+  const ratingText = reviewCount && seller.averageRating ? `${ratingValue} / 5` : 'No rating yet';
+  const reviewText = `${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'}`;
+  const visibleProductCount = productsTotal || seller.productCount || 0;
   const memberSince = seller.createdAt ? new Date(seller.createdAt).getFullYear() : 'New seller';
   const locationText = formatAddress(seller.defaultAddress);
   const isBuyerViewingSeller = hasRole(user, 'Buyer') && seller.isSeller;
 
   const renderBuyerShopContent = () => {
     if (activeTab === 'reviews') {
-      return (
-        <div className="buyer-shop-empty">
-          <span className="material-symbols-outlined">reviews</span>
-          <h2>{ratingText}</h2>
-          <p>Buyer reviews for this shop will be shown here.</p>
-        </div>
-      );
+      return <SellerRatingPanel seller={seller} ratingText={ratingText} reviewText={reviewText} />;
     }
 
     if (activeTab === 'auction') {
@@ -187,36 +223,16 @@ export default function SellerProfile() {
       );
     }
 
-    return (
-      <div className="buyer-product-grid">
-        <div className="buyer-shop-empty buyer-shop-empty-grid">
-          <span className="material-symbols-outlined">inventory_2</span>
-          <h2>{seller.productCount ? `${seller.productCount} listings` : 'No active products yet'}</h2>
-          <p>Product cards will appear here after the seller product listing API is connected.</p>
-        </div>
-      </div>
-    );
+    return <SellerProductGrid products={sellerProducts} loading={productsLoading} total={visibleProductCount} />;
   };
 
   const renderTabContent = () => {
     if (activeTab === 'items') {
-      return (
-        <div className="seller-tab-panel seller-empty-panel">
-          <span className="material-symbols-outlined">inventory_2</span>
-          <h2>{seller.productCount} Active Items</h2>
-          <p>Products from this seller will appear here when product listing is connected.</p>
-        </div>
-      );
+      return <SellerProductGrid products={sellerProducts} loading={productsLoading} total={visibleProductCount} compact />;
     }
 
     if (activeTab === 'reviews') {
-      return (
-        <div className="seller-tab-panel seller-empty-panel">
-          <span className="material-symbols-outlined">reviews</span>
-          <h2>{ratingText}</h2>
-          <p>Buyer reviews and rating details will be shown here.</p>
-        </div>
-      );
+      return <SellerRatingPanel seller={seller} ratingText={ratingText} reviewText={reviewText} compact />;
     }
 
     if (activeTab === 'contact') {
@@ -306,7 +322,6 @@ export default function SellerProfile() {
               <h1>{getDisplayName(seller)}</h1>
               <div className="buyer-shop-meta">
                 <span><span className="material-symbols-outlined">location_on</span>{locationText}</span>
-                <span><span className="material-symbols-outlined">calendar_month</span>Joined {formatDate(seller.createdAt)}</span>
                 <span><span className="material-symbols-outlined">star</span>{ratingText}</span>
               </div>
               <div className="buyer-shop-actions">
@@ -326,12 +341,20 @@ export default function SellerProfile() {
 
           <div className="buyer-shop-kpis">
             <div>
-              <strong>{seller.productCount}</strong>
+              <strong>{visibleProductCount}</strong>
               <span>Listings</span>
             </div>
             <div>
               <strong>{seller.followersCount}</strong>
               <span>Followers</span>
+            </div>
+            <div>
+              <strong>{ratingValue}</strong>
+              <span>Rating</span>
+            </div>
+            <div>
+              <strong>{reviewCount}</strong>
+              <span>Reviews</span>
             </div>
           </div>
         </section>
@@ -375,7 +398,6 @@ export default function SellerProfile() {
             <h1>{getDisplayName(seller)}</h1>
             <div className="seller-shop-meta">
               <span><span className="material-symbols-outlined">location_on</span>{locationText}</span>
-              <span><span className="material-symbols-outlined">calendar_month</span>Member since {memberSince}</span>
               <span><span className="material-symbols-outlined">star</span>{ratingText}</span>
             </div>
           </div>
@@ -405,7 +427,7 @@ export default function SellerProfile() {
 
       <section className="seller-shop-stats">
         <div className="seller-shop-stat">
-          <span>{seller.productCount}</span>
+          <span>{visibleProductCount}</span>
           <p>Active Listings</p>
         </div>
         <div className="seller-shop-stat">
@@ -417,8 +439,12 @@ export default function SellerProfile() {
           <p>Following</p>
         </div>
         <div className="seller-shop-stat">
-          <span>{seller.averageRating ? seller.averageRating.toFixed(1) : '-'}</span>
+          <span>{ratingValue}</span>
           <p>Average Rating</p>
+        </div>
+        <div className="seller-shop-stat">
+          <span>{reviewCount}</span>
+          <p>Reviews</p>
         </div>
       </section>
 
@@ -444,4 +470,107 @@ export default function SellerProfile() {
       </section>
     </div>
   );
+}
+
+function SellerProductGrid({ products, loading, total, compact = false }) {
+  if (loading) {
+    return (
+      <div className={`seller-profile-products ${compact ? 'compact' : ''}`}>
+        {[...Array(4)].map((_, index) => (
+          <div className="seller-profile-product-card skeleton" key={index}>
+            <span></span>
+            <div></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!products.length) {
+    return (
+      <div className="buyer-shop-empty">
+        <span className="material-symbols-outlined">inventory_2</span>
+        <h2>{total ? `${total} listings` : 'No active products yet'}</h2>
+        <p>This seller has no visible product cards right now.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`seller-profile-products ${compact ? 'compact' : ''}`}>
+      {products.map((product) => (
+        <SellerProductCard key={product.productId} product={product} />
+      ))}
+    </div>
+  );
+}
+
+function SellerProductCard({ product }) {
+  return (
+    <Link to={`/product/${product.productId}`} className="seller-profile-product-card">
+      <div className="seller-profile-product-media">
+        {product.mainImageUrl ? (
+          <img src={product.mainImageUrl} alt={product.name || 'Seller product'} loading="lazy" />
+        ) : (
+          <span className="material-symbols-outlined">inventory_2</span>
+        )}
+        {product.condition ? <em>{product.condition}</em> : null}
+      </div>
+
+      <div className="seller-profile-product-body">
+        <span>{product.categoryName || 'Uncategorized'}</span>
+        <strong>{product.name || 'Untitled product'}</strong>
+        <div>
+          <b>{product.price != null ? formatPrice(product.price) : 'Auction'}</b>
+          <small>{product.stockQuantity ?? 0} left</small>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function SellerRatingPanel({ seller, ratingText, reviewText, compact = false }) {
+  const stats = seller.ratingStats?.length
+    ? seller.ratingStats
+    : [5, 4, 3, 2, 1].map((rating) => ({ rating, count: 0, percentage: 0 }));
+
+  return (
+    <div className={`seller-rating-panel ${compact ? 'compact' : ''}`}>
+      <section className="seller-rating-overview">
+        <span className="material-symbols-outlined">star</span>
+        <h2>{ratingText}</h2>
+        <StarMeter value={seller.averageRating || 0} />
+        <p>{reviewText}</p>
+      </section>
+
+      <section className="seller-rating-bars">
+        {stats.map((stat) => (
+          <div className="seller-rating-row" key={stat.rating}>
+            <span>{stat.rating}</span>
+            <span className="material-symbols-outlined">star</span>
+            <div>
+              <i style={{ width: `${Math.min(100, Math.max(0, stat.percentage || 0))}%` }}></i>
+            </div>
+            <strong>{stat.count}</strong>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function StarMeter({ value }) {
+  const rounded = Math.round(Number(value || 0));
+
+  return (
+    <div className="seller-star-meter" aria-label={`${value || 0} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span key={star} className={`material-symbols-outlined ${star <= rounded ? 'filled' : ''}`}>star</span>
+      ))}
+    </div>
+  );
+}
+
+function formatPrice(value) {
+  return `${currencyFormatter.format(Number(value || 0))} VND`;
 }
