@@ -3,6 +3,8 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
+import addressService from '../../../services/addressService';
+import AddressPopup from '../../../components/AddressPopup/AddressPopup';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 
@@ -44,6 +46,7 @@ export default function SellerDashboard() {
   const [dynamicAttributes, setDynamicAttributes] = useState({});
   // Validation errors (dictionary of field/attribute ID -> error message)
   const [validationErrors, setValidationErrors] = useState({});
+  const [isAddressPopupOpen, setIsAddressPopupOpen] = useState(false);
 
   // Validate single dynamic attribute
   const validateAttribute = (attr, val) => {
@@ -287,8 +290,7 @@ export default function SellerDashboard() {
     );
   };
 
-  // Setup form for New Product
-  const initNewProductForm = () => {
+  const openNewProductFormDirectly = () => {
     setFormData({
       name: '',
       categoryId: '',
@@ -307,6 +309,25 @@ export default function SellerDashboard() {
     setValidationErrors({});
     setSelectedProductId(null);
     setActiveTab('new-product');
+  };
+
+  // Setup form for New Product
+  const initNewProductForm = async () => {
+    try {
+      setProductsLoading(true);
+      const data = await addressService.getMyAddresses();
+      const addrList = Array.isArray(data) ? data : (data?.data || []);
+      if (addrList.length === 0) {
+        showToast('Bạn cần thêm địa chỉ trước khi tạo sản phẩm!', 'warning');
+        setIsAddressPopupOpen(true);
+        return;
+      }
+      openNewProductFormDirectly();
+    } catch (error) {
+      showToast('Không thể xác thực thông tin địa chỉ giao hàng.', 'error');
+    } finally {
+      setProductsLoading(false);
+    }
   };
 
   // Setup form for Edit Product
@@ -1030,6 +1051,17 @@ export default function SellerDashboard() {
               </div>
             </form>
           </div>
+        )}
+
+        {isAddressPopupOpen && (
+          <AddressPopup 
+            onClose={() => setIsAddressPopupOpen(false)} 
+            onSelect={(selectedAddr) => {
+              setIsAddressPopupOpen(false);
+              showToast('Đã thêm địa chỉ thành công! Giờ bạn có thể tạo sản phẩm.', 'success');
+              openNewProductFormDirectly();
+            }} 
+          />
         )}
     </>
   );
