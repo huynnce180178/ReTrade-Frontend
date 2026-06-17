@@ -59,6 +59,13 @@ export default function SellerLayout() {
           >
             <span className="material-symbols-outlined">inventory_2</span>My Products
           </button>
+          <NavLink
+            to="/seller-dashboard/sales-statistics"
+            className={location.pathname.startsWith('/seller-dashboard/sales-statistics') ? 'active' : ''}
+            onClick={() => setActiveTab('sales-statistics')}
+          >
+            <span className="material-symbols-outlined">monitoring</span>Sales Statistics
+          </NavLink>
           <Link to="/auction"><span className="material-symbols-outlined">gavel</span>Auction Room</Link>
           <NavLink
             to="/seller-dashboard/orders"
