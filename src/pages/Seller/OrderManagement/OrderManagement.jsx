@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
@@ -7,21 +7,19 @@ import { createOrderHubConnection } from '../../../services/orderRealtimeService
 import './OrderManagement.css';
 
 const pageSize = 5;
+const SHIPPING_PROVIDER = 'GHN';
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
 const awaitingPaymentCancelDelayMs = 15 * 60 * 1000;
+const defaultShippingDelayMs = 30 * 1000;
 
 const tabs = [
-  { key: '', label: 'All Orders' },
+  { key: '', label: 'All' },
   { key: 'AwaitingPayment', label: 'Awaiting Payment' },
   { key: 'Pending', label: 'Pending' },
   { key: 'Confirmed', label: 'Confirmed' },
   { key: 'Shipping', label: 'Shipping' },
   { key: 'Delivered', label: 'Delivered' },
+  { key: 'Completed', label: 'Completed' },
   { key: 'Returned', label: 'Returned' },
   { key: 'Cancelled', label: 'Cancelled' },
 ];
@@ -32,36 +30,32 @@ const statusMeta = {
   Confirmed: { label: 'Confirmed', className: 'confirmed' },
   Shipping: { label: 'Shipping', className: 'shipping' },
   Delivered: { label: 'Delivered', className: 'delivered' },
+  Completed: { label: 'Completed', className: 'completed' },
   Returned: { label: 'Returned', className: 'returned' },
   Cancelled: { label: 'Cancelled', className: 'cancelled' },
 };
 
 const nextActionByStatus = {
-  Pending: { label: 'Confirm', tone: 'primary' },
-  Confirmed: { label: 'Ship', tone: 'primary' },
-  Shipping: { label: 'Deliver', tone: 'primary' },
+  Pending: { label: 'Confirm', status: 'Confirmed', tone: 'primary' },
+  Confirmed: { label: 'Ship', status: 'Shipping', tone: 'info' },
 };
 
 const initialFilterForm = {
-  status: '',
-  keyword: '',
-  minTotal: '',
-  fromDate: '',
-  toDate: '',
-  orderBy: 'CreatedAt desc',
+  sortBy: 'newest',
 };
 
 const sortOptions = [
-  { value: 'CreatedAt desc', label: 'Newest first' },
-  { value: 'CreatedAt asc', label: 'Oldest first' },
-  { value: 'FinalAmount desc', label: 'Highest total' },
-  { value: 'FinalAmount asc', label: 'Lowest total' },
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'total_desc', label: 'Highest total' },
+  { value: 'total_asc', label: 'Lowest total' },
 ];
 
 export default function OrderManagement() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const skipNextFilterAutoApply = useRef(false);
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -71,13 +65,38 @@ export default function OrderManagement() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterForm, setFilterForm] = useState(initialFilterForm);
-  const [odataQuery, setOdataQuery] = useState(null);
+  const [appliedFilters, setAppliedFilters] = useState(null);
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
   const sellerId = user?.userId || user?.id;
+  const hasActiveControls = Boolean(activeStatus || appliedSearchTerm || appliedFilters);
+
+  useEffect(() => {
+    if (skipNextFilterAutoApply.current) {
+      skipNextFilterAutoApply.current = false;
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      const nextFilters = normalizeFilterForm(filterForm);
+      setAppliedFilters(nextFilters);
+      setPage(1);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [filterForm]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearchTerm(searchTerm.trim());
+      setPage(1);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchOrders = useCallback(async () => {
     if (!sellerId) {
@@ -86,12 +105,15 @@ export default function OrderManagement() {
 
     try {
       setLoading(true);
+      const effectiveStatus = appliedFilters?.status || activeStatus || undefined;
+
       const data = await orderService.getSellerOrders({
-        sellerId,
-        status: activeStatus || undefined,
-        searchTerm: appliedSearchTerm || undefined,
-        page,
-        pageSize,
+        SellerId: sellerId,
+        Status: effectiveStatus,
+        SearchTerm: appliedSearchTerm || undefined,
+        SortBy: appliedFilters?.sortBy || 'newest',
+        Page: page,
+        PageSize: pageSize,
       });
 
       setOrders(data?.items || []);
@@ -102,44 +124,13 @@ export default function OrderManagement() {
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, appliedSearchTerm, page, sellerId, showToast]);
-
-  const fetchFilteredOrders = useCallback(async (nextPage, query) => {
-    if (!sellerId || !query) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const data = await orderService.getSellerOrdersOData({
-        sellerId,
-        ...query,
-        $count: true,
-        $skip: (nextPage - 1) * pageSize,
-        $top: pageSize,
-      });
-      const items = normalizeODataItems(data);
-      const count = data?.['@odata.count'] ?? data?.count ?? items.length;
-
-      setOrders(items);
-      setTotalItems(count);
-      setTotalPages(Math.max(1, Math.ceil(count / pageSize)));
-    } catch (error) {
-      showToast(error?.response?.data || 'Failed to filter seller orders.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [sellerId, showToast]);
+  }, [activeStatus, appliedFilters, appliedSearchTerm, page, sellerId, showToast]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
-      if (odataQuery) {
-        fetchFilteredOrders(page, odataQuery);
-      } else {
-        fetchOrders();
-      }
+      fetchOrders();
     }
-  }, [fetchFilteredOrders, fetchOrders, isAdmin, isSeller, odataQuery, page, user]);
+  }, [fetchOrders, isAdmin, isSeller, user]);
 
   useEffect(() => {
     if (!sellerId || !isSeller) {
@@ -160,11 +151,11 @@ export default function OrderManagement() {
           setOrders((value) => upsertOrder(value, realtimeOrder));
         }
 
-        if (activeStatus || appliedSearchTerm || odataQuery || page !== 1) {
+        if (activeStatus || appliedSearchTerm || appliedFilters || page !== 1) {
           setActiveStatus('');
           setAppliedSearchTerm('');
           setSearchTerm('');
-          setOdataQuery(null);
+          setAppliedFilters(null);
           setPage(1);
           return;
         }
@@ -199,7 +190,7 @@ export default function OrderManagement() {
       }
       connection.stop().catch(() => {});
     };
-  }, [activeStatus, appliedSearchTerm, fetchOrders, isSeller, odataQuery, page, sellerId, showToast]);
+  }, [activeStatus, appliedFilters, appliedSearchTerm, fetchOrders, isSeller, page, sellerId, showToast]);
 
   const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
   const firstVisibleItem = orders.length ? (page - 1) * pageSize + 1 : 0;
@@ -220,7 +211,6 @@ export default function OrderManagement() {
 
   const handleSearch = (event) => {
     event.preventDefault();
-    setOdataQuery(null);
     setAppliedSearchTerm(searchTerm.trim());
     setPage(1);
   };
@@ -229,25 +219,50 @@ export default function OrderManagement() {
     setFilterForm((current) => ({ ...current, [field]: value }));
   };
 
-  const handleApplyFilters = (event) => {
-    event.preventDefault();
-    const query = buildSellerOrderODataQuery(filterForm);
-    setOdataQuery(query);
+  const resetFilterFormSilently = () => {
+    if (!isDefaultFilterForm(filterForm)) {
+      skipNextFilterAutoApply.current = true;
+    }
+    setFilterForm(initialFilterForm);
+  };
+
+  const handleResetFilters = () => {
+    resetFilterFormSilently();
+    setAppliedFilters(null);
     setAppliedSearchTerm('');
     setSearchTerm('');
     setActiveStatus('');
     setPage(1);
-    setFiltersOpen(false);
   };
 
-  const handleClearFilters = () => {
-    setFilterForm(initialFilterForm);
-    setOdataQuery(null);
-    setPage(1);
+  const handleInlineStatusUpdate = async (order) => {
+    const action = getNextAction(order);
+    if (!action?.status || !sellerId) {
+      return;
+    }
+
+    try {
+      setUpdatingOrderId(order.orderId);
+      const updated = await orderService.updateStatus(
+        order.orderId,
+        buildStatusPayload(order, action.status),
+        { sellerId }
+      );
+
+      const updatedOrder = { ...order, ...(updated || {}), status: updated?.status || action.status };
+      setOrders((current) => current.map((item) => (
+        item.orderId === order.orderId ? { ...item, ...updatedOrder } : item
+      )));
+      showToast(`Order status updated to ${getStatusLabel(updatedOrder.status)}.`, 'success');
+      fetchOrders();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to update order status.', 'error');
+    } finally {
+      setUpdatingOrderId(null);
+    }
   };
 
   const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
-  const openStatusUpdate = (orderId) => navigate(`/seller-dashboard/orders/${orderId}/status`);
 
   if (authLoading) {
     return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading orders...</p></div>;
@@ -264,14 +279,6 @@ export default function OrderManagement() {
           <h1>Order Management</h1>
           <p>Review buyer orders, confirm processing, and keep fulfillment status current.</p>
         </div>
-        <form className="om-search" onSubmit={handleSearch}>
-          <span className="material-symbols-outlined">search</span>
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search orders, products, or customers..."
-          />
-        </form>
       </header>
 
       <section className="om-stats">
@@ -287,105 +294,60 @@ export default function OrderManagement() {
         ))}
       </section>
 
-      <section className="om-command-bar">
-        <div>
-          <button
-            type="button"
-            className={`om-tool-button ${filtersOpen ? 'active' : ''}`}
-            onClick={() => setFiltersOpen((value) => !value)}
-          >
-            <span className="material-symbols-outlined">filter_alt</span>
-            Filter Orders
-          </button>
+      <section className="om-list-controls">
+        <div className="om-tab-strip">
+          {tabs.map((tab) => (
+            <button
+              key={tab.label}
+              type="button"
+              className={activeStatus === tab.key ? 'active' : ''}
+              onClick={() => {
+                setAppliedFilters(null);
+                resetFilterFormSilently();
+                setActiveStatus(tab.key);
+                setPage(1);
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-        {odataQuery ? <span className="om-filter-badge">OData filter active</span> : null}
-      </section>
-
-      {filtersOpen ? (
-        <form className="om-filter-panel" onSubmit={handleApplyFilters}>
-          <label>
-            <span>Status</span>
-            <select value={filterForm.status} onChange={(event) => handleFilterChange('status', event.target.value)}>
-              <option value="">All statuses</option>
-              {tabs.filter((tab) => tab.key).map((tab) => (
-                <option key={tab.key} value={tab.key}>{tab.label}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Keyword</span>
+        <div className="om-control-tools">
+          <form className="om-search om-list-search" onSubmit={handleSearch}>
+            <span className="material-symbols-outlined">search</span>
             <input
-              value={filterForm.keyword}
-              onChange={(event) => handleFilterChange('keyword', event.target.value)}
-              placeholder="Order, product, buyer..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search orders, products, buyers..."
             />
-          </label>
-          <label>
-            <span>Min total</span>
-            <input
-              type="number"
-              min="0"
-              value={filterForm.minTotal}
-              onChange={(event) => handleFilterChange('minTotal', event.target.value)}
-              placeholder="0"
-            />
-          </label>
-          <label>
-            <span>From date</span>
-            <input
-              type="date"
-              value={filterForm.fromDate}
-              onChange={(event) => handleFilterChange('fromDate', event.target.value)}
-            />
-          </label>
-          <label>
-            <span>To date</span>
-            <input
-              type="date"
-              value={filterForm.toDate}
-              onChange={(event) => handleFilterChange('toDate', event.target.value)}
-            />
-          </label>
-          <label>
+          </form>
+          <label className="om-sort-control">
             <span>Sort</span>
-            <select value={filterForm.orderBy} onChange={(event) => handleFilterChange('orderBy', event.target.value)}>
+            <select value={filterForm.sortBy} onChange={(event) => handleFilterChange('sortBy', event.target.value)}>
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
-          <div className="om-filter-actions">
-            <button type="button" onClick={handleClearFilters}>Clear</button>
-            <button type="submit">Apply Filter</button>
-          </div>
-        </form>
-      ) : null}
+          <button
+            type="button"
+            className="om-reset-button"
+            disabled={!hasActiveControls}
+            onClick={handleResetFilters}
+            aria-label="Reset filters"
+            title="Reset filters"
+          >
+            <span className="material-symbols-outlined">restart_alt</span>
+          </button>
+        </div>
+      </section>
 
       <section className="om-panel">
-        <div className="om-tabs">
-          <div>
-            {tabs.map((tab) => (
-              <button
-                key={tab.label}
-                type="button"
-                className={activeStatus === tab.key ? 'active' : ''}
-                onClick={() => {
-                  setOdataQuery(null);
-                  setActiveStatus(tab.key);
-                  setPage(1);
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="om-table-wrap">
           <table className="om-table">
             <thead>
               <tr>
-                <th>Order ID & Date</th>
+                <th>STT</th>
                 <th>Customer</th>
                 <th>Product Details</th>
                 <th>Total Amount</th>
@@ -403,19 +365,19 @@ export default function OrderManagement() {
                   <td colSpan="6"><div className="om-empty">No seller orders found.</div></td>
                 </tr>
               ) : (
-                orders.map((order) => {
+                orders.map((order, index) => {
                   const meta = statusMeta[order.status] || { label: order.status || 'Unknown', className: 'default' };
                   const action = getNextAction(order);
+                  const orderNumber = (page - 1) * pageSize + index + 1;
+                  const isUpdating = updatingOrderId === order.orderId;
 
                   return (
                     <tr key={order.orderId}>
-                      <td>
-                        <strong>#{order.orderCode || order.orderId}</strong>
-                        <span>{formatDate(order.createdAt)}</span>
+                      <td className="om-index-cell">
+                        <strong>{orderNumber}</strong>
                       </td>
                       <td>
                         <strong>{order.buyerName || 'Unknown Buyer'}</strong>
-                        <span>{order.buyerEmail || order.buyerId || '-'}</span>
                       </td>
                       <td>
                         <div className="om-product">
@@ -428,7 +390,6 @@ export default function OrderManagement() {
                       </td>
                       <td>
                         <strong>{formatVnd(order.finalAmount || 0)}</strong>
-                        <span>VND</span>
                       </td>
                       <td><em className={`om-status ${meta.className}`}>{meta.label}</em></td>
                       <td>
@@ -445,9 +406,10 @@ export default function OrderManagement() {
                             <button
                               type="button"
                               className={`om-primary-action ${action.tone || 'primary'}`}
-                              onClick={() => openStatusUpdate(order.orderId)}
+                              disabled={isUpdating}
+                              onClick={() => handleInlineStatusUpdate(order)}
                             >
-                              {action.label}
+                              {isUpdating ? 'Updating...' : action.label}
                             </button>
                           ) : (
                             <span className="om-action-spacer" aria-hidden="true" />
@@ -493,67 +455,43 @@ export default function OrderManagement() {
   );
 }
 
-function normalizeODataItems(data) {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.value)) return data.value;
-  if (Array.isArray(data?.Value)) return data.Value;
-  return [];
-}
-
-function buildSellerOrderODataQuery(form) {
-  const filterParts = [];
-  const keyword = form.keyword.trim().toLowerCase();
-  const minTotal = Number(form.minTotal);
-
-  if (form.status) {
-    filterParts.push(`Status eq '${escapeODataString(form.status)}'`);
-  }
-
-  if (keyword) {
-    const escapedKeyword = escapeODataString(keyword);
-    filterParts.push([
-      `(OrderCode ne null and contains(tolower(OrderCode),'${escapedKeyword}'))`,
-      `(ProductName ne null and contains(tolower(ProductName),'${escapedKeyword}'))`,
-      `(BuyerName ne null and contains(tolower(BuyerName),'${escapedKeyword}'))`,
-      `(BuyerEmail ne null and contains(tolower(BuyerEmail),'${escapedKeyword}'))`,
-    ].join(' or '));
-  }
-
-  if (Number.isFinite(minTotal) && minTotal > 0) {
-    filterParts.push(`FinalAmount ge ${minTotal}`);
-  }
-
-  if (form.fromDate) {
-    filterParts.push(`CreatedAt ge ${form.fromDate}T00:00:00Z`);
-  }
-
-  if (form.toDate) {
-    filterParts.push(`CreatedAt le ${form.toDate}T23:59:59Z`);
-  }
-
-  return {
-    ...(filterParts.length ? { $filter: filterParts.map((part) => `(${part})`).join(' and ') } : {}),
-    $orderby: form.orderBy || 'CreatedAt desc',
+function normalizeFilterForm(form) {
+  const nextFilters = {
+    sortBy: form.sortBy,
   };
+
+  const hasFilters = nextFilters.sortBy !== initialFilterForm.sortBy;
+
+  return hasFilters ? nextFilters : null;
 }
 
-function escapeODataString(value) {
-  return String(value || '').replace(/'/g, "''");
-}
-
-function formatDate(value) {
-  if (!value) return '-';
-  return dateFormatter.format(new Date(value));
+function isDefaultFilterForm(form) {
+  return form.sortBy === initialFilterForm.sortBy;
 }
 
 function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
+function buildStatusPayload(order, status) {
+  return {
+    status,
+    trackingCode: order.trackingCode || null,
+    shippingProvider: status === 'Shipping' ? SHIPPING_PROVIDER : order.shippingProvider || null,
+    expectedDeliveryTime: status === 'Shipping'
+      ? new Date(Date.now() + defaultShippingDelayMs).toISOString()
+      : null,
+  };
+}
+
+function getStatusLabel(status) {
+  return statusMeta[status]?.label || status || 'Unknown';
+}
+
 function getNextAction(order) {
   if (order?.status === 'AwaitingPayment') {
     return isAwaitingPaymentExpired(order)
-      ? { label: 'Cancel', tone: 'danger' }
+      ? { label: 'Cancel', status: 'Cancelled', tone: 'danger' }
       : null;
   }
 

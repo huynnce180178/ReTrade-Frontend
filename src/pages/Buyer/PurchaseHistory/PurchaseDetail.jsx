@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
+import ReviewModal from '../../../components/ReviewModal/ReviewModal';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import purchaseService from '../../../services/purchaseService';
+import reviewService from '../../../services/reviewService';
 import paymentService from '../../../services/paymentService';
+import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import '../../../styles/MyAccount.css';
 import './PurchaseHistory.css';
 
@@ -36,10 +39,13 @@ export default function PurchaseDetail() {
   const [purchase, setPurchase] = useState(null);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const buyerId = user?.userId;
 
-  const loadPurchase = async () => {
+  const loadPurchase = useCallback(async () => {
     if (!buyerId || !orderId) return;
 
     try {
@@ -51,11 +57,50 @@ export default function PurchaseDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [buyerId, orderId, showToast]);
 
   useEffect(() => {
     loadPurchase();
-  }, [buyerId, orderId]);
+  }, [loadPurchase]);
+
+  useEffect(() => {
+    if (!buyerId || !orderId) return undefined;
+
+    const connection = createOrderHubConnection();
+    let disposed = false;
+
+    const handleBuyerOrderStatusChanged = (payload) => {
+      const payloadOrderId = payload?.orderId || payload?.OrderId;
+      const payloadBuyerId = payload?.buyerId || payload?.BuyerId;
+      if (payloadBuyerId && payloadBuyerId !== buyerId) return;
+      if (payloadOrderId && payloadOrderId !== orderId) return;
+      loadPurchase();
+    };
+
+    connection.on('BuyerOrderStatusChanged', handleBuyerOrderStatusChanged);
+
+    const startConnection = async () => {
+      try {
+        await connection.start();
+        if (!disposed) {
+          await connection.invoke('JoinBuyerOrderGroup', buyerId);
+        }
+      } catch (error) {
+        console.error('Failed to connect buyer order hub:', error);
+      }
+    };
+
+    startConnection();
+
+    return () => {
+      disposed = true;
+      connection.off('BuyerOrderStatusChanged', handleBuyerOrderStatusChanged);
+      if (connection.state === 'Connected') {
+        connection.invoke('LeaveBuyerOrderGroup', buyerId).catch(() => {});
+      }
+      connection.stop().catch(() => {});
+    };
+  }, [buyerId, loadPurchase, orderId]);
 
   // Ensure the page scrolls to top when viewing a detail
   useEffect(() => {
@@ -84,10 +129,38 @@ export default function PurchaseDetail() {
       const updated = await purchaseService.complete(buyerId, purchase.orderId);
       setPurchase(updated);
       showToast('Purchase marked as completed.', 'success');
+      setReviewTarget(updated ? { ...purchase, ...updated } : purchase);
+      setReviewModalOpen(true);
     } catch (error) {
       showToast(error?.response?.data || 'Failed to complete purchase.', 'error');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const openReviewModal = () => {
+    setReviewTarget(purchase);
+    setReviewModalOpen(true);
+  };
+
+  const handleSubmitReview = async ({ rating, comment }) => {
+    if (!buyerId || !reviewTarget?.orderId) return;
+
+    try {
+      setReviewSubmitting(true);
+      await reviewService.create(buyerId, {
+        orderId: reviewTarget.orderId,
+        rating,
+        comment,
+      });
+      showToast('Review submitted successfully.', 'success');
+      setReviewModalOpen(false);
+      setReviewTarget(null);
+      loadPurchase();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to submit review.', 'error');
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
@@ -263,12 +336,29 @@ export default function PurchaseDetail() {
                           {updating ? 'Updating...' : 'Mark Completed'}
                         </button>
                       )}
+                      {purchase.status === 'Completed' && !purchase.hasReview && (
+                        <button type="button" className="purchase-primary-btn" onClick={openReviewModal}>
+                          Write Review
+                        </button>
+                      )}
                     </section>
                   </aside>
                 </div>
               </>
             )}
           </div>
+
+          <ReviewModal
+            isOpen={reviewModalOpen}
+            title="Write a Review"
+            purchase={reviewTarget}
+            submitting={reviewSubmitting}
+            onClose={() => {
+              setReviewModalOpen(false);
+              setReviewTarget(null);
+            }}
+            onSubmit={handleSubmitReview}
+          />
         </main>
       </div>
     </div>
