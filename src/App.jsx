@@ -18,6 +18,7 @@ import MyAccount from './pages/Buyer/MyAccount/MyAccount';
 import ChangePassword from './pages/Buyer/ChangePassword/ChangePassword';
 import AddressBook from './pages/Buyer/AddressBook/AddressBook';
 import PurchaseHistory from './pages/Buyer/PurchaseHistory/PurchaseHistory';
+import PurchaseDetail from './pages/Buyer/PurchaseHistory/PurchaseDetail';
 import BidHistory from './pages/Buyer/BidHistory/BidHistory';
 import Product from './pages/Buyer/Product/Product';
 import ProductDetail from './pages/Buyer/ProductDetail/ProductDetail';
@@ -75,6 +76,7 @@ function App() {
                 <Route path="change-password" element={<ChangePassword />} />
                 <Route path="address-book" element={<AddressBook />} />
                 <Route path="purchase-history" element={<PurchaseHistory />} />
+                <Route path="purchase-history/:orderId" element={<PurchaseDetail />} />
                 <Route path="bid-history" element={<BidHistory />} />
                 <Route path="payment/vnpay-return" element={<PaymentResult />} />
                 <Route path="category" element={<CategoryList />} />
