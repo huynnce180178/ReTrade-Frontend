@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -8,7 +9,7 @@ import '../../../styles/ProductDetail.css';
 
 function formatPrice(price) {
   if (price == null) return null;
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+  return new Intl.NumberFormat('vi-VN').format(price);
 }
 
 function formatDate(dateStr) {
@@ -36,6 +37,40 @@ export default function ProductDetail() {
   const [mainImageIndex, setMainImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [togglingWishlist, setTogglingWishlist] = useState(false);
+
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const images = product?.images || [];
+  const sortedImages = [...images].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+
+  const handleOpenLightbox = () => {
+    if (sortedImages.length > 0) {
+      setLightboxIndex(mainImageIndex);
+      setLightboxOpen(true);
+    }
+  };
+
+  const handlePrevImage = (e) => {
+    e.stopPropagation();
+    setLightboxIndex((prev) => (prev === 0 ? sortedImages.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = (e) => {
+    e.stopPropagation();
+    setLightboxIndex((prev) => (prev === sortedImages.length - 1 ? 0 : prev + 1));
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!lightboxOpen) return;
+      if (e.key === 'Escape') setLightboxOpen(false);
+      if (e.key === 'ArrowLeft') handlePrevImage(e);
+      if (e.key === 'ArrowRight') handleNextImage(e);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen, sortedImages.length]);
 
   useEffect(() => {
     const fetchWishlistStatus = async () => {
@@ -138,8 +173,6 @@ export default function ProductDetail() {
     );
   }
 
-  const images = product.images || [];
-  const sortedImages = [...images].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   const mainImage = sortedImages[mainImageIndex] || null;
   const attributes = (product.attributes || []).filter(a => a.value);
   const hasDimensions = product.weightGram || product.lengthCm || product.widthCm || product.heightCm;
@@ -165,9 +198,19 @@ export default function ProductDetail() {
       <div className="pd-main-layout">
         {/* Left: Image Gallery */}
         <div className="pd-gallery">
-          <div className="pd-main-image-wrapper">
+          <div 
+            className="pd-main-image-wrapper" 
+            onClick={handleOpenLightbox}
+            style={{ cursor: mainImage?.imageUrl ? 'zoom-in' : 'default' }}
+          >
             {mainImage?.imageUrl ? (
-              <img src={mainImage.imageUrl} alt={mainImage.altText || product.name} />
+              <>
+                <img src={mainImage.imageUrl} alt={mainImage.altText || product.name} />
+                <div className="pd-main-image-overlay">
+                  <span className="material-symbols-outlined">zoom_in</span>
+                  <span>Click to expand</span>
+                </div>
+              </>
             ) : (
               <div className="pd-main-image-placeholder">📦</div>
             )}
@@ -274,49 +317,52 @@ export default function ProductDetail() {
           <div className="pd-divider" />
 
           {/* Dates */}
-          <div className="pd-meta-row">
-            <div className="pd-meta-tag">
-              <span className="meta-label">Listed</span>
-              <span className="meta-val">{formatDate(product.createdAt)}</span>
+          <div className="pd-date-info">
+            <div className="pd-date-item">
+              <span>Listed</span>
+              <strong>{formatDate(product.createdAt)}</strong>
             </div>
             {product.updatedAt && product.updatedAt !== product.createdAt && (
-              <div className="pd-meta-tag">
-                <span className="meta-label">Updated</span>
-                <span className="meta-val">{formatDate(product.updatedAt)}</span>
+              <div className="pd-date-item">
+                <span>Updated</span>
+                <strong>{formatDate(product.updatedAt)}</strong>
               </div>
             )}
           </div>
 
           {/* Actions */}
           <div className="pd-actions">
-            <button className="btn btn-primary" onClick={handleGoToCheckout}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="9" cy="21" r="1" />
-                <circle cx="20" cy="21" r="1" />
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h7.72a2 2 0 0 0 2-1.61L21 6H6" />
-              </svg>
-              Buy Now
-            </button>
-            <button className="btn btn-primary">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              Contact Seller
-            </button>
-            <button 
-              className={`btn ${isWishlisted ? 'btn-primary' : 'btn-outline'}`}
-              onClick={handleToggleWishlist}
-              disabled={togglingWishlist}
-            >
-              {togglingWishlist ? (
-                <span>⏳ </span>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill={isWishlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-              )}
-              {isWishlisted ? ' Wishlisted' : ' Wishlist'}
-            </button>
+            {product.price != null ? (
+              <button className="btn btn-primary pd-btn-buy" onClick={handleGoToCheckout}>
+                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>shopping_cart</span>
+                Buy Now
+              </button>
+            ) : (
+              <button className="btn btn-primary pd-btn-buy" onClick={handleGoToCheckout}>
+                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>gavel</span>
+                Place Bid
+              </button>
+            )}
+            
+            <div className="pd-actions-icons">
+              <button className="btn btn-outline pd-btn-icon" title="Contact Seller">
+                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>chat</span>
+              </button>
+              <button 
+                className={`btn ${isWishlisted ? 'btn-primary' : 'btn-outline'} pd-btn-icon`}
+                onClick={handleToggleWishlist}
+                disabled={togglingWishlist}
+                title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+              >
+                {togglingWishlist ? (
+                  <span className="pd-wl-spinner" />
+                ) : (
+                  <span className="material-symbols-outlined" style={{ fontSize: '22px', fontVariationSettings: isWishlisted ? "'FILL' 1" : "'FILL' 0" }}>
+                    favorite
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -382,6 +428,55 @@ export default function ProductDetail() {
             </div>
           )}
         </div>
+
+      {/* Lightbox Modal via Portal */}
+      {lightboxOpen && sortedImages.length > 0 && createPortal(
+        <div className="pd-lightbox-overlay" onClick={() => setLightboxOpen(false)}>
+          <button className="pd-lightbox-close" onClick={() => setLightboxOpen(false)} aria-label="Close lightbox">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          
+          {sortedImages.length > 1 && (
+            <button className="pd-lightbox-arrow left" onClick={handlePrevImage} aria-label="Previous image">
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+          )}
+
+          <div className="pd-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={sortedImages[lightboxIndex]?.imageUrl} 
+              alt={sortedImages[lightboxIndex]?.altText || product.name} 
+              className="pd-lightbox-img"
+            />
+            {sortedImages[lightboxIndex]?.altText && (
+              <div className="pd-lightbox-caption">
+                {sortedImages[lightboxIndex].altText}
+              </div>
+            )}
+          </div>
+
+          {sortedImages.length > 1 && (
+            <button className="pd-lightbox-arrow right" onClick={handleNextImage} aria-label="Next image">
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          )}
+
+          {sortedImages.length > 1 && (
+            <div className="pd-lightbox-thumbnails" onClick={(e) => e.stopPropagation()}>
+              {sortedImages.map((img, idx) => (
+                <div
+                  key={img.imageId || idx}
+                  className={`pd-lightbox-thumb ${idx === lightboxIndex ? 'active' : ''}`}
+                  onClick={() => setLightboxIndex(idx)}
+                >
+                  <img src={img.imageUrl} alt={img.altText || `Thumb ${idx + 1}`} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

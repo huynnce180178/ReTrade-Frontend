@@ -234,169 +234,180 @@ export default function AddressBook() {
   }
 
   return (
-    <div className="profile-page-wrapper container animate-fade-in">
-      <div className="profile-grid">
-        <AccountSidebar />
+    <>
+      <div className="profile-page-wrapper container animate-fade-in">
+        <div className="profile-grid">
+          <AccountSidebar />
 
-        <main className="ma-main">
-          <div className="address-dashboard-grid">
-            <div className="address-content-column">
-              <div className="ma-card address-hero-card">
-                <div className="ma-header-info">
-                  <div className="address-hero-icon">
-                    <span className="material-symbols-outlined">location_on</span>
-                  </div>
-                  <div>
-                    <h1 className="ma-headline">Address Book</h1>
-                    <p className="ma-subtitle">Manage your shipping and billing addresses to ensure a seamless checkout experience.</p>
-                  </div>
-                </div>
-              </div>
-
-              {showForm && (
-                <div className="ma-card address-form-card">
-                  <h4 className="ma-card-title">{editingId ? 'Edit Address' : 'Add New Address'}</h4>
-                  <form className="ma-form" onSubmit={handleSubmit}>
-                    <div className="ma-form-grid">
-                      <div className="ma-form-group">
-                        <label className="ma-label">Province</label>
-                        <select className="ma-input" value={form.provinceId} onChange={(e) => handleFieldChange('provinceId', e.target.value)}>
-                          <option value="">Select Province</option>
-                          {provinces.map((province) => <option key={province.code} value={province.code}>{province.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="ma-form-group">
-                        <label className="ma-label">District</label>
-                        <select className="ma-input" value={form.districtId} onChange={(e) => handleFieldChange('districtId', e.target.value)} disabled={!form.provinceId || locationLoading}>
-                          <option value="">Select District</option>
-                          {districts.map((district) => <option key={district.code} value={district.code}>{district.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="ma-form-group">
-                        <label className="ma-label">Ward</label>
-                        <select className="ma-input" value={form.wardCode} onChange={(e) => handleFieldChange('wardCode', e.target.value)} disabled={!form.districtId || locationLoading}>
-                          <option value="">Select Ward</option>
-                          {wards.map((ward) => <option key={ward.code} value={ward.code}>{ward.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="ma-form-group">
-                        <label className="ma-label">Receiver Name</label>
-                        <input className="ma-input" value={form.receiverName} onChange={(e) => handleFieldChange('receiverName', e.target.value)} />
-                      </div>
-                      <div className="ma-form-group">
-                        <label className="ma-label">Receiver Phone</label>
-                        <input className="ma-input" value={form.receiverPhone} onChange={(e) => handleFieldChange('receiverPhone', e.target.value.replace(/\D/g, ''))} />
-                      </div>
-                      <div className="ma-form-group ma-form-group-wide">
-                        <label className="ma-label">Street Address</label>
-                        <input className="ma-input" value={form.streetAddress} onChange={(e) => handleFieldChange('streetAddress', e.target.value)} placeholder="House number, street, building" />
-                      </div>
-                      <label className="address-default-toggle">
-                        <input type="checkbox" checked={form.isDefault} onChange={(e) => handleFieldChange('isDefault', e.target.checked)} />
-                        Set as default address
-                      </label>
+          <main className="ma-main">
+            <div className="address-dashboard-grid">
+              <div className="address-content-column">
+                <div className="ma-card address-hero-card">
+                  <div className="ma-header-info">
+                    <div className="address-hero-icon">
+                      <span className="material-symbols-outlined">location_on</span>
                     </div>
-
-                    <div className="ma-form-actions">
-                      <button className="ma-btn-primary" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Address'}</button>
-                      <button className="ma-btn-secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button>
+                    <div>
+                      <h1 className="ma-headline">Address Book</h1>
+                      <p className="ma-subtitle">Manage your shipping and billing addresses to ensure a seamless checkout experience.</p>
                     </div>
-                  </form>
+                  </div>
                 </div>
-              )}
 
-              <div className="ma-card address-saved-card">
-                <div className="address-section-header">
-                  <h2>Saved Addresses</h2>
-                  <button className="ma-btn-primary address-add-btn" type="button" onClick={handleAddClick}>
-                    <span className="material-symbols-outlined">add</span>
-                    Add New Address
-                  </button>
-                </div>
-                {loading ? (
-                  <div className="address-empty-state">
-                    <span className="btn-spinner"></span>
-                    <p>Loading addresses...</p>
+                <div className="ma-card address-saved-card">
+                  <div className="address-section-header">
+                    <h2>Saved Addresses</h2>
+                    <button className="ma-btn-primary address-add-btn" type="button" onClick={handleAddClick}>
+                      <span className="material-symbols-outlined">add</span>
+                      Add New Address
+                    </button>
                   </div>
-                ) : addresses.length === 0 ? (
-                  <div className="address-empty-state">
-                    <span className="material-symbols-outlined">home_work</span>
-                    <p>You haven't added any addresses yet.</p>
-                  </div>
-                ) : (
-                  <div className="address-list">
-                    {addresses.map((address) => (
-                      <article key={address.addressId} className="address-card">
-                        <div className="address-card-main">
-                          <div className="address-card-title-row">
-                            <h3>{address.receiverName}</h3>
-                            {address.isDefault && <span className="address-default-badge">Default Shipping</span>}
+                  {loading ? (
+                    <div className="address-empty-state">
+                      <span className="btn-spinner"></span>
+                      <p>Loading addresses...</p>
+                    </div>
+                  ) : addresses.length === 0 ? (
+                    <div className="address-empty-state">
+                      <span className="material-symbols-outlined">home_work</span>
+                      <p>You haven't added any addresses yet.</p>
+                    </div>
+                  ) : (
+                    <div className="address-list">
+                      {addresses.map((address) => (
+                        <article key={address.addressId} className="address-card">
+                          <div className="address-card-main">
+                            <div className="address-card-title-row">
+                              <h3>{address.receiverName}</h3>
+                              {address.isDefault && <span className="address-default-badge">Default Shipping</span>}
+                            </div>
+                            <p><span className="material-symbols-outlined">call</span>{address.receiverPhone}</p>
+                            <p><span className="material-symbols-outlined">home_pin</span>{formatAddressLine(address)}</p>
                           </div>
-                          <p><span className="material-symbols-outlined">call</span>{address.receiverPhone}</p>
-                          <p><span className="material-symbols-outlined">home_pin</span>{formatAddressLine(address)}</p>
-                        </div>
-                        <div className="address-card-actions">
-                          {!address.isDefault && <button type="button" onClick={() => handleSetDefault(address.addressId)}>Set Default</button>}
-                          <button type="button" onClick={() => handleEditClick(address)}>Edit</button>
-                          <button type="button" className="danger" onClick={() => handleDelete(address.addressId)}>Delete</button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
+                          <div className="address-card-actions">
+                            {!address.isDefault && <button type="button" onClick={() => handleSetDefault(address.addressId)}>Set Default</button>}
+                            <button type="button" onClick={() => handleEditClick(address)}>Edit</button>
+                            <button type="button" className="danger" onClick={() => handleDelete(address.addressId)}>Delete</button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
+
+              <aside className="address-side-column">
+                <section className="ma-card address-preference-card">
+                  <div className="address-side-title">
+                    <span className="material-symbols-outlined">local_shipping</span>
+                    <h3>Delivery Preferences</h3>
+                  </div>
+                  <label className="address-delivery-option selected">
+                    <input type="radio" defaultChecked />
+                    <span>
+                      <strong>Standard Shipping</strong>
+                      <small>3-5 business days</small>
+                    </span>
+                  </label>
+                  <label className="address-delivery-option">
+                    <input type="radio" />
+                    <span>
+                      <strong>Express Priority</strong>
+                      <small>Next day delivery</small>
+                    </span>
+                  </label>
+                </section>
+
+                <section className="ma-card address-stats-card">
+                  <h3>Quick Stats</h3>
+                  <div className="address-stat-grid">
+                    <div>
+                      <span>Total</span>
+                      <strong>{String(addresses.length).padStart(2, '0')}</strong>
+                    </div>
+                    <div>
+                      <span>Verified</span>
+                      <strong>{String(addresses.length).padStart(2, '0')}</strong>
+                    </div>
+                  </div>
+                  <div className="address-default-status">
+                    <span>Default Set</span>
+                    <strong>{defaultAddress ? 'Active' : 'Missing'}</strong>
+                    <span className="material-symbols-outlined">{defaultAddress ? 'check_circle' : 'error'}</span>
+                  </div>
+                </section>
+
+                <section className="address-tip-card">
+                  <span className="material-symbols-outlined">emoji_objects</span>
+                  <h3>Pro Tip</h3>
+                  <p>Keep your address information accurate to avoid delivery delays for high-value orders.</p>
+                </section>
+              </aside>
             </div>
-
-            <aside className="address-side-column">
-              <section className="ma-card address-preference-card">
-                <div className="address-side-title">
-                  <span className="material-symbols-outlined">local_shipping</span>
-                  <h3>Delivery Preferences</h3>
-                </div>
-                <label className="address-delivery-option selected">
-                  <input type="radio" defaultChecked />
-                  <span>
-                    <strong>Standard Shipping</strong>
-                    <small>3-5 business days</small>
-                  </span>
-                </label>
-                <label className="address-delivery-option">
-                  <input type="radio" />
-                  <span>
-                    <strong>Express Priority</strong>
-                    <small>Next day delivery</small>
-                  </span>
-                </label>
-              </section>
-
-              <section className="ma-card address-stats-card">
-                <h3>Quick Stats</h3>
-                <div className="address-stat-grid">
-                  <div>
-                    <span>Total</span>
-                    <strong>{String(addresses.length).padStart(2, '0')}</strong>
-                  </div>
-                  <div>
-                    <span>Verified</span>
-                    <strong>{String(addresses.length).padStart(2, '0')}</strong>
-                  </div>
-                </div>
-                <div className="address-default-status">
-                  <span>Default Set</span>
-                  <strong>{defaultAddress ? 'Active' : 'Missing'}</strong>
-                  <span className="material-symbols-outlined">{defaultAddress ? 'check_circle' : 'error'}</span>
-                </div>
-              </section>
-
-              <section className="address-tip-card">
-                <span className="material-symbols-outlined">emoji_objects</span>
-                <h3>Pro Tip</h3>
-                <p>Keep your address information accurate to avoid delivery delays for high-value orders.</p>
-              </section>
-            </aside>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+
+      {showForm && (
+        <div className="ma-modal-overlay">
+          <div className="ma-modal animate-fade-in">
+            <div className="ma-modal-header">
+              <h3>{editingId ? 'Edit Address' : 'Add New Address'}</h3>
+              <button className="ma-modal-close" onClick={() => setShowForm(false)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="ma-modal-body">
+              <form onSubmit={handleSubmit}>
+                <div className="ma-form-grid">
+                  <div className="ma-form-group">
+                    <label className="ma-label">Province</label>
+                    <select className="ma-input" value={form.provinceId} onChange={(e) => handleFieldChange('provinceId', e.target.value)}>
+                      <option value="">Select Province</option>
+                      {provinces.map((province) => <option key={province.code} value={province.code}>{province.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="ma-form-group">
+                    <label className="ma-label">District</label>
+                    <select className="ma-input" value={form.districtId} onChange={(e) => handleFieldChange('districtId', e.target.value)} disabled={!form.provinceId || locationLoading}>
+                      <option value="">Select District</option>
+                      {districts.map((district) => <option key={district.code} value={district.code}>{district.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="ma-form-group">
+                    <label className="ma-label">Ward</label>
+                    <select className="ma-input" value={form.wardCode} onChange={(e) => handleFieldChange('wardCode', e.target.value)} disabled={!form.districtId || locationLoading}>
+                      <option value="">Select Ward</option>
+                      {wards.map((ward) => <option key={ward.code} value={ward.code}>{ward.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="ma-form-group">
+                    <label className="ma-label">Receiver Name</label>
+                    <input className="ma-input" value={form.receiverName} onChange={(e) => handleFieldChange('receiverName', e.target.value)} />
+                  </div>
+                  <div className="ma-form-group">
+                    <label className="ma-label">Receiver Phone</label>
+                    <input className="ma-input" value={form.receiverPhone} onChange={(e) => handleFieldChange('receiverPhone', e.target.value.replace(/\D/g, ''))} />
+                  </div>
+                  <div className="ma-form-group ma-form-group-wide">
+                    <label className="ma-label">Street Address</label>
+                    <input className="ma-input" value={form.streetAddress} onChange={(e) => handleFieldChange('streetAddress', e.target.value)} placeholder="House number, street, building" />
+                  </div>
+                  <label className="address-default-toggle">
+                    <input type="checkbox" checked={form.isDefault} onChange={(e) => handleFieldChange('isDefault', e.target.checked)} />
+                    Set as default address
+                  </label>
+                </div>
+
+                <div className="ma-form-actions" style={{ marginTop: '24px', paddingTop: '20px' }}>
+                  <button className="ma-btn-primary" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Address'}</button>
+                  <button className="ma-btn-secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

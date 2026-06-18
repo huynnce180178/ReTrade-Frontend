@@ -186,9 +186,9 @@ export default function OrderManagement() {
       disposed = true;
       connection.off('SellerOrderStatusChanged', handleOrderStatusChanged);
       if (connection.state === 'Connected') {
-        connection.invoke('LeaveSellerOrderGroup', sellerId).catch(() => {});
+        connection.invoke('LeaveSellerOrderGroup', sellerId).catch(() => { });
       }
-      connection.stop().catch(() => {});
+      connection.stop().catch(() => { });
     };
   }, [activeStatus, appliedFilters, appliedSearchTerm, fetchOrders, isSeller, page, sellerId, showToast]);
 
@@ -295,23 +295,6 @@ export default function OrderManagement() {
       </section>
 
       <section className="om-list-controls">
-        <div className="om-tab-strip">
-          {tabs.map((tab) => (
-            <button
-              key={tab.label}
-              type="button"
-              className={activeStatus === tab.key ? 'active' : ''}
-              onClick={() => {
-                setAppliedFilters(null);
-                resetFilterFormSilently();
-                setActiveStatus(tab.key);
-                setPage(1);
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
         <div className="om-control-tools">
           <form className="om-search om-list-search" onSubmit={handleSearch}>
             <span className="material-symbols-outlined">search</span>
@@ -339,6 +322,23 @@ export default function OrderManagement() {
           >
             <span className="material-symbols-outlined">restart_alt</span>
           </button>
+        </div>
+        <div className="om-tab-strip">
+          {tabs.map((tab) => (
+            <button
+              key={tab.label}
+              type="button"
+              className={activeStatus === tab.key ? 'active' : ''}
+              onClick={() => {
+                setAppliedFilters(null);
+                resetFilterFormSilently();
+                setActiveStatus(tab.key);
+                setPage(1);
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -396,11 +396,10 @@ export default function OrderManagement() {
                         <div className="om-actions">
                           <button
                             type="button"
-                            aria-label="View order detail"
-                            title="Order detail"
+                            className="om-detail-btn"
                             onClick={() => openDetail(order.orderId)}
                           >
-                            <span className="material-symbols-outlined">visibility</span>
+                            Details
                           </button>
                           {action ? (
                             <button

@@ -445,6 +445,98 @@
   border: 1px solid rgba(255,255,255,0.5);
 }
 
+.product-wishlist-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 2;
+}
+
+.product-wishlist-btn:hover:not(:disabled) {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.product-wishlist-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.product-wishlist-btn.active {
+  background: var(--bg-secondary);
+}
+
+.product-wishlist-btn.active .product-wishlist-heart {
+  font-variation-settings: 'FILL' 1, 'wght' 400;
+  color: var(--error);
+  animation: heart-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.product-wishlist-heart {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-muted);
+  font-variation-settings: 'FILL' 0, 'wght' 350;
+  transition: transform 0.2s ease, color 0.2s ease, font-variation-settings 0.2s ease;
+}
+
+.product-wishlist-btn:hover:not(:disabled) .product-wishlist-heart {
+  color: var(--error);
+  font-variation-settings: 'FILL' 0, 'wght' 400;
+}
+
+.product-buy-now-btn {
+  position: absolute;
+  top: 10px;
+  right: 54px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 2;
+  color: var(--text-muted);
+}
+
+.product-buy-now-btn:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--primary);
+}
+
+.product-buy-now-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.product-wl-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(2, 36, 27, 0.2);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: wl-spin 0.7s linear infinite;
+}
+
 .product-card-body {
   padding: 16px;
   display: flex;

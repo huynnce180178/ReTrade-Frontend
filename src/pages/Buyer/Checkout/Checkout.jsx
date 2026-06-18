@@ -130,7 +130,7 @@ const Checkout = () => {
           const paymentRes = await createVnPayPaymentUrl({
             orderId: res.orderId || res.OrderId,
             amount: total,
-            orderDescription: `Thanh toan don hang ${res.orderId || res.OrderId}`
+            orderDescription: `Payment for order ${res.orderId || res.OrderId}`
           });
           if (paymentRes?.paymentUrl) {
             window.location.href = paymentRes.paymentUrl;

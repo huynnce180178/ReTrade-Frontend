@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
+import wishlistService from '../../../services/wishlistService';
+import { useAuth } from '../../../context/AuthContext';
 import '../../../styles/Product.css';
 
 const CONDITIONS = ['New (Sealed)', 'Like New (99%)', 'Used', 'Heavily Used'];
@@ -59,6 +61,10 @@ export default function Product() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
+  const { user } = useAuth();
+  const [wishlistIds, setWishlistIds] = useState(new Set());
+  const [togglingId, setTogglingId] = useState(null);
+
   // Filter states — sync from URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
   const searchTerm = searchParams.get('search') || '';
@@ -94,6 +100,20 @@ export default function Product() {
     };
     fetchCategories();
   }, []);
+
+  const fetchWishlist = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await wishlistService.getWishlist();
+      const ids = new Set((data.items ?? []).map(i => i.productId));
+      setWishlistIds(ids);
+    } catch {
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchWishlist();
+  }, [fetchWishlist]);
 
   // Fetch products
   useEffect(() => {
@@ -164,6 +184,39 @@ export default function Product() {
     setSearchParams({ page: '1' });
     setMinPriceInput('');
     setMaxPriceInput('');
+  };
+
+  const handleToggleWishlist = async (product) => {
+    if (!user) {
+      showToast('Please sign in to use the wishlist.', 'error');
+      return;
+    }
+    if (product.sellerId === user.userId || product.sellerId === user.id) {
+      showToast('You cannot add your own product to your wishlist.', 'error');
+      return;
+    }
+    setTogglingId(product.productId);
+    const isAdded = wishlistIds.has(product.productId);
+    try {
+      if (isAdded) {
+        const data = await wishlistService.getWishlist();
+        const item = (data.items ?? []).find(i => i.productId === product.productId);
+        if (item) {
+          await wishlistService.removeItem(item.wishlistItemId);
+          setWishlistIds(prev => { const n = new Set(prev); n.delete(product.productId); return n; });
+          showToast('Removed from wishlist.', 'success');
+        }
+      } else {
+        await wishlistService.addToWishlist(product.productId);
+        setWishlistIds(prev => new Set([...prev, product.productId]));
+        showToast('Added to wishlist!', 'success');
+      }
+    } catch (err) {
+      const msg = err.response?.data || err.message || 'Something went wrong.';
+      showToast(msg, 'error');
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   // Build hierarchical categories (only root + 1 level for filter sidebar)
@@ -371,6 +424,38 @@ export default function Product() {
                       )}
                       {product.condition && (
                         <span className="product-card-condition">{product.condition}</span>
+                      )}
+                      {product.status !== 'SoldOut' && product.status !== 'Sold' && product.status !== 'Inactive' && product.stockQuantity > 0 && (
+                        <>
+                          <button
+                            className={`product-wishlist-btn${wishlistIds.has(product.productId) ? ' active' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleWishlist(product);
+                            }}
+                            disabled={togglingId === product.productId}
+                            title={wishlistIds.has(product.productId) ? 'Remove from wishlist' : 'Add to wishlist'}
+                          >
+                            {togglingId === product.productId
+                              ? <span className="product-wl-spinner" />
+                              : <span className="material-symbols-outlined product-wishlist-heart">
+                                {wishlistIds.has(product.productId) ? 'favorite' : 'favorite'}
+                              </span>
+                            }
+                          </button>
+                          {product.price != null && (
+                            <button
+                              className="product-buy-now-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/checkout/${product.productId}`);
+                              }}
+                              title="Buy Now"
+                            >
+                              <span className="material-symbols-outlined">shopping_cart</span>
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                     <div className="product-card-body">

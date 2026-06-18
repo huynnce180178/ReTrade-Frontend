@@ -34,6 +34,8 @@ import SellerLayout from './layouts/SellerLayout/SellerLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
+import MyProducts from './pages/Seller/MyProducts/MyProducts';
+import ProductForm from './pages/Seller/ProductForm/ProductForm';
 import OrderManagement from './pages/Seller/OrderManagement/OrderManagement';
 import OrderDetail from './pages/Seller/OrderDetail/OrderDetail';
 import OrderStatusUpdate from './pages/Seller/OrderStatusUpdate/OrderStatusUpdate';
@@ -62,6 +64,9 @@ function App() {
                 <Route path="sellers/:sellerId" element={<SellerProfile />} />
                 <Route path="seller-dashboard" element={<SellerLayout />}>
                   <Route index element={<SellerDashboard />} />
+                  <Route path="products" element={<MyProducts />} />
+                  <Route path="products/new" element={<ProductForm />} />
+                  <Route path="products/edit/:productId" element={<ProductForm />} />
                   <Route path="sales-statistics" element={<SalesStatistics />} />
                   <Route path="orders" element={<OrderManagement />} />
                   <Route path="orders/:orderId/status" element={<OrderStatusUpdate />} />

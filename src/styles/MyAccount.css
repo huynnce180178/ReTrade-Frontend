@@ -1365,3 +1365,92 @@
     justify-content: center;
   }
 }
+
+/* Modal Popup Styles for Address Book */
+.ma-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.ma-modal {
+  width: 100%;
+  max-width: 600px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(113, 121, 117, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ma-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(113, 121, 117, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ma-modal-header h3 {
+  margin: 0;
+  font-family: var(--font-title, 'Playfair Display', serif);
+  font-size: 24px;
+  color: #000805;
+  font-weight: 700;
+}
+
+.ma-modal-close {
+  background: transparent;
+  border: none;
+  color: #717975;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.ma-modal-close:hover {
+  background-color: #f4f4f3;
+  color: #000805;
+}
+
+.ma-modal-body {
+  padding: 24px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.ma-modal-body .ma-form-grid {
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 640px) {
+  .ma-modal-body .ma-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ma-modal-body .ma-form-group-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.ma-modal-body .address-default-toggle {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 8px;
+}

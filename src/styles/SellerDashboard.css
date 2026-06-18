@@ -30,6 +30,49 @@
   padding: 34px 18px;
 }
 
+.seller-mobile-header {
+  display: none;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(113, 121, 117, 0.12);
+}
+
+.seller-mobile-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #003d2f;
+}
+
+.seller-mobile-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: #003d2f;
+  cursor: pointer;
+}
+
+.seller-sidebar-close {
+  display: none;
+}
+
+.seller-sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 27, 20, 0.4);
+  z-index: 998;
+}
+
 .seller-dash-profile {
   text-align: center;
   margin-bottom: 36px;
@@ -2280,10 +2323,48 @@
 @media (max-width: 1180px) {
   .seller-dashboard-page {
     grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .seller-mobile-header {
+    display: flex;
   }
 
   .seller-dash-sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    left: -300px;
+    bottom: 0;
+    width: 260px;
+    z-index: 999;
+    background: #ffffff;
+    overflow-y: auto;
+    transition: left 0.3s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+  }
+
+  .seller-dash-sidebar.open {
+    left: 0;
+  }
+
+  .seller-sidebar-overlay {
+    display: block;
+  }
+
+  .seller-sidebar-close {
+    display: inline-flex;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #6c7772;
+    cursor: pointer;
   }
 
   .product-form-layout {

@@ -210,6 +210,30 @@ export default function Listings() {
           </div>
 
           <div className="admin-panel-actions">
+            <div className="admin-search-row">
+              <label className="admin-search-box">
+                <span className="material-symbols-outlined">search</span>
+                <input
+                  type="text"
+                  placeholder="Search by product name, seller..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </label>
+
+              <label className="admin-select-box">
+                <span className="material-symbols-outlined">filter_alt</span>
+                <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                  <option value="All">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.categoryId} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <div className="admin-pill-group">
               <button
                 className={`admin-pill ${statusFilter === 'All' ? 'active' : ''}`}
@@ -253,30 +277,6 @@ export default function Listings() {
               >
                 Inactive
               </button>
-            </div>
-
-            <div className="admin-search-row">
-              <label className="admin-search-box">
-                <span className="material-symbols-outlined">search</span>
-                <input
-                  type="text"
-                  placeholder="Search by product name, seller..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </label>
-
-              <label className="admin-select-box">
-                <span className="material-symbols-outlined">filter_alt</span>
-                <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-                  <option value="All">All Categories</option>
-                  {categories.map((c) => (
-                    <option key={c.categoryId} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
           </div>
         </header>
@@ -348,8 +348,7 @@ export default function Listings() {
                             openProductDetail(p);
                           }}
                         >
-                          <span className="material-symbols-outlined">visibility</span>
-                          View Details
+                          Details
                         </button>
                       </td>
                     </tr>

@@ -51,9 +51,8 @@
 
 @media (min-width: 1024px) {
   .admin-panel-header {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
@@ -73,14 +72,8 @@
 .admin-panel-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-@media (min-width: 640px) {
-  .admin-panel-actions {
-    flex-direction: row;
-    align-items: center;
-  }
+  gap: 16px;
+  width: 100%;
 }
 
 .admin-pill-group {
@@ -88,6 +81,9 @@
   background-color: #f3f4f6;
   border-radius: 8px;
   padding: 4px;
+  width: fit-content;
+  flex-wrap: wrap;
+  gap: 2px;
 }
 
 .admin-pill {
@@ -110,7 +106,15 @@
 
 .admin-search-row {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .admin-search-row {
+    flex-direction: column;
+    width: 100%;
+  }
 }
 
 .admin-search-box {
@@ -120,6 +124,8 @@
   border-radius: 8px;
   padding: 0 12px;
   background-color: #ffffff;
+  flex: 1;
+  min-height: 42px;
 }
 
 .admin-search-box span {
@@ -133,7 +139,7 @@
   font-size: 13px;
   color: #111827;
   outline: none;
-  width: 200px;
+  width: 100%;
 }
 
 .admin-select-box {
@@ -143,6 +149,15 @@
   border-radius: 8px;
   padding: 0 8px;
   background-color: #ffffff;
+  min-width: 220px;
+  min-height: 42px;
+}
+
+@media (max-width: 640px) {
+  .admin-select-box {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .admin-select-box span {
@@ -159,6 +174,7 @@
   background: none;
   padding: 8px 12px;
   cursor: pointer;
+  width: 100%;
 }
 
 .admin-listings-table-wrap {

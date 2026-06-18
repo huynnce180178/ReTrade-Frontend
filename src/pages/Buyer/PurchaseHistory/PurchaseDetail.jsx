@@ -173,7 +173,7 @@ export default function PurchaseDetail() {
       const payload = {
         orderId: purchase.orderId,
         amount: Number(purchase.finalAmount || purchase.totalAmount || totals.final || 0),
-        orderDescription: `Thanh toán đơn hàng ${purchase.orderCode || purchase.orderId}`,
+        orderDescription: `Payment for order ${purchase.orderCode || purchase.orderId}`,
       };
 
       const resp = await paymentService.createVnpayPaymentUrl(payload);

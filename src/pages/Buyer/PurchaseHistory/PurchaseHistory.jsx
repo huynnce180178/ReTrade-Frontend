@@ -6,6 +6,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import purchaseService from '../../../services/purchaseService';
 import reviewService from '../../../services/reviewService';
+import paymentService from '../../../services/paymentService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import '../../../styles/MyAccount.css';
 import './PurchaseHistory.css';
@@ -290,6 +291,36 @@ export default function PurchaseHistory() {
     }
   };
 
+  const handlePayAgain = async (purchase) => {
+    if (!buyerId || !purchase?.orderId) return;
+
+    try {
+      setUpdatingId(purchase.orderId);
+      const payload = {
+        orderId: purchase.orderId,
+        amount: Number(purchase.finalAmount || purchase.totalAmount || 0),
+        orderDescription: `Payment for order ${purchase.orderCode || purchase.orderId}`,
+      };
+
+      const resp = await paymentService.createVnpayPaymentUrl(payload);
+      const url =
+        typeof resp === 'string'
+          ? resp
+          : resp?.paymentUrl || resp?.url || resp?.paymentLink || null;
+
+      if (!url) {
+        showToast('Payment URL not returned from server.', 'error');
+        return;
+      }
+
+      window.location.href = url;
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to create payment link.', 'error');
+    } finally {
+      setUpdatingId('');
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="profile-loading-wrapper">
@@ -370,6 +401,7 @@ export default function PurchaseHistory() {
                       onCancel={() => updatePurchase(purchase, 'cancel')}
                       onComplete={() => updatePurchase(purchase, 'complete')}
                       onWriteReview={() => handleOpenReview(purchase)}
+                      onPayAgain={() => handlePayAgain(purchase)}
                     />
                   ))
                 )}
@@ -467,39 +499,74 @@ export default function PurchaseHistory() {
   );
 }
 
-function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview }) {
+function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onPayAgain }) {
   const meta = statusMeta[purchase.status] || { label: purchase.status || 'Unknown', className: 'default' };
   const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
   const canComplete = purchase.status === 'Delivered';
   const canReview = purchase.status === 'Completed' && !purchase.hasReview;
+  const canPay = purchase.status === 'AwaitingPayment';
 
   return (
     <article className="purchase-card">
-      <header className="purchase-card-header">
-        <div>
-          <strong>#{purchase.orderCode || purchase.orderId}</strong>
-          <span>{formatDate(purchase.createdAt)}</span>
-        </div>
-        <em className={`purchase-status ${meta.className}`}>{meta.label}</em>
-      </header>
+      <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-card-click-area">
+        <header className="purchase-card-header">
+          <div className="purchase-card-header-left">
+            <strong className="purchase-card-order-code">Order #{purchase.orderCode || purchase.orderId}</strong>
+            <span className="purchase-card-date">{formatDate(purchase.createdAt)}</span>
+            <span className="purchase-card-seller">
+              <span className="material-symbols-outlined">storefront</span>
+              {purchase.sellerName || purchase.sellerEmail || '-'}
+            </span>
+          </div>
+          <em className={`purchase-status ${meta.className}`}>{meta.label}</em>
+        </header>
 
-      <div className="purchase-card-body">
-        <img src={purchase.productImageUrl || '/vite.svg'} alt={purchase.productName || 'Purchased product'} />
-        <div className="purchase-card-info">
-          <h3>{purchase.productName || 'Untitled product'}</h3>
-          <p>Seller: {purchase.sellerName || purchase.sellerEmail || '-'}</p>
-          <p>Qty: {purchase.quantity || 0}</p>
+        <div className="purchase-card-body">
+          <div className="purchase-product-item">
+            <img 
+              className="purchase-product-img" 
+              src={purchase.productImageUrl || '/vite.svg'} 
+              alt={purchase.productName || 'Purchased product'} 
+            />
+            <div className="purchase-product-details">
+              <h3 className="purchase-product-title">{purchase.productName || 'Untitled product'}</h3>
+              <span className="purchase-product-qty">Qty: x{purchase.quantity || 0}</span>
+            </div>
+            <div className="purchase-product-price-info">
+              <span className="purchase-product-unit-price">
+                {formatVnd(purchase.unitPrice || (purchase.totalAmount / (purchase.quantity || 1)) || 0)}
+              </span>
+            </div>
+          </div>
+
+          <div className="purchase-order-total">
+            <div className="purchase-shipping-info">
+              <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle', marginRight: '4px', color: 'var(--text-muted)' }}>
+                local_shipping
+              </span>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                {purchase.shippingProvider || 'Shipping pending'}
+              </span>
+            </div>
+            <div className="purchase-total-price-wrap">
+              <span className="purchase-total-label">Order Total: </span>
+              <strong className="purchase-total-price">
+                {formatVnd(purchase.finalAmount || purchase.totalAmount || 0)}
+              </strong>
+            </div>
+          </div>
         </div>
-                    <div className="purchase-card-amount">
-          <strong>{formatVnd(purchase.finalAmount || purchase.totalAmount || 0)}</strong>
-          <span>{purchase.shippingProvider || 'Shipping pending'}</span>
-        </div>
-      </div>
+      </Link>
 
       <footer className="purchase-card-actions">
         {canCancel && (
           <button type="button" className="purchase-text-danger" disabled={updating} onClick={onCancel}>
             {updating ? 'Updating...' : 'Cancel'}
+          </button>
+        )}
+        {canPay && (
+          <button type="button" className="purchase-primary-btn" disabled={updating} onClick={onPayAgain}>
+            {updating ? 'Processing...' : 'Pay Again'}
           </button>
         )}
         {canReview && (
@@ -510,11 +577,11 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview 
         <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-detail-btn">
           Details
         </Link>
-            {canComplete && (
-              <button type="button" className="purchase-primary-btn" disabled={updating} onClick={onComplete}>
-                {updating ? 'Updating...' : 'Mark Completed'}
-              </button>
-            )}
+        {canComplete && (
+          <button type="button" className="purchase-primary-btn" disabled={updating} onClick={onComplete}>
+            {updating ? 'Updating...' : 'Mark Completed'}
+          </button>
+        )}
       </footer>
     </article>
   );

@@ -461,6 +461,18 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
             }
           </button>
         )}
+        {!isOutOfStock && product.price != null && (
+          <button
+            className="home-buy-now-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/checkout/${product.productId}`);
+            }}
+            title="Buy Now"
+          >
+            <span className="material-symbols-outlined">shopping_cart</span>
+          </button>
+        )}
         {product.condition && (
           <span className="home-product-condition">{product.condition}</span>
         )}
