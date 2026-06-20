@@ -1,14 +1,174 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import productService from '../../../services/productService';
+import wishlistService from '../../../services/wishlistService';
+import categoryService from '../../../services/categoryService';
+import userFavoriteService from '../../../services/userFavoriteService';
+import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
+import FavoriteCategoriesModal from '../../../components/FavoriteCategoriesModal/FavoriteCategoriesModal';
 import '../../../styles/Home.css';
 
-export default function Home() {
-  const [searchQuery, setSearchQuery] = useState('');
+function formatPrice(price) {
+  if (price == null) return null;
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+}
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      alert(`Searching for: "${searchQuery}"`);
+export default function Home() {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
+  const isLoggedIn = !!user;
+
+
+
+  // Wishlist
+  const [wishlistIds, setWishlistIds] = useState(new Set());
+  const [togglingId, setTogglingId] = useState(null);
+
+  // Favorites
+  const [favorites, setFavorites] = useState([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
+  const [favoriteProducts, setFavoriteProducts] = useState({});
+  const [showFavModal, setShowFavModal] = useState(false);
+
+  // Latest products
+  const [latestProducts, setLatestProducts] = useState([]);
+  const [loadingLatest, setLoadingLatest] = useState(true);
+
+  // Categories
+  const [categories, setCategories] = useState([]);
+
+  // Fetch all root categories for the horizontal list
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await categoryService.getAllActive("?$filter=Status eq 'Active'&$orderby=Name asc");
+        const arr = Array.isArray(data) ? data : (data?.value || []);
+        setCategories(arr.filter(c => !c.parentId));
+      } catch {
+        // Silently fail
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const fetchLatestProducts = useCallback(async () => {
+    setLoadingLatest(true);
+    try {
+      const data = await productService.getAll({
+        Status: 'Accepted',
+        Page: 1,
+        PageSize: 8,
+        SortBy: 'newest',
+      });
+      setLatestProducts(data.items || []);
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingLatest(false);
+    }
+  }, []);
+
+  const fetchFavorites = useCallback(async () => {
+    setLoadingFavorites(true);
+    try {
+      const data = await userFavoriteService.getFavorites();
+      const favs = Array.isArray(data) ? data : [];
+      setFavorites(favs);
+
+      if (favs.length === 0) {
+        // Show modal if no favorites
+        if (user && user.userId) {
+          setShowFavModal(true);
+        }
+      } else {
+        // Fetch products for each favorite category
+        const productMap = {};
+        await Promise.all(
+          favs.slice(0, 6).map(async (fav) => {
+            try {
+              const result = await productService.getAll({
+                CategoryId: fav.categoryId,
+                Status: 'Accepted',
+                Page: 1,
+                PageSize: 6,
+              });
+              productMap[fav.categoryId] = result.items || [];
+            } catch {
+              productMap[fav.categoryId] = [];
+            }
+          })
+        );
+        setFavoriteProducts(productMap);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingFavorites(false);
+    }
+  }, [user]);
+
+  const fetchWishlist = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await wishlistService.getWishlist();
+      const ids = new Set((data.items ?? []).map(i => i.productId));
+      setWishlistIds(ids);
+    } catch {
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchLatestProducts();
+  }, [fetchLatestProducts]);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchFavorites();
+    }
+  }, [isLoggedIn, fetchFavorites]);
+
+  useEffect(() => {
+    fetchWishlist();
+  }, [fetchWishlist]);
+
+
+
+  const handleTagClick = (tag) => {
+    navigate(`/product?search=${encodeURIComponent(tag)}`);
+  };
+
+  const handleToggleWishlist = async (product) => {
+    if (!user) {
+      showToast('Please sign in to use the wishlist.', 'error');
+      return;
+    }
+    if (product.sellerId === user.userId || product.sellerId === user.id) {
+      showToast('You cannot add your own product to your wishlist.', 'error');
+      return;
+    }
+    setTogglingId(product.productId);
+    const isAdded = wishlistIds.has(product.productId);
+    try {
+      if (isAdded) {
+        const data = await wishlistService.getWishlist();
+        const item = (data.items ?? []).find(i => i.productId === product.productId);
+        if (item) {
+          await wishlistService.removeItem(item.wishlistItemId);
+          setWishlistIds(prev => { const n = new Set(prev); n.delete(product.productId); return n; });
+          showToast('Removed from wishlist.', 'success');
+        }
+      } else {
+        await wishlistService.addToWishlist(product.productId);
+        setWishlistIds(prev => new Set([...prev, product.productId]));
+        showToast('Added to wishlist!', 'success');
+      }
+    } catch (err) {
+      const msg = err.response?.data || err.message || 'Something went wrong.';
+      showToast(msg, 'error');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -17,7 +177,7 @@ export default function Home() {
       <section className="hero-section">
         <div className="hero-glow hero-glow-1"></div>
         <div className="hero-glow hero-glow-2"></div>
-        
+
         <div className="container hero-container">
           <div className="hero-content">
             <span className="hero-badge">✨ Next-Generation Trading Platform</span>
@@ -29,30 +189,12 @@ export default function Home() {
               Buy, sell, and host auctions for quality pre-loved goods. Fully secured, verified, and community-driven.
             </p>
 
-            <form className="hero-search-form" onSubmit={handleSearchSubmit}>
-              <div className="search-input-wrapper">
-                <svg className="search-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="search-input"
-                />
-              </div>
-              <button type="submit" className="btn btn-primary search-btn">
-                Search
-              </button>
-            </form>
-
             <div className="hero-tags">
               <span className="tag-label">Popular:</span>
-              <button className="tag-btn" onClick={() => setSearchQuery('iPhone')}>iPhone</button>
-              <button className="tag-btn" onClick={() => setSearchQuery('Motorcycle')}>Motorcycle</button>
-              <button className="tag-btn" onClick={() => setSearchQuery('Camera')}>Camera</button>
-              <button className="tag-btn" onClick={() => setSearchQuery('Laptop')}>Laptop</button>
+              <button className="tag-btn" onClick={() => handleTagClick('iPhone')}>iPhone</button>
+              <button className="tag-btn" onClick={() => handleTagClick('Laptop')}>Laptop</button>
+              <button className="tag-btn" onClick={() => handleTagClick('Sneakers')}>Sneakers</button>
+              <button className="tag-btn" onClick={() => handleTagClick('Camera')}>Camera</button>
             </div>
           </div>
 
@@ -77,7 +219,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            
+
             <div className="visual-card floating-card-1">
               <div className="float-badge">🚀 Fast Deal</div>
               <p>MacBook Pro M2 - $1,100</p>
@@ -90,7 +232,25 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="stats-section">
+      {/* Horizontal Category List */}
+      {categories.length > 0 && (
+        <section className="home-categories-section">
+          <div className="container">
+            <div className="home-categories-list">
+              {categories.map(cat => (
+                <Link to={`/category/${cat.categoryId}`} key={cat.categoryId} className="home-category-card">
+                  <div className="home-category-icon">
+                    {cat.imageUrl ? <img src={cat.imageUrl} alt={cat.name} /> : <span>🏷️</span>}
+                  </div>
+                  <span className="home-category-name">{cat.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="home-main-section">
         <div className="container stats-grid grid-4-col">
           <div className="stat-card glass-card">
             <h3>$3.5M+</h3>
@@ -107,6 +267,111 @@ export default function Home() {
           <div className="stat-card glass-card">
             <h3>99.4%</h3>
             <p>Success Rate</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Favorite Categories / Latest Products Section */}
+      <section className="home-products-section">
+        <div className="container">
+          {isLoggedIn && favorites.length > 0 && (
+            <>
+              <div className="home-section-header">
+                <div>
+                  <h2 className="section-title">Your <span className="gradient-primary-text">Favorites</span></h2>
+                  <p className="section-subtitle">Products from your favorite categories</p>
+                </div>
+                <button className="btn btn-outline" onClick={() => setShowFavModal(true)} style={{ fontSize: '13px', padding: '8px 16px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }}>
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Edit Favorites
+                </button>
+              </div>
+              {favorites.slice(0, 6).map(fav => {
+                const products = favoriteProducts[fav.categoryId] || [];
+                if (products.length === 0) return null;
+                return (
+                  <div key={fav.categoryId} className="home-category-section">
+                    <div className="home-category-header">
+                      <h3>{fav.categoryName || 'Category'}</h3>
+                      <Link to={`/category/${fav.categoryId}`} className="home-view-all-link">
+                        View All →
+                      </Link>
+                    </div>
+                    <div className="home-product-scroll">
+                      {products.map(p => (
+                        <HomeProductCard
+                          key={p.productId}
+                          product={p}
+                          isWishlisted={wishlistIds.has(p.productId)}
+                          toggling={togglingId === p.productId}
+                          onToggleWishlist={handleToggleWishlist}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Always show Latest Products / Random Products at the bottom */}
+          <div style={{ marginTop: isLoggedIn && favorites.length > 0 ? '60px' : '0' }}>
+            <div className="home-section-header">
+              <div>
+                <h2 className="section-title">
+                  {isLoggedIn ? 'Products You Might Be ' : 'Latest '}
+                  <span className="gradient-primary-text">
+                    {isLoggedIn ? 'Interested In' : 'Products'}
+                  </span>
+                </h2>
+                <p className="section-subtitle">
+                  {isLoggedIn
+                    ? 'Recently listed items from our verified sellers based on your preferences'
+                    : 'Recently listed items from our verified sellers'}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {isLoggedIn && (
+                  <button className="btn btn-outline" onClick={() => setShowFavModal(true)} style={{ fontSize: '13px', padding: '8px 16px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }}>
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                    Set Favorite Categories
+                  </button>
+                )}
+                <Link to="/product" className="btn btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
+                  Browse All →
+                </Link>
+              </div>
+            </div>
+
+            {loadingLatest ? (
+              <div className="home-products-loading">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="home-product-skeleton" />
+                ))}
+              </div>
+            ) : latestProducts.length > 0 ? (
+              <div className="home-product-scroll">
+                {latestProducts.map(p => (
+                  <HomeProductCard
+                    key={p.productId}
+                    product={p}
+                    isWishlisted={wishlistIds.has(p.productId)}
+                    toggling={togglingId === p.productId}
+                    onToggleWishlist={handleToggleWishlist}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="home-products-empty">
+                <span>🛍️</span>
+                <p>No products yet. Check back soon!</p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -150,6 +415,80 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Favorite Categories Modal */}
+      <FavoriteCategoriesModal
+        isOpen={showFavModal}
+        onClose={() => setShowFavModal(false)}
+        currentFavorites={favorites}
+        onUpdate={fetchFavorites}
+      />
+    </div>
+  );
+}
+
+function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) {
+  const isOutOfStock = product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || product.stockQuantity <= 0;
+  const navigate = useNavigate();
+
+  return (
+    <div
+      className="home-product-card glass-card"
+      onClick={() => navigate(`/product/${product.productId}`)}
+      style={{ cursor: 'pointer' }}
+    >
+      <div className="home-product-img-wrap">
+        {product.mainImageUrl ? (
+          <img src={product.mainImageUrl} alt={product.name} className="home-product-img" />
+        ) : (
+          <div className="home-product-img-placeholder">🛍️</div>
+        )}
+        {!isOutOfStock && (
+          <button
+            className={`home-wishlist-btn${isWishlisted ? ' active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleWishlist(product);
+            }}
+            disabled={toggling}
+            title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+          >
+            {toggling
+              ? <span className="home-wl-spinner" />
+              : <span className="material-symbols-outlined home-wishlist-heart">
+                {isWishlisted ? 'favorite' : 'favorite'}
+              </span>
+            }
+          </button>
+        )}
+        {!isOutOfStock && product.price != null && (
+          <button
+            className="home-buy-now-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/checkout/${product.productId}`);
+            }}
+            title="Buy Now"
+          >
+            <span className="material-symbols-outlined">shopping_cart</span>
+          </button>
+        )}
+        {product.condition && (
+          <span className="home-product-condition">{product.condition}</span>
+        )}
+      </div>
+
+      <div className="home-product-body">
+        <p className="home-product-seller">{product.sellerName ?? 'Unknown Seller'}</p>
+        <h3 className="home-product-name">{product.name}</h3>
+        <div className="home-product-footer">
+          <span className="home-product-price">
+            {product.price != null
+              ? `${Number(product.price).toLocaleString('vi-VN')} ₫`
+              : 'Auction'}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

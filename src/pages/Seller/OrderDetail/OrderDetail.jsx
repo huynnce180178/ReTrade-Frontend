@@ -15,15 +15,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   minute: '2-digit',
 });
 
-const statusOptions = [
-  'AwaitingPayment',
-  'Pending',
-  'Confirmed',
-  'Shipping',
-  'Delivered',
-  'Returned',
-  'Cancelled',
-];
+const SHIPPING_PROVIDER = 'GHN';
 
 const statusLabels = {
   AwaitingPayment: 'Awaiting Payment',
@@ -31,6 +23,8 @@ const statusLabels = {
   Confirmed: 'Confirmed',
   Shipping: 'Shipping',
   Delivered: 'Delivered',
+  Completed: 'Completed',
+  DeliveryFailed: 'Delivery Failed',
   Returned: 'Returned',
   Cancelled: 'Cancelled',
 };
@@ -41,11 +35,11 @@ const statusClass = {
   Confirmed: 'confirmed',
   Shipping: 'shipping',
   Delivered: 'delivered',
+  Completed: 'completed',
+  DeliveryFailed: 'delivery-failed',
   Returned: 'returned',
   Cancelled: 'cancelled',
 };
-
-const statusOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered'];
 
 export default function OrderDetail() {
   const { orderId } = useParams();
@@ -54,13 +48,6 @@ export default function OrderDetail() {
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    status: 'Pending',
-    trackingCode: '',
-    shippingProvider: '',
-    expectedDeliveryTime: '',
-  });
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
@@ -74,12 +61,6 @@ export default function OrderDetail() {
       setLoading(true);
       const data = await orderService.getById(orderId, { sellerId: user.userId });
       setOrder(data);
-      setForm({
-        status: data?.status || 'Pending',
-        trackingCode: data?.trackingCode || '',
-        shippingProvider: data?.shippingProvider || '',
-        expectedDeliveryTime: toDateTimeInputValue(data?.expectedDeliveryTime),
-      });
     } catch (error) {
       showToast(error?.response?.data || 'Failed to load order detail.', 'error');
     } finally {
@@ -144,38 +125,7 @@ export default function OrderDetail() {
     }),
     [order]
   );
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!user?.userId) {
-      showToast('SellerId is missing. Please sign in again.', 'error');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const payload = {
-        status: form.status,
-        trackingCode: form.trackingCode || null,
-        shippingProvider: form.shippingProvider || null,
-        expectedDeliveryTime: form.expectedDeliveryTime ? new Date(form.expectedDeliveryTime).toISOString() : null,
-      };
-      const updated = await orderService.updateStatus(orderId, payload, { sellerId: user.userId });
-      setOrder(updated);
-      setForm({
-        status: updated?.status || form.status,
-        trackingCode: updated?.trackingCode || '',
-        shippingProvider: updated?.shippingProvider || '',
-        expectedDeliveryTime: toDateTimeInputValue(updated?.expectedDeliveryTime),
-      });
-      showToast('Order status updated successfully.', 'success');
-    } catch (error) {
-      showToast(error?.response?.data || 'Failed to update order status.', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const timeline = useMemo(() => getOrderTimeline(order), [order]);
 
   if (authLoading) {
     return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading order...</p></div>;
@@ -215,6 +165,23 @@ export default function OrderDetail() {
 
           <div className="sod-layout">
             <section className="sod-main">
+              <article className="sod-card sod-timeline-card">
+                <h2><span className="material-symbols-outlined">route</span>Order Timeline</h2>
+                <ol className="sod-timeline">
+                  {timeline.map((step) => (
+                    <li key={step.key} className={`sod-timeline-step ${step.state}`}>
+                      <span className="sod-timeline-marker">
+                        <span className="material-symbols-outlined">{step.icon}</span>
+                      </span>
+                      <div>
+                        <strong>{step.title}</strong>
+                        <p>{step.detail}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </article>
+
               <article className="sod-card">
                 <h2><span className="material-symbols-outlined">inventory_2</span>Order Item</h2>
                 <div className="sod-item-row">
@@ -225,56 +192,41 @@ export default function OrderDetail() {
                       <small>{order.productId}</small>
                     </div>
                   </div>
-                  <span>Qty {order.quantity || 0}</span>
-                  <strong>{formatVnd(order.unitPrice || 0)}</strong>
-                  <strong className="amount">{formatVnd(order.finalAmount || 0)}</strong>
+                  <div className="sod-qty-cell">
+                    <span>Quantity</span>
+                    <strong>{order.quantity || 0}</strong>
+                  </div>
+                  <div className="sod-price-cell">
+                    <span>Unit Price</span>
+                    <strong>{formatVnd(order.unitPrice || 0)}</strong>
+                  </div>
+                  <div className="sod-price-cell total">
+                    <span>Final Amount</span>
+                    <strong>{formatVnd(order.finalAmount || 0)}</strong>
+                  </div>
                 </div>
               </article>
 
               <article className="sod-card">
-                <h2><span className="material-symbols-outlined">published_with_changes</span>Update Status</h2>
-                <form className="sod-status-form" onSubmit={handleSubmit}>
-                  <label>
+                <h2><span className="material-symbols-outlined">receipt_long</span>Order Snapshot</h2>
+                <div className="sod-snapshot-grid">
+                  <div>
                     <span>Status</span>
-                    <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}>
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>{statusLabels[status]}</option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span>Tracking Code</span>
-                    <input
-                      value={form.trackingCode}
-                      onChange={(event) => setForm((value) => ({ ...value, trackingCode: event.target.value }))}
-                      placeholder="VD: GHN-123456"
-                    />
-                  </label>
-
-                  <label>
-                    <span>Shipping Provider</span>
-                    <input
-                      value={form.shippingProvider}
-                      onChange={(event) => setForm((value) => ({ ...value, shippingProvider: event.target.value }))}
-                      placeholder="VD: GHN, GHTK, Viettel Post"
-                    />
-                  </label>
-
-                  <label>
+                    <strong>{statusLabels[order.status] || order.status || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>Provider</span>
+                    <strong>{order.shippingProvider || SHIPPING_PROVIDER}</strong>
+                  </div>
+                  <div>
                     <span>Expected Delivery</span>
-                    <input
-                      type="datetime-local"
-                      value={form.expectedDeliveryTime}
-                      onChange={(event) => setForm((value) => ({ ...value, expectedDeliveryTime: event.target.value }))}
-                    />
-                  </label>
-
-                  <button type="submit" disabled={saving}>
-                    <span className="material-symbols-outlined">save</span>
-                    {saving ? 'Saving...' : 'Save Status'}
-                  </button>
-                </form>
+                    <strong>{formatDateTime(order.expectedDeliveryTime)}</strong>
+                  </div>
+                  <div>
+                    <span>Updated</span>
+                    <strong>{formatDateTime(order.updatedAt)}</strong>
+                  </div>
+                </div>
               </article>
             </section>
 
@@ -283,14 +235,14 @@ export default function OrderDetail() {
                 <h3><span className="material-symbols-outlined">person</span>Buyer</h3>
                 <strong>{order.buyerName || 'Unknown Buyer'}</strong>
                 <p><span className="material-symbols-outlined">mail</span>{order.buyerEmail || '-'}</p>
-                <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || '-'}</p>
+                <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || getPhoneFromAddressSnapshot(order.addressSnapshot) || '-'}</p>
               </article>
 
               <article className="sod-side-card">
                 <h3><span className="material-symbols-outlined">local_shipping</span>Shipping</h3>
                 <dl>
-                  <div><dt>Provider</dt><dd>{order.shippingProvider || '-'}</dd></div>
-                  <div><dt>Tracking</dt><dd>{order.trackingCode || '-'}</dd></div>
+                  <div><dt>Provider</dt><dd>{order.shippingProvider || SHIPPING_PROVIDER}</dd></div>
+                  {order.trackingCode && <div><dt>Tracking</dt><dd>{order.trackingCode}</dd></div>}
                   <div><dt>Expected</dt><dd>{formatDateTime(order.expectedDeliveryTime)}</dd></div>
                 </dl>
               </article>
@@ -320,12 +272,107 @@ function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
-function toDateTimeInputValue(value) {
-  if (!value) return '';
+function getOrderTimeline(order) {
+  if (!order) return [];
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  if (order.status === 'Cancelled') {
+    return [
+      timelineStep('placed', 'Order Placed', formatDateTime(order.createdAt), 'done', 'check'),
+      timelineStep('cancelled', 'Order Cancelled', formatDateTime(order.updatedAt), 'danger', 'close'),
+    ];
+  }
 
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 16);
+  const rank = getStatusRank(order.status);
+  const stateFor = (status) => {
+    const targetRank = getStatusRank(status);
+    if (order.status === status) return 'current';
+    return rank > targetRank ? 'done' : 'pending';
+  };
+
+  const steps = [
+    timelineStep('placed', 'Order Placed', formatDateTime(order.createdAt), 'done', 'check'),
+    timelineStep(
+      'payment',
+      'Payment Confirmed',
+      order.status === 'AwaitingPayment' ? 'Waiting for buyer payment' : formatDateTime(order.updatedAt || order.createdAt),
+      order.status === 'AwaitingPayment' ? 'current' : stateFor('Pending'),
+      rank > getStatusRank('Pending') ? 'check' : 'schedule'
+    ),
+    timelineStep(
+      'confirmed',
+      'Seller Confirmed',
+      rank >= getStatusRank('Confirmed') ? formatDateTime(order.updatedAt) : 'Waiting for seller confirmation',
+      stateFor('Confirmed'),
+      rank > getStatusRank('Confirmed') ? 'check' : 'inventory'
+    ),
+    timelineStep(
+      'shipping',
+      'In Transit',
+      rank >= getStatusRank('Shipping')
+        ? `Provider: ${order.shippingProvider || SHIPPING_PROVIDER}`
+        : 'Waiting for GHN handoff',
+      stateFor('Shipping'),
+      'local_shipping'
+    ),
+  ];
+
+  if (order.status === 'DeliveryFailed') {
+    steps.push(timelineStep('delivery-failed', 'Delivery Failed', formatDateTime(order.updatedAt), 'danger', 'report'));
+    return steps;
+  }
+
+  steps.push(
+    timelineStep(
+      'delivered',
+      'Delivered',
+      rank >= getStatusRank('Delivered')
+        ? formatDateTime(order.updatedAt)
+        : `Estimated Delivery: ${formatDateTime(order.expectedDeliveryTime)}`,
+      stateFor('Delivered'),
+      rank > getStatusRank('Delivered') ? 'check' : 'radio_button_unchecked'
+    ),
+    timelineStep(
+      'completed',
+      'Completed',
+      order.status === 'Completed' ? formatDateTime(order.updatedAt) : 'Waiting for buyer confirmation',
+      stateFor('Completed'),
+      order.status === 'Completed' ? 'verified' : 'task_alt'
+    )
+  );
+
+  if (order.status === 'Returned') {
+    steps.push(timelineStep('returned', 'Returned', formatDateTime(order.updatedAt), 'warning', 'assignment_return'));
+  }
+
+  return steps;
+}
+
+function timelineStep(key, title, detail, state, icon) {
+  return { key, title, detail, state, icon };
+}
+
+function getStatusRank(status) {
+  const ranks = {
+    AwaitingPayment: 0,
+    Pending: 1,
+    Confirmed: 2,
+    Shipping: 3,
+    Delivered: 4,
+    DeliveryFailed: 4,
+    Completed: 5,
+    Returned: 6,
+  };
+
+  return ranks[status] ?? 0;
+}
+
+function getPhoneFromAddressSnapshot(snapshot) {
+  if (!snapshot) return null;
+
+  const parts = String(snapshot)
+    .split(' - ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.find((part) => /^\d{9,12}$/.test(part)) || null;
 }
