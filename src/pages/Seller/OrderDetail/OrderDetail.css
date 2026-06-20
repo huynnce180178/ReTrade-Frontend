@@ -281,6 +281,11 @@
   color: #ffffff;
 }
 
+.sod-status.delivery-failed {
+  background: rgba(180, 83, 9, 0.14);
+  color: #92400e;
+}
+
 .sod-status.returned {
   background: rgba(217, 119, 6, 0.12);
   color: #a16207;

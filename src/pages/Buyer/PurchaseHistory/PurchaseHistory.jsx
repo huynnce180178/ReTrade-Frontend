@@ -25,6 +25,7 @@ const statusTabs = [
   { key: 'Shipping', label: 'Shipping' },
   { key: 'Delivered', label: 'Delivered' },
   { key: 'Completed', label: 'Completed' },
+  { key: 'DeliveryFailed', label: 'Delivery Failed' },
   { key: 'Cancelled', label: 'Cancelled' },
 ];
 
@@ -35,6 +36,7 @@ const statusTabs = [
   Shipping: { label: 'Shipping', className: 'shipping' },
   Delivered: { label: 'Delivered', className: 'delivered' },
   Completed: { label: 'Completed', className: 'completed' },
+  DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
   Cancelled: { label: 'Cancelled', className: 'cancelled' },
   Returned: { label: 'Returned', className: 'returned' },
 };
@@ -213,7 +215,7 @@ export default function PurchaseHistory() {
   const summary = useMemo(() => {
     const source = allPurchases.length ? allPurchases : purchases;
     const totalSpent = source
-      .filter((purchase) => purchase.status !== 'Cancelled')
+      .filter((purchase) => !['Cancelled', 'DeliveryFailed'].includes(purchase.status))
       .reduce((sum, purchase) => sum + Number(purchase.finalAmount || 0), 0);
     const pending = source.filter((purchase) => ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status)).length;
     const transit = source.filter((purchase) => purchase.status === 'Shipping').length;

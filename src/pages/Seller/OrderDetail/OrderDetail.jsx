@@ -24,6 +24,7 @@ const statusLabels = {
   Shipping: 'Shipping',
   Delivered: 'Delivered',
   Completed: 'Completed',
+  DeliveryFailed: 'Delivery Failed',
   Returned: 'Returned',
   Cancelled: 'Cancelled',
 };
@@ -35,6 +36,7 @@ const statusClass = {
   Shipping: 'shipping',
   Delivered: 'delivered',
   Completed: 'completed',
+  DeliveryFailed: 'delivery-failed',
   Returned: 'returned',
   Cancelled: 'cancelled',
 };
@@ -312,6 +314,14 @@ function getOrderTimeline(order) {
       stateFor('Shipping'),
       'local_shipping'
     ),
+  ];
+
+  if (order.status === 'DeliveryFailed') {
+    steps.push(timelineStep('delivery-failed', 'Delivery Failed', formatDateTime(order.updatedAt), 'danger', 'report'));
+    return steps;
+  }
+
+  steps.push(
     timelineStep(
       'delivered',
       'Delivered',
@@ -327,8 +337,8 @@ function getOrderTimeline(order) {
       order.status === 'Completed' ? formatDateTime(order.updatedAt) : 'Waiting for buyer confirmation',
       stateFor('Completed'),
       order.status === 'Completed' ? 'verified' : 'task_alt'
-    ),
-  ];
+    )
+  );
 
   if (order.status === 'Returned') {
     steps.push(timelineStep('returned', 'Returned', formatDateTime(order.updatedAt), 'warning', 'assignment_return'));
@@ -348,6 +358,7 @@ function getStatusRank(status) {
     Confirmed: 2,
     Shipping: 3,
     Delivered: 4,
+    DeliveryFailed: 4,
     Completed: 5,
     Returned: 6,
   };

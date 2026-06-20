@@ -777,6 +777,11 @@
   color: #15803d;
 }
 
+.seller-order-status.delivery-failed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .seller-order-status.returned {
   background: #fef3c7;
   color: #a16207;

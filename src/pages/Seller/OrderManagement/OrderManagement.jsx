@@ -20,6 +20,7 @@ const tabs = [
   { key: 'Shipping', label: 'Shipping' },
   { key: 'Delivered', label: 'Delivered' },
   { key: 'Completed', label: 'Completed' },
+  { key: 'DeliveryFailed', label: 'Delivery Failed' },
   { key: 'Returned', label: 'Returned' },
   { key: 'Cancelled', label: 'Cancelled' },
 ];
@@ -31,6 +32,7 @@ const statusMeta = {
   Shipping: { label: 'Shipping', className: 'shipping' },
   Delivered: { label: 'Delivered', className: 'delivered' },
   Completed: { label: 'Completed', className: 'completed' },
+  DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
   Returned: { label: 'Returned', className: 'returned' },
   Cancelled: { label: 'Cancelled', className: 'cancelled' },
 };

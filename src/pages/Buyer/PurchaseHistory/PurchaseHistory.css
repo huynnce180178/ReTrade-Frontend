@@ -196,6 +196,11 @@
   color: #15803d;
 }
 
+.purchase-status.delivery-failed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .purchase-status.cancelled,
 .purchase-status.returned {
   background: #fee2e2;

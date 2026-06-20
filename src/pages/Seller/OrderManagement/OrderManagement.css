@@ -417,6 +417,12 @@
   box-shadow: 0 8px 16px rgba(51, 65, 85, 0.16);
 }
 
+.om-status.delivery-failed {
+  background: #b45309;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(180, 83, 9, 0.16);
+}
+
 .om-status.returned {
   background: #7c3aed;
   color: #ffffff;
