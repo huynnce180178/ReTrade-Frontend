@@ -30,6 +30,7 @@ const statusLabels = {
   Confirmed: 'Confirmed',
   Shipping: 'Shipping',
   Delivered: 'Delivered',
+  DeliveryFailed: 'Delivery Failed',
   Returned: 'Returned',
   Cancelled: 'Cancelled',
 };
@@ -40,6 +41,7 @@ const statusClass = {
   Confirmed: 'confirmed',
   Shipping: 'shipping',
   Delivered: 'delivered',
+  DeliveryFailed: 'delivery-failed',
   Returned: 'returned',
   Cancelled: 'cancelled',
 };

@@ -378,6 +378,16 @@ function Journey({ status, createdAt, updatedAt }) {
     );
   }
 
+  if (String(status).toLowerCase() === 'deliveryfailed') {
+    return (
+      <div className="purchase-empty-state">
+        <span className="material-symbols-outlined">report</span>
+        <h3>Delivery Failed</h3>
+        <p>The carrier could not complete delivery on {formatDateTime(updatedAt || createdAt)}.</p>
+      </div>
+    );
+  }
+
   const activeIndex = statusOrder.indexOf(status);
   const hasActive = activeIndex >= 0;
 
@@ -419,6 +429,7 @@ function getStatusLabel(status) {
     Shipping: 'Shipping',
     Delivered: 'Delivered',
     Completed: 'Completed',
+    DeliveryFailed: 'Delivery Failed',
     Returned: 'Returned',
     Cancelled: 'Cancelled',
   };
