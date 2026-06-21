@@ -340,8 +340,17 @@ function getOrderTimeline(order) {
     )
   );
 
-  if (order.status === 'Returned') {
-    steps.push(timelineStep('returned', 'Returned', formatDateTime(order.updatedAt), 'warning', 'assignment_return'));
+  // Only show at most one return-related step (requested, rejected, or returned)
+  if (['ReturnRequested', 'ReturnRejected', 'Returned'].includes(order.status)) {
+    if (order.status === 'ReturnRequested') {
+      steps.push(timelineStep('return-requested', 'Return Requested', formatDateTime(order.updatedAt), 'info', 'assignment_return'));
+    } else if (order.status === 'ReturnRejected') {
+      // show ReturnRejected visually like Returned so the timeline connects the same,
+      // but render it with danger state so marker/connector are red.
+      steps.push(timelineStep('return-rejected', 'Return Rejected', formatDateTime(order.updatedAt), 'danger', 'assignment_return'));
+    } else {
+      steps.push(timelineStep('returned', 'Returned', formatDateTime(order.updatedAt), 'warning', 'assignment_return'));
+    }
   }
 
   return steps;
@@ -361,6 +370,8 @@ function getStatusRank(status) {
     DeliveryFailed: 4,
     Completed: 5,
     Returned: 6,
+    ReturnRequested: 6,
+    ReturnRejected: 6,
   };
 
   return ranks[status] ?? 0;

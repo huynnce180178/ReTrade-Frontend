@@ -176,40 +176,66 @@
 
 .purchase-status.awaiting,
 .purchase-status.pending {
-  background: #fff7ed;
-  color: #c2410c;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.08);
 }
 
 .purchase-status.confirmed {
-  background: #eef2ff;
-  color: #4338ca;
+  background: #16a34a;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(22, 163, 74, 0.08);
 }
 
 .purchase-status.shipping {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #0891b2;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(8, 145, 178, 0.08);
 }
 
-.purchase-status.delivered,
+.purchase-status.delivered {
+  background: #047857;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(4, 120, 87, 0.08);
+}
 .purchase-status.completed {
-  background: #dcfce7;
-  color: #15803d;
+  background: #334155;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(51, 65, 85, 0.08);
+}
+
+.purchase-status.return-requested {
+  background: #7c3aed;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.08);
 }
 
 .purchase-status.delivery-failed {
-  background: #fef3c7;
-  color: #92400e;
+  background: #b45309;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(180, 83, 9, 0.08);
+}
+.purchase-status.return-rejected {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.08);
 }
 
-.purchase-status.cancelled,
+.purchase-status.cancelled {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.08);
+}
+
 .purchase-status.returned {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: rgba(217, 119, 6, 0.12);
+  color: #a16207;
+  box-shadow: 0 8px 16px rgba(217, 119, 6, 0.08);
 }
 
 .purchase-status.default {
-  background: #eef2f0;
-  color: #5c706b;
+  background: #4b5563;
+  color: #ffffff;
 }
 
 .purchase-card-body {
@@ -315,6 +341,25 @@
   color: var(--primary);
 }
 
+.purchase-return-note {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #7c2d12;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.purchase-return-note .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.purchase-return-note p {
+  margin: 0;
+}
+
 .purchase-card-actions {
   display: flex;
   justify-content: flex-end;
@@ -345,6 +390,23 @@
   color: #414845;
 }
 
+/* Request Return button: use return-request purple matching status */
+.purchase-detail-btn.request-return {
+  border: 0;
+  background: #7c3aed;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.08);
+}
+
+.purchase-detail-btn.request-return:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.purchase-detail-btn.request-return:hover:enabled {
+  background: #5b21b6;
+}
+
 .purchase-primary-btn {
   border: 0;
   background: #1b6b51;
@@ -352,9 +414,11 @@
 }
 
 .purchase-text-danger {
-  border: 0;
+  border: 1px solid rgba(185, 28, 28, 0.12);
   background: transparent;
   color: #b91c1c;
+  border-radius: 6px;
+  padding: 0 12px;
 }
 
 .purchase-primary-btn:disabled,
@@ -959,4 +1023,126 @@
 
 .purchase-card-click-area:hover {
   color: inherit !important;
+}
+
+.purchase-return-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 8, 5, 0.46);
+}
+
+.purchase-return-modal {
+  width: min(520px, 100%);
+  position: relative;
+  padding: 28px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(113, 121, 117, 0.16);
+  box-shadow: 0 24px 70px rgba(0, 8, 5, 0.22);
+}
+
+.purchase-return-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: #eef2f0;
+  color: #414845;
+  cursor: pointer;
+}
+
+.purchase-return-modal-close .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.purchase-return-modal header h2 {
+  margin: 0;
+  color: #000805;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.purchase-return-modal header p {
+  margin: 8px 0 22px;
+  color: #717975;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.purchase-return-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.purchase-return-reason span {
+  color: #414845;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.purchase-return-reason textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 130px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(113, 121, 117, 0.22);
+  outline: 0;
+  color: #1a1c1c;
+  font-family: var(--font-body, 'Manrope', sans-serif);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.purchase-return-reason textarea:focus {
+  border-color: #1b6b51;
+  box-shadow: 0 0 0 3px rgba(27, 107, 81, 0.12);
+}
+
+.purchase-return-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* Modal-specific button adjustments */
+.purchase-return-modal .purchase-primary-btn {
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #1b6b51;
+  color: #ffffff;
+  border: 0;
+  font-weight: 900;
+}
+
+.purchase-return-modal .purchase-primary-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.purchase-return-modal .purchase-detail-btn {
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(113, 121, 117, 0.16);
+  background: #ffffff;
+  color: #414845;
+  font-weight: 900;
+}
+
+.purchase-return-modal .purchase-detail-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }

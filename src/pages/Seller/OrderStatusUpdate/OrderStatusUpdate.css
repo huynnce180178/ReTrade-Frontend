@@ -167,11 +167,25 @@
 .osu-status.returned {
   background: rgba(217, 119, 6, 0.12);
   color: #a16207;
+  box-shadow: 0 8px 16px rgba(217, 119, 6, 0.08);
 }
 
 .osu-status.cancelled {
   background: rgba(220, 38, 38, 0.1);
   color: #b91c1c;
+}
+
+/* Return requested / rejected */
+.osu-status.return-requested {
+  background: #7c3aed;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.08);
+}
+
+.osu-status.return-rejected {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.08);
 }
 
 .osu-status.default {
@@ -456,6 +470,44 @@
   font-size: 12px;
   font-weight: 900;
   text-align: right;
+}
+
+/* Return reason style: allow multi-line and left-aligned in side card */
+.osu-side-card .osu-return-reason {
+  display: block;
+}
+.osu-side-card .osu-return-reason dt {
+  color: #7a8580;
+  font-size: 12px;
+}
+.osu-side-card .osu-return-reason dd {
+  margin: 0;
+  color: #0b2f2a;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: left;
+  line-height: 1.6;
+  word-break: break-word;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Danger button style for reject return */
+.osu-return-reject.danger {
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-weight: 900;
+}
+
+.osu-return-reject.danger:hover:not(:disabled) {
+  background: #b91c1c;
+  color: #ffffff;
 }
 
 @media (max-width: 920px) {
