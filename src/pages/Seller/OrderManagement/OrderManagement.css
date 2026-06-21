@@ -361,10 +361,24 @@
 }
 
 .om-product strong {
-  max-width: 190px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+/* Return reason preview under product details */
+.om-return-reason {
+  margin-top: 6px;
+  color: #243831;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 700;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .om-status {
@@ -424,15 +438,28 @@
 }
 
 .om-status.returned {
-  background: #7c3aed;
-  color: #ffffff;
-  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.16);
+  background: rgba(217, 119, 6, 0.12);
+  color: #a16207;
+  box-shadow: 0 8px 16px rgba(217, 119, 6, 0.08);
 }
 
 .om-status.cancelled {
   background: #dc2626;
   color: #ffffff;
   box-shadow: 0 8px 16px rgba(220, 38, 38, 0.16);
+}
+
+/* Return requested / rejected styles */
+.om-status.return-requested {
+  background: #7c3aed;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.08);
+}
+
+.om-status.return-rejected {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.08);
 }
 
 .om-status.default {

@@ -30,6 +30,7 @@ const journeySteps = [
 ];
 
 const statusOrder = journeySteps.map((step) => step.key);
+const returnRequestWindowMs = 7 * 24 * 60 * 60 * 1000;
 
 export default function PurchaseDetail() {
   const { orderId } = useParams();
@@ -42,6 +43,9 @@ export default function PurchaseDetail() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   const buyerId = user?.userId;
 
@@ -164,6 +168,43 @@ export default function PurchaseDetail() {
     }
   };
 
+  const openReturnModal = () => {
+    setReturnReason('');
+    setReturnModalOpen(true);
+  };
+
+  const closeReturnModal = () => {
+    if (returnSubmitting) return;
+    setReturnModalOpen(false);
+    setReturnReason('');
+  };
+
+  const handleSubmitReturn = async (event) => {
+    event.preventDefault();
+    if (!buyerId || !purchase?.orderId) return;
+
+    const reason = returnReason.trim();
+    if (!reason) {
+      showToast('Please enter a return reason.', 'warning');
+      return;
+    }
+
+    try {
+      setReturnSubmitting(true);
+      setUpdating(true);
+      const updated = await purchaseService.requestReturn(buyerId, purchase.orderId, reason);
+      setPurchase(updated);
+      setReturnModalOpen(false);
+      setReturnReason('');
+      showToast('Return request submitted.', 'success');
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to submit return request.', 'error');
+    } finally {
+      setReturnSubmitting(false);
+      setUpdating(false);
+    }
+  };
+
   const payAgain = async () => {
     if (!buyerId || !purchase?.orderId) return;
 
@@ -279,7 +320,9 @@ export default function PurchaseDetail() {
                         <div>
                           <div className="purchase-detail-item-top">
                             <h3>{purchase.productName || 'Untitled product'}</h3>
-                            <em>{getStatusLabel(purchase.status)}</em>
+                            <em className={`purchase-status ${getStatusClassName(purchase.status)}`}>
+                              {getStatusLabel(purchase.status)}
+                            </em>
                           </div>
                           <p>Seller: {purchase.sellerName || purchase.sellerEmail || '-'}</p>
                           <p>Quantity: {purchase.quantity || 0}</p>
@@ -341,6 +384,11 @@ export default function PurchaseDetail() {
                           Write Review
                         </button>
                       )}
+                      {purchase.status === 'Completed' && isWithinReturnRequestWindow(purchase) && (
+                        <button type="button" className="purchase-detail-btn request-return" disabled={updating} onClick={openReturnModal}>
+                          Request Return
+                        </button>
+                      )}
                     </section>
                   </aside>
                 </div>
@@ -359,7 +407,55 @@ export default function PurchaseDetail() {
             }}
             onSubmit={handleSubmitReview}
           />
+
+          {returnModalOpen && (
+            <ReturnRequestModal
+              purchase={purchase}
+              reason={returnReason}
+              submitting={returnSubmitting}
+              onReasonChange={setReturnReason}
+              onClose={closeReturnModal}
+              onSubmit={handleSubmitReturn}
+            />
+          )}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onClose, onSubmit }) {
+  return (
+    <div className="purchase-return-modal-overlay" role="presentation" onMouseDown={onClose}>
+      <div className="purchase-return-modal" role="dialog" aria-modal="true" aria-labelledby="return-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" className="purchase-return-modal-close" onClick={onClose} disabled={submitting} aria-label="Close return request form">
+          <span className="material-symbols-outlined">close</span>
+        </button>
+        <header>
+          <h2 id="return-modal-title">Request Return</h2>
+          <p>Order #{purchase?.orderCode || purchase?.orderId}</p>
+        </header>
+        <form onSubmit={onSubmit}>
+          <label className="purchase-return-reason">
+            <span>Return reason</span>
+            <textarea
+              value={reason}
+              onChange={(event) => onReasonChange(event.target.value)}
+              placeholder="Describe why you want to return this purchase..."
+              rows={5}
+              maxLength={1000}
+              disabled={submitting}
+            />
+          </label>
+          <div className="purchase-return-modal-actions">
+            <button type="button" className="purchase-detail-btn" onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button type="submit" className="purchase-primary-btn" disabled={submitting || !reason.trim()}>
+              {submitting ? 'Submitting...' : 'Submit Request'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -388,6 +484,36 @@ function Journey({ status, createdAt, updatedAt }) {
     );
   }
 
+  if (String(status).toLowerCase() === 'returnrequested') {
+    return (
+      <div className="purchase-empty-state">
+        <span className="material-symbols-outlined">assignment_return</span>
+        <h3>Return Requested</h3>
+        <p>Your return request was submitted on {formatDateTime(updatedAt || createdAt)}.</p>
+      </div>
+    );
+  }
+
+  if (String(status).toLowerCase() === 'returnrejected') {
+    return (
+      <div className="purchase-empty-state">
+        <span className="material-symbols-outlined">do_not_disturb_on</span>
+        <h3>Return Rejected</h3>
+        <p>The seller rejected this return request on {formatDateTime(updatedAt || createdAt)}.</p>
+      </div>
+    );
+  }
+
+  if (String(status).toLowerCase() === 'returned') {
+    return (
+      <div className="purchase-empty-state">
+        <span className="material-symbols-outlined">assignment_turned_in</span>
+        <h3>Returned</h3>
+        <p>This purchase was approved for return on {formatDateTime(updatedAt || createdAt)}.</p>
+      </div>
+    );
+  }
+
   const activeIndex = statusOrder.indexOf(status);
   const hasActive = activeIndex >= 0;
 
@@ -411,6 +537,14 @@ function Journey({ status, createdAt, updatedAt }) {
   );
 }
 
+function isWithinReturnRequestWindow(purchase) {
+  const updatedAt = Date.parse(purchase?.updatedAt || '');
+  if (Number.isNaN(updatedAt)) return false;
+
+  const elapsed = Date.now() - updatedAt;
+  return elapsed >= 0 && elapsed <= returnRequestWindowMs;
+}
+
 function formatDateTime(value) {
   if (!value) return '-';
   return dateTimeFormatter.format(new Date(value));
@@ -430,8 +564,27 @@ function getStatusLabel(status) {
     Delivered: 'Delivered',
     Completed: 'Completed',
     DeliveryFailed: 'Delivery Failed',
+    ReturnRequested: 'Return Requested',
+    ReturnRejected: 'Return Rejected',
     Returned: 'Returned',
     Cancelled: 'Cancelled',
   };
   return labels[status] || status;
+}
+
+function getStatusClassName(status) {
+  const classes = {
+    AwaitingPayment: 'awaiting',
+    Pending: 'pending',
+    Confirmed: 'confirmed',
+    Shipping: 'shipping',
+    Delivered: 'delivered',
+    Completed: 'completed',
+    DeliveryFailed: 'delivery-failed',
+    ReturnRequested: 'return-requested',
+    ReturnRejected: 'return-rejected',
+    Returned: 'returned',
+    Cancelled: 'cancelled',
+  };
+  return classes[status] || 'default';
 }

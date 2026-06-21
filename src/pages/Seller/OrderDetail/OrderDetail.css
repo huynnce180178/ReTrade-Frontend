@@ -289,11 +289,25 @@
 .sod-status.returned {
   background: rgba(217, 119, 6, 0.12);
   color: #a16207;
+  box-shadow: 0 8px 16px rgba(217, 119, 6, 0.08);
 }
 
 .sod-status.cancelled {
   background: rgba(220, 38, 38, 0.1);
   color: #b91c1c;
+}
+
+/* Return requested / rejected */
+.sod-status.return-requested {
+  background: #7c3aed;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.08);
+}
+
+.sod-status.return-rejected {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.08);
 }
 
 .sod-status.default {
@@ -424,6 +438,18 @@
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+/* Info state for Return Requested (purple) */
+.sod-timeline-step.info .sod-timeline-marker {
+  border-color: #7c3aed;
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.sod-timeline-step.info > div {
+  border-color: rgba(124, 58, 237, 0.16);
+  background: #f7f0ff;
 }
 
 .sod-timeline-step.current strong {
