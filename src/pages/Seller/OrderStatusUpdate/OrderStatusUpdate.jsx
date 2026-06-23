@@ -4,18 +4,12 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
+import { formatDateTimeGmt7, parseBackendUtcDate } from '../../../utils/dateTime';
 import './OrderStatusUpdate.css';
 
 const SHIPPING_PROVIDER = 'GHN';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 const awaitingPaymentCancelDelayMs = 15 * 60 * 1000;
 
 const statusTransitions = {
@@ -389,8 +383,7 @@ export default function OrderStatusUpdate() {
 }
 
 function formatDateTime(value) {
-  if (!value) return '-';
-  return dateTimeFormatter.format(new Date(value));
+  return formatDateTimeGmt7(value);
 }
 
 function formatVnd(value) {
@@ -399,8 +392,8 @@ function formatVnd(value) {
 
 function isAwaitingPaymentExpired(order) {
   if (!order?.createdAt) return false;
-  const createdAt = new Date(order.createdAt);
-  if (Number.isNaN(createdAt.getTime())) return false;
+  const createdAt = parseBackendUtcDate(order.createdAt);
+  if (!createdAt || Number.isNaN(createdAt.getTime())) return false;
   return Date.now() - createdAt.getTime() >= awaitingPaymentCancelDelayMs;
 }
 

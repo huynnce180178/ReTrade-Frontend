@@ -2,19 +2,12 @@ import React, { useEffect, useState } from 'react';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 import { useToast } from '../../../context/ToastContext';
+import { formatDateTimeGmt7 } from '../../../utils/dateTime';
 import './Listings.css';
 
 const moneyFormatter = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
   currency: 'VND',
-});
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
 });
 
 export default function Listings() {
@@ -338,7 +331,7 @@ export default function Listings() {
                       <td>{p.stockQuantity}</td>
                       <td>{getStatusBadge(p.status)}</td>
                       <td>{p.sellerName || 'N/A'}</td>
-                      <td>{p.createdAt ? dateFormatter.format(new Date(p.createdAt)) : '-'}</td>
+                      <td>{formatDateTimeGmt7(p.createdAt)}</td>
                       <td>
                         <button
                           type="button"
