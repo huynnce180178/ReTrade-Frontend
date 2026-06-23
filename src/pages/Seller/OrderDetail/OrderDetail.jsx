@@ -4,16 +4,10 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
+import { formatDateTimeGmt7 } from '../../../utils/dateTime';
 import './OrderDetail.css';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 
 const SHIPPING_PROVIDER = 'GHN';
 
@@ -264,8 +258,7 @@ export default function OrderDetail() {
 }
 
 function formatDateTime(value) {
-  if (!value) return '-';
-  return dateTimeFormatter.format(new Date(value));
+  return formatDateTimeGmt7(value);
 }
 
 function formatVnd(value) {

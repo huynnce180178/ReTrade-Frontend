@@ -4,13 +4,9 @@ import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import addressService from '../../../services/addressService';
 import AddressPopup from '../../../components/AddressPopup/AddressPopup';
+import { formatDateGmt7 } from '../../../utils/dateTime';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
 
 function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
@@ -221,7 +217,7 @@ export default function MyProducts() {
                         <td>
                           <span className={`seller-status-chip ${status.cls}`}>{status.text}</span>
                         </td>
-                        <td>{p.createdAt ? dateTimeFormatter.format(new Date(p.createdAt)) : '-'}</td>
+                        <td>{formatDateGmt7(p.createdAt)}</td>
                         <td>
                           <div className="seller-action-actions">
                             <button type="button" className="seller-icon-action" onClick={() => navigate(`/seller-dashboard/products/edit/${p.productId}`)}>
