@@ -8,6 +8,7 @@ export default function PaymentResult() {
   const paymentId = searchParams.get('paymentId') || '';
   const amount = searchParams.get('amount') || '';
   const transactionNo = searchParams.get('transactionNo') || '';
+  const auctionId = searchParams.get('auctionId') || '';
 
   return (
     <div className="container animate-fade-in" style={{ padding: '60px 20px', minHeight: '60vh' }}>
@@ -53,7 +54,14 @@ export default function PaymentResult() {
         </div>
 
         <div style={{ marginTop: '28px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <Link to="/" className="btn btn-primary">Về trang chủ</Link>
+          {auctionId ? (
+            <>
+              <Link to={`/auction/${auctionId}`} className="btn btn-primary">Quay lại trang đấu giá</Link>
+              <Link to="/" className="btn btn-secondary">Về trang chủ</Link>
+            </>
+          ) : (
+            <Link to="/" className="btn btn-primary">Về trang chủ</Link>
+          )}
           <Link to="/purchase-history" className="btn btn-secondary">Xem lịch sử mua hàng</Link>
         </div>
       </div>

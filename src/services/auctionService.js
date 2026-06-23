@@ -8,6 +8,7 @@ const auctionService = {
   getAll: (params) => get('/Auction', { params }),
   getById: (id) => get(`/Auction/${id}`),
   getMyAuctions: (params) => get('/Auction/my', { params }),
+  getMyBids: () => get('/Auction/my-bids'),
   getEligibleProducts: (params) => get('/Auction/eligible-products', { params }),
   create: (data) => post('/Auction', data),
   update: (id, data) => put(`/Auction/${id}`, data),

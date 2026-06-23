@@ -293,69 +293,71 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
       </section>
 
       <div className="auction-workspace-grid">
-        <section className="auction-create-panel">
-          <div className="auction-section-title">
-            <div>
-              <h2>Create Auction</h2>
-              <p>Select a product approved for auction and configure the room.</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleCreateAuction} className="auction-create-form">
-            <label>
-              <span>Auction Product</span>
-              <select name="productId" value={form.productId} onChange={handleFormChange} required>
-                <option value="">Select ready product</option>
-                {eligibleProducts.map((product) => (
-                  <option key={product.productId} value={product.productId}>
-                    {product.name} - {product.sellerName || product.sellerId}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="auction-form-two">
-              <label>
-                <span>Starting Bid</span>
-                <input name="startingPrice" type="number" min="1" value={form.startingPrice} onChange={handleFormChange} required />
-              </label>
-              <label>
-                <span>Bid Step</span>
-                <input name="minIncrement" type="number" min="1" value={form.minIncrement} onChange={handleFormChange} required />
-              </label>
-            </div>
-
-            <div className="auction-form-two">
-              <label>
-                <span>Buy Now Price</span>
-                <input name="buyNowPrice" type="number" min="0" value={form.buyNowPrice} onChange={handleFormChange} />
-              </label>
-            </div>
-
-            <div className="auction-form-two">
-              <label>
-                <span>Start Time</span>
-                <input name="startTime" type="datetime-local" value={form.startTime} onChange={handleFormChange} required />
-              </label>
-              <label>
-                <span>End Time</span>
-                <input name="endTime" type="datetime-local" value={form.endTime} onChange={handleFormChange} required />
-              </label>
-            </div>
-
-            {eligibleProducts.length === 0 && (
-              <div className="auction-create-empty">
-                <span className="material-symbols-outlined">inventory_2</span>
-                <p>No ready auction products available.</p>
+        {!isAdmin && (
+          <section className="auction-create-panel">
+            <div className="auction-section-title">
+              <div>
+                <h2>Create Auction</h2>
+                <p>Select a product approved for auction and configure the room.</p>
               </div>
-            )}
+            </div>
 
-            <button type="submit" className="auction-primary-action" disabled={creating || eligibleProducts.length === 0}>
-              {creating ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">add_circle</span>}
-              Create Auction
-            </button>
-          </form>
-        </section>
+            <form onSubmit={handleCreateAuction} className="auction-create-form">
+              <label>
+                <span>Auction Product</span>
+                <select name="productId" value={form.productId} onChange={handleFormChange} required>
+                  <option value="">Select ready product</option>
+                  {eligibleProducts.map((product) => (
+                    <option key={product.productId} value={product.productId}>
+                      {product.name} - {product.sellerName || product.sellerId}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="auction-form-two">
+                <label>
+                  <span>Starting Bid</span>
+                  <input name="startingPrice" type="number" min="1" value={form.startingPrice} onChange={handleFormChange} required />
+                </label>
+                <label>
+                  <span>Bid Step</span>
+                  <input name="minIncrement" type="number" min="1" value={form.minIncrement} onChange={handleFormChange} required />
+                </label>
+              </div>
+
+              <div className="auction-form-two">
+                <label>
+                  <span>Buy Now Price</span>
+                  <input name="buyNowPrice" type="number" min="0" value={form.buyNowPrice} onChange={handleFormChange} />
+                </label>
+              </div>
+
+              <div className="auction-form-two">
+                <label>
+                  <span>Start Time</span>
+                  <input name="startTime" type="datetime-local" value={form.startTime} onChange={handleFormChange} required />
+                </label>
+                <label>
+                  <span>End Time</span>
+                  <input name="endTime" type="datetime-local" value={form.endTime} onChange={handleFormChange} required />
+                </label>
+              </div>
+
+              {eligibleProducts.length === 0 && (
+                <div className="auction-create-empty">
+                  <span className="material-symbols-outlined">inventory_2</span>
+                  <p>No ready auction products available.</p>
+                </div>
+              )}
+
+              <button type="submit" className="auction-primary-action" disabled={creating || eligibleProducts.length === 0}>
+                {creating ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">add_circle</span>}
+                Create Auction
+              </button>
+            </form>
+          </section>
+        )}
 
         <section className="auction-list-panel">
           <div className="auction-section-title">

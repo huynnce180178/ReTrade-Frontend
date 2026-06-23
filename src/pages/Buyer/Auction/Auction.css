@@ -432,7 +432,7 @@
 
 .auction-detail-action-head {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -538,6 +538,12 @@
   padding: 14px;
   border-radius: 8px;
   background: rgba(15, 118, 110, 0.08);
+}
+
+.auction-detail-buynow-item {
+  grid-column: span 2;
+  background: rgba(15, 118, 110, 0.14) !important;
+  border: 1px dashed var(--accent);
 }
 
 .auction-detail-progress {
@@ -703,4 +709,185 @@
   .auction-detail-thumbs {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+/* Auction Rules Popup Styles */
+.auction-rules-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.auction-rules-card {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 24px 64px rgba(2, 36, 27, 0.18);
+  display: flex;
+  flex-direction: column;
+  animation: auction-zoom-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes auction-zoom-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.auction-rules-popup-header {
+  padding: 24px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auction-rules-popup-header .material-symbols-outlined {
+  font-size: 32px;
+  color: var(--accent);
+}
+
+.auction-rules-popup-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--primary);
+  font-family: var(--font-title);
+  line-height: 1.2;
+}
+
+.auction-rules-content {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rules-section h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.rules-section p, 
+.rules-section ul {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.rules-section ul {
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.auction-rules-footer {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-rules-agree {
+  min-height: 44px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.2);
+  transition: all 0.2s ease;
+}
+
+.btn-rules-agree:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.3);
+}
+
+/* Auction Detail Status Card Styles */
+.auction-detail-status-card {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  align-items: flex-start;
+}
+
+.auction-detail-status-card.winner-card {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #15803d;
+}
+
+.auction-detail-status-card.winner-card .material-symbols-outlined {
+  color: #166534;
+  font-size: 32px;
+}
+
+.auction-detail-status-card.ended-card {
+  background: rgba(107, 114, 128, 0.1);
+  border-color: rgba(107, 114, 128, 0.3);
+  color: var(--text-primary);
+}
+
+.auction-detail-status-card.ended-card .material-symbols-outlined {
+  color: var(--text-muted);
+  font-size: 32px;
+}
+
+.auction-detail-status-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.auction-detail-status-card p {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.auction-detail-status-card .refund-notice {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
+.btn-view-order {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 16px;
+  background: #16a34a;
+  color: #ffffff !important;
+  font-weight: 800;
+  border-radius: 6px;
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.btn-view-order:hover {
+  background: #15803d;
 }

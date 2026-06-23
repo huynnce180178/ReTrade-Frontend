@@ -20,6 +20,7 @@ import AddressBook from './pages/Buyer/AddressBook/AddressBook';
 import PurchaseHistory from './pages/Buyer/PurchaseHistory/PurchaseHistory';
 import PurchaseDetail from './pages/Buyer/PurchaseHistory/PurchaseDetail';
 import BidHistory from './pages/Buyer/BidHistory/BidHistory';
+import RefundHistory from './pages/Buyer/RefundHistory/RefundHistory';
 import OfferHistory from './pages/Buyer/OfferHistory/OfferHistory';
 import Product from './pages/Buyer/Product/Product';
 import ProductDetail from './pages/Buyer/ProductDetail/ProductDetail';
@@ -46,6 +47,7 @@ import MyAuctions from './pages/Seller/MyAuctions/MyAuctions';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 import Listings from './pages/Admin/Listings/Listings';
 import AuctionControl from './pages/Admin/Auctions/AuctionControl';
+import ManageRefunds from './pages/Admin/Refunds/ManageRefunds';
 
 function App() {
   return (
@@ -89,6 +91,7 @@ function App() {
                 <Route path="purchase-history" element={<PurchaseHistory />} />
                 <Route path="purchase-history/:orderId" element={<PurchaseDetail />} />
                 <Route path="bid-history" element={<BidHistory />} />
+                <Route path="refund-history" element={<RefundHistory />} />
                 <Route path="offer-history" element={<OfferHistory />} />
                 <Route path="payment/vnpay-return" element={<PaymentResult />} />
                 <Route path="category" element={<CategoryList />} />
@@ -103,6 +106,7 @@ function App() {
                 <Route path="users" element={<UserAccounts />} />
                 <Route path="listings" element={<Listings />} />
                 <Route path="auctions" element={<AuctionControl />} />
+                <Route path="refunds" element={<ManageRefunds />} />
                 <Route path="*" element={
                   <div className="admin-placeholder-page">
                     <span className="material-symbols-outlined admin-placeholder-icon">construction</span>
