@@ -20,6 +20,7 @@ import AddressBook from './pages/Buyer/AddressBook/AddressBook';
 import PurchaseHistory from './pages/Buyer/PurchaseHistory/PurchaseHistory';
 import PurchaseDetail from './pages/Buyer/PurchaseHistory/PurchaseDetail';
 import BidHistory from './pages/Buyer/BidHistory/BidHistory';
+import OfferHistory from './pages/Buyer/OfferHistory/OfferHistory';
 import Product from './pages/Buyer/Product/Product';
 import ProductDetail from './pages/Buyer/ProductDetail/ProductDetail';
 import Auction from './pages/Buyer/Auction/Auction';
@@ -83,6 +84,7 @@ function App() {
                 <Route path="purchase-history" element={<PurchaseHistory />} />
                 <Route path="purchase-history/:orderId" element={<PurchaseDetail />} />
                 <Route path="bid-history" element={<BidHistory />} />
+                <Route path="offer-history" element={<OfferHistory />} />
                 <Route path="payment/vnpay-return" element={<PaymentResult />} />
                 <Route path="category" element={<CategoryList />} />
                 <Route path="category/:categoryId" element={<CategoryProductList />} />

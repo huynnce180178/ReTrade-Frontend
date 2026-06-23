@@ -88,6 +88,10 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">gavel</span>
           Bid History
         </Link>
+        <Link to="/offer-history" className={`menu-item ${isActive('/offer-history')}`}>
+          <span className="material-symbols-outlined">local_offer</span>
+          Offer History
+        </Link>
 
         {isAdmin && (
           <>
