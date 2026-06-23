@@ -21,6 +21,22 @@ function formatDateTime(value) {
   return formatAuctionDateTime(value);
 }
 
+function formatDuration(ms) {
+  if (ms <= 0) return '00:00:00';
+  const totalSecs = Math.floor(ms / 1000);
+  const days = Math.floor(totalSecs / 86400);
+  const hours = Math.floor((totalSecs % 86400) / 3600);
+  const minutes = Math.floor((totalSecs % 3600) / 60);
+  const seconds = totalSecs % 60;
+
+  const pad = (num) => String(num).padStart(2, '0');
+
+  if (days > 0) {
+    return `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+  }
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
 function getProgress(auction) {
   const start = parseAuctionDateTime(auction?.startTime)?.getTime() || 0;
   const end = parseAuctionDateTime(auction?.endTime)?.getTime() || 0;
@@ -50,6 +66,42 @@ export default function AuctionDetail() {
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+
+  const [showRules, setShowRules] = useState(() => {
+    return !localStorage.getItem('retrade_seen_rules');
+  });
+
+  const handleCloseRules = () => {
+    localStorage.setItem('retrade_seen_rules', 'true');
+    setShowRules(false);
+  };
+
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    if (!auction) return;
+
+    const calculateTimeLeft = () => {
+      const now = Date.now();
+      const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
+      const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
+
+      if (auction.status === 'Upcoming' && start > now) {
+        const diff = start - now;
+        setTimeLeft(`Starts in: ${formatDuration(diff)}`);
+      } else if (auction.status === 'Ongoing' && end > now) {
+        const diff = end - now;
+        setTimeLeft(`Ends in: ${formatDuration(diff)}`);
+      } else {
+        setTimeLeft('Auction Ended');
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(interval);
+  }, [auction]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -146,6 +198,8 @@ export default function AuctionDetail() {
   const maxBidAmount = Number(deposit?.maxBidAmount || deposit?.depositAmount || 0);
   const canBid = Boolean(user && auction && isOngoing && !isOwner && paidDeposit);
   const canDeposit = Boolean(user && auction && !isOwner && !['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid', 'Cancelled'].includes(auction.status));
+  const isEnded = ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'].includes(auction?.status);
+  const isWinner = Boolean(user && auction && auction.winnerId && (auction.winnerId === user.userId || auction.winnerId === user.id));
 
   const refreshAuction = async () => {
     const data = await auctionService.getById(auctionId);
@@ -196,7 +250,7 @@ export default function AuctionDetail() {
       return;
     }
     if (amount > maxBidAmount) {
-      showToast('Bid cannot exceed your deposit amount.', 'warning');
+      showToast('Bid cannot exceed your bidding limit (deposit - 20,000 VND).', 'warning');
       return;
     }
     if (auction.buyNowPrice && amount > Number(auction.buyNowPrice)) {
@@ -298,9 +352,42 @@ export default function AuctionDetail() {
                 <span>Your Deposit</span>
                 <strong>{deposit?.status === 'Paid' ? formatMoney(deposit.depositAmount) : '-'}</strong>
               </div>
+              <div>
+                <span>Bidding Limit</span>
+                <strong>{deposit?.status === 'Paid' ? formatMoney(maxBidAmount) : '-'}</strong>
+              </div>
             </div>
 
-            {isOwner ? (
+             {isEnded ? (
+              <div className={`auction-detail-status-card ${isWinner ? 'winner-card' : 'ended-card'}`}>
+                <span className="material-symbols-outlined">
+                  {isWinner ? 'emoji_events' : 'info'}
+                </span>
+                {isWinner ? (
+                  <div>
+                    <h3>You Won!</h3>
+                    <p>Congratulations, you won this auction with a bid of <strong>{formatMoney(auction.currentPrice)}</strong>.</p>
+                    <Link to="/purchase-history" className="btn-view-order">View in Purchase History</Link>
+                  </div>
+                ) : paidDeposit ? (
+                  <div>
+                    <h3>Auction Ended</h3>
+                    <p>Winner: <strong>{auction.winnerName || 'Anonymous'}</strong>.</p>
+                    <small className="refund-notice">Your deposit balance (excluding the 20,000 VND participation fee) will be manually refunded by the administrator.</small>
+                  </div>
+                ) : auction.winnerId ? (
+                  <div>
+                    <h3>Auction Ended</h3>
+                    <p>Winner: <strong>{auction.winnerName || 'Anonymous'}</strong>.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <h3>Auction Ended</h3>
+                    <p>This auction ended with no bids placed.</p>
+                  </div>
+                )}
+              </div>
+            ) : isOwner ? (
               <div className="auction-detail-notice">You cannot bid on your own auction.</div>
             ) : !paidDeposit ? (
               <form className="auction-deposit-form" onSubmit={handleDepositSubmit}>
@@ -376,12 +463,18 @@ export default function AuctionDetail() {
                 <span>Bids</span>
                 <strong>{auction.bidCount || 0}</strong>
               </div>
+              {auction.buyNowPrice && (
+                <div className="auction-detail-buynow-item">
+                  <span>Buy Now Price</span>
+                  <strong>{formatMoney(auction.buyNowPrice)}</strong>
+                </div>
+              )}
             </div>
 
             <div className="auction-detail-progress">
               <div>
-                <span>Progress</span>
-                <strong>{progress}%</strong>
+                <span>Time Left</span>
+                <strong>{timeLeft}</strong>
               </div>
               <i><b style={{ width: `${progress}%` }} /></i>
             </div>
@@ -444,6 +537,49 @@ export default function AuctionDetail() {
           )}
         </article>
       </section>
+
+      {showRules && (
+        <div className="auction-rules-overlay" role="dialog" aria-modal="true">
+          <div className="auction-rules-card animate-fade-in">
+            <header className="auction-rules-popup-header">
+              <span className="material-symbols-outlined">gavel</span>
+              <h2>Auction Rules & Guidelines</h2>
+            </header>
+            
+            <div className="auction-rules-content">
+              <div className="rules-section">
+                <h3>1. Free to Watch</h3>
+                <p>Viewing ongoing auctions is completely free. No deposit or registration fees are required.</p>
+              </div>
+
+              <div className="rules-section">
+                <h3>2. Participation & Entry Fee</h3>
+                <p>To place bids, a mandatory deposit is required. A non-refundable entry fee of <strong>20,000 VND</strong> is charged immediately upon joining the auction.</p>
+              </div>
+
+              <div className="rules-section">
+                <h3>3. Bidding Limit</h3>
+                <p>Your maximum allowable bid is calculated as: <br />
+                <strong>Bidding Limit = Total Deposit - 20,000 VND</strong>.</p>
+              </div>
+
+              <div className="rules-section">
+                <h3>4. Refund Policies</h3>
+                <ul>
+                  <li><strong>If you win:</strong> The winning bid amount will be deducted from your deposit. The remaining balance (Deposit - Win Amount - 20,000 VND) will be manually refunded by the administrator.</li>
+                  <li><strong>If you lose:</strong> The remaining deposit (Deposit - 20,000 VND fee) will be manually refunded by the administrator.</li>
+                </ul>
+              </div>
+            </div>
+
+            <footer className="auction-rules-footer">
+              <button type="button" onClick={handleCloseRules} className="btn-rules-agree">
+                I Understand & Agree
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -88,6 +88,10 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">gavel</span>
           Bid History
         </Link>
+        <Link to="/refund-history" className={`menu-item ${isActive('/refund-history')}`}>
+          <span className="material-symbols-outlined">account_balance_wallet</span>
+          Refund History
+        </Link>
         <Link to="/offer-history" className={`menu-item ${isActive('/offer-history')}`}>
           <span className="material-symbols-outlined">local_offer</span>
           Offer History

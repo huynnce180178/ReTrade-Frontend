@@ -29,17 +29,32 @@ function formatDateTime(value) {
   return formatAuctionDateTime(value, { year: undefined });
 }
 
-function getTimeLabel(auction) {
-  const now = Date.now();
+function formatDuration(ms) {
+  if (ms <= 0) return '00:00:00';
+  const totalSecs = Math.floor(ms / 1000);
+  const days = Math.floor(totalSecs / 86400);
+  const hours = Math.floor((totalSecs % 86400) / 3600);
+  const minutes = Math.floor((totalSecs % 3600) / 60);
+  const seconds = totalSecs % 60;
+
+  const pad = (num) => String(num).padStart(2, '0');
+
+  if (days > 0) {
+    return `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+  }
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function getTimeLabel(auction, now) {
   const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
   const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
   if (auction.status === 'Upcoming' && start > now) {
-    const hours = Math.max(1, Math.ceil((start - now) / 3600000));
-    return `Starts in ${hours}h`;
+    const diff = start - now;
+    return `Starts in ${formatDuration(diff)}`;
   }
   if (auction.status === 'Ongoing' && end > now) {
-    const hours = Math.max(1, Math.ceil((end - now) / 3600000));
-    return `Ends in ${hours}h`;
+    const diff = end - now;
+    return `Ends in ${formatDuration(diff)}`;
   }
   return auction.status || 'Auction';
 }
@@ -54,6 +69,14 @@ export default function Auction() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [realtimeTick, setRealtimeTick] = useState(0);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const page = Number(searchParams.get('page') || 1);
   const searchTerm = searchParams.get('search') || '';
@@ -235,7 +258,7 @@ export default function Auction() {
                   </div>
                 </div>
                 <div className="auction-card-footer">
-                  <span>{getTimeLabel(auction)}</span>
+                  <span>{getTimeLabel(auction, currentTime)}</span>
                   <span>{auction.bidCount || 0} bids</span>
                 </div>
                 <div className="auction-card-dates">

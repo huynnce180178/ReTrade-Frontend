@@ -139,6 +139,10 @@
   align-items: start;
 }
 
+.auction-workspace.admin-mode .auction-workspace-grid {
+  grid-template-columns: 1fr;
+}
+
 .auction-create-panel,
 .auction-list-panel {
   padding: 22px;
