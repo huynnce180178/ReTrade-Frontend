@@ -32,6 +32,22 @@ const offerService = {
   /** Buyer: checkout using an accepted offer */
   checkoutFromOffer: (offerId, addressId, paymentMethod = 'COD') =>
     post('/Offer/checkout', { offerId, addressId, paymentMethod }),
+
+  /** Seller: get received offers for the logged in seller */
+  getSellerOffers: () =>
+    get('/seller-offers'),
+
+  /** Seller: counter a buyer's offer */
+  counterOffer: (offerId, counterPrice) =>
+    api.patch('/seller-offers/counter-offer', { offerId, counterPrice }).then(r => r.data),
+
+  /** Seller: accept a buyer's offer */
+  acceptSellerOffer: (offerId) =>
+    api.patch(`/seller-offers/${offerId}/accept`).then(r => r.data),
+
+  /** Seller: reject a buyer's offer */
+  rejectSellerOffer: (offerId) =>
+    api.patch(`/seller-offers/${offerId}/reject`).then(r => r.data),
 };
 
 export default offerService;
