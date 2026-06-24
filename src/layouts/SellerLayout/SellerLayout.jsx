@@ -93,7 +93,7 @@ export default function SellerLayout() {
           >
             <span className="material-symbols-outlined">gavel</span>My Auctions
           </NavLink>
-          <Link to="/auction" onClick={closeSidebar}><span className="material-symbols-outlined">gavel</span>Auction Room</Link>
+          <Link to="/auction" onClick={closeSidebar}><span className="material-symbols-outlined">meeting_room</span>Auction Room</Link>
           <NavLink
             to="/seller-dashboard/orders"
             onClick={closeSidebar}

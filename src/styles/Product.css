@@ -601,13 +601,16 @@
 }
 
 .product-card-price-no {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent);
-  padding: 4px 10px;
-  background: var(--accent-glow);
+  font-size: 12px;
+  font-weight: 900;
+  color: #ffffff;
+  padding: 6px 11px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
   border-radius: var(--border-radius-sm);
-  border: 1px solid rgba(11, 148, 133, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .product-card-date {

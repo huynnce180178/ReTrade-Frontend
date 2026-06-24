@@ -198,6 +198,7 @@
 .auction-toolbar input,
 .auction-toolbar select {
   width: 100%;
+  min-width: 0;
   min-height: 42px;
   border: 1px solid var(--border-color, #d1d5db);
   border-radius: 8px;
@@ -206,6 +207,12 @@
   padding: 0 12px;
   font-size: 14px;
   outline: none;
+}
+
+.auction-create-form input[type="datetime-local"],
+.auction-workspace-modal-card input[type="datetime-local"] {
+  font-size: 13px;
+  padding-right: 8px;
 }
 
 .auction-create-form input:focus,
@@ -358,13 +365,15 @@
 }
 
 .auction-status.ongoing {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.13);
+  color: #ffffff;
+  background: linear-gradient(135deg, #059669, #10b981);
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.2);
 }
 
 .auction-status.upcoming {
-  color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.13);
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
 }
 
 .auction-status.ended {
@@ -424,14 +433,14 @@
   background: rgba(15, 118, 110, 0.1);
 }
 
-.auction-workspace-card-actions button:hover:not(:disabled) {
+.auction-workspace-card-actions button:hover:not([aria-disabled="true"]) {
   background: #0f766e;
   color: #ffffff;
 }
 
-.auction-workspace-card-actions button:disabled {
+.auction-workspace-card-actions button[aria-disabled="true"] {
   opacity: 0.45;
-  cursor: not-allowed;
+  cursor: help;
 }
 
 .auction-workspace-modal {
