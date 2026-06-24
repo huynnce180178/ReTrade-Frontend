@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
@@ -6,11 +6,14 @@ import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
 import { formatAuctionDateTime, parseAuctionDateTime } from '../../../utils/auctionTime';
 import './Auction.css';
+import './AuctionDetail.css';
 
 const moneyFormatter = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
   currency: 'VND',
 });
+
+const AUCTION_ENTRY_FEE = 20000;
 
 function formatMoney(value) {
   if (value == null) return '-';
@@ -53,6 +56,55 @@ function getMinimumNextBid(auction) {
   return Number(auction.currentPrice || 0) + Number(auction.minIncrement || 0);
 }
 
+const ENDED_AUCTION_STATUSES = ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'];
+
+function getEffectiveAuctionStatus(auction, now = Date.now()) {
+  if (!auction) return '';
+  if ([...ENDED_AUCTION_STATUSES, 'Cancelled'].includes(auction.status)) return auction.status;
+
+  const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
+  const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
+
+  if (end && end <= now) return 'Ended';
+  if (start && start > now) return 'Upcoming';
+  return 'Ongoing';
+}
+
+function isEndedAuctionStatus(status) {
+  return ENDED_AUCTION_STATUSES.includes(status);
+}
+
+function getUserId(user) {
+  return user?.userId || user?.id || '';
+}
+
+function isAuctionWinner(auction, user) {
+  const userId = getUserId(user);
+  return Boolean(userId && auction?.winnerId && auction.winnerId === userId);
+}
+
+function getApiErrorMessage(error) {
+  const data = error?.response?.data;
+  if (typeof data === 'string') return data;
+  return data?.message || data?.title || '';
+}
+
+function translateBidError(message) {
+  const normalized = String(message || '').toLowerCase();
+
+  if (normalized.includes('greater than 0')) return 'Bid amount must be greater than 0.';
+  if (normalized.includes('auction not found')) return 'Auction not found.';
+  if (normalized.includes('own auction')) return 'You cannot bid on your own auction.';
+  if (normalized.includes('active auctions')) return 'Bids can only be placed on active auctions.';
+  if (normalized.includes('paid deposit') || normalized.includes('accepted policy')) return 'A paid deposit and accepted policy are required before bidding.';
+  if (normalized.includes('bidding limit')) return 'Bid amount cannot exceed your bidding limit.';
+  if (normalized.includes('current bid')) return 'Bid amount must be greater than the current bid.';
+  if (normalized.includes('at least')) return 'Bid amount does not meet the minimum required amount.';
+  if (normalized.includes('buy now price')) return 'Bid amount cannot be greater than the buy now price.';
+
+  return message || 'Failed to place bid. Please try again.';
+}
+
 export default function AuctionDetail() {
   const { auctionId } = useParams();
   const navigate = useNavigate();
@@ -66,6 +118,9 @@ export default function AuctionDetail() {
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [showAuctionEndNotice, setShowAuctionEndNotice] = useState(false);
+  const previousAuctionStatusRef = useRef(null);
+  const shownEndNoticeRef = useRef(new Set());
 
   const [showRules, setShowRules] = useState(() => {
     return !localStorage.getItem('retrade_seen_rules');
@@ -78,6 +133,30 @@ export default function AuctionDetail() {
 
   const [timeLeft, setTimeLeft] = useState('');
 
+  const getEndNoticeKey = useCallback((nextAuction) => {
+    const currentUserId = getUserId(user) || 'guest';
+    return `retrade_auction_end_notice_dismissed_v2_${nextAuction?.auctionId}_${currentUserId}`;
+  }, [user]);
+
+  const triggerAuctionEndNotice = useCallback((nextAuction) => {
+    if (!nextAuction?.auctionId) return;
+    if (!isEndedAuctionStatus(getEffectiveAuctionStatus(nextAuction))) return;
+
+    const noticeKey = getEndNoticeKey(nextAuction);
+    if (sessionStorage.getItem(noticeKey)) return;
+    if (shownEndNoticeRef.current.has(noticeKey)) return;
+
+    shownEndNoticeRef.current.add(noticeKey);
+    setShowAuctionEndNotice(true);
+  }, [getEndNoticeKey]);
+
+  const closeAuctionEndNotice = () => {
+    if (auction?.auctionId) {
+      sessionStorage.setItem(getEndNoticeKey(auction), 'true');
+    }
+    setShowAuctionEndNotice(false);
+  };
+
   useEffect(() => {
     if (!auction) return;
 
@@ -86,10 +165,12 @@ export default function AuctionDetail() {
       const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
       const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
 
-      if (auction.status === 'Upcoming' && start > now) {
+      const effectiveStatus = getEffectiveAuctionStatus(auction, now);
+
+      if (effectiveStatus === 'Upcoming' && start > now) {
         const diff = start - now;
         setTimeLeft(`Starts in: ${formatDuration(diff)}`);
-      } else if (auction.status === 'Ongoing' && end > now) {
+      } else if (effectiveStatus === 'Ongoing' && end > now) {
         const diff = end - now;
         setTimeLeft(`Ends in: ${formatDuration(diff)}`);
       } else {
@@ -148,8 +229,16 @@ export default function AuctionDetail() {
 
     const handleAuctionUpdated = (payload) => {
       const nextAuction = payload?.auction || payload?.Auction;
+      const eventType = payload?.eventType || payload?.EventType || '';
       if (!nextAuction || nextAuction.auctionId !== auctionId) return;
-      setAuction(nextAuction);
+      setAuction((currentAuction) => {
+        const wasEnded = isEndedAuctionStatus(getEffectiveAuctionStatus(currentAuction));
+        const nowEnded = isEndedAuctionStatus(getEffectiveAuctionStatus(nextAuction));
+        if ((!wasEnded && nowEnded) || String(eventType).startsWith('AuctionEnded')) {
+          triggerAuctionEndNotice(nextAuction);
+        }
+        return nextAuction;
+      });
       setActiveImage((current) => current || nextAuction?.images?.find(i => i.isMain)?.imageUrl || nextAuction?.images?.[0]?.imageUrl || nextAuction?.productImageUrl || '');
     };
 
@@ -178,7 +267,7 @@ export default function AuctionDetail() {
       connection.off('AuctionDepositChanged', handleDepositChanged);
       connection.stop().catch(() => {});
     };
-  }, [auctionId, authLoading, user, showToast]);
+  }, [auctionId, authLoading, user, showToast, triggerAuctionEndNotice]);
 
   const specRows = useMemo(() => {
     if (!auction) return [];
@@ -191,15 +280,36 @@ export default function AuctionDetail() {
     ].filter(([, value]) => value != null && value !== '');
   }, [auction]);
 
+  const effectiveStatus = getEffectiveAuctionStatus(auction);
   const minimumNextBid = getMinimumNextBid(auction);
   const isOwner = Boolean(user && auction && (auction.sellerId === user.userId || auction.sellerId === user.id));
-  const isOngoing = auction?.status === 'Ongoing';
+  const isOngoing = effectiveStatus === 'Ongoing';
   const paidDeposit = deposit?.status === 'Paid' && deposit?.policyAccepted;
-  const maxBidAmount = Number(deposit?.maxBidAmount || deposit?.depositAmount || 0);
+  const depositPaidAmount = Number(deposit?.depositAmount || 0);
+  const fallbackMaxBidAmount = Math.max(0, depositPaidAmount - AUCTION_ENTRY_FEE);
+  const maxBidAmount = Number(deposit?.maxBidAmount ?? fallbackMaxBidAmount);
+  const buyNowAmount = Number(auction?.buyNowPrice || 0);
+  const highestAllowedBid = buyNowAmount ? Math.min(maxBidAmount, buyNowAmount) : maxBidAmount;
   const canBid = Boolean(user && auction && isOngoing && !isOwner && paidDeposit);
-  const canDeposit = Boolean(user && auction && !isOwner && !['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid', 'Cancelled'].includes(auction.status));
-  const isEnded = ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'].includes(auction?.status);
-  const isWinner = Boolean(user && auction && auction.winnerId && (auction.winnerId === user.userId || auction.winnerId === user.id));
+  const canDeposit = Boolean(user && auction && !isOwner && ![...ENDED_AUCTION_STATUSES, 'Cancelled'].includes(effectiveStatus));
+  const isEnded = isEndedAuctionStatus(effectiveStatus);
+  const isWinner = isAuctionWinner(auction, user);
+
+  useEffect(() => {
+    if (!auction || !user) return;
+
+    const previousStatus = previousAuctionStatusRef.current;
+    const currentStatus = getEffectiveAuctionStatus(auction);
+    const nowEnded = isEndedAuctionStatus(currentStatus);
+    const wasEnded = isEndedAuctionStatus(previousStatus);
+    const isFirstStatusCheck = previousStatus == null;
+
+    if (nowEnded && (!wasEnded || (isFirstStatusCheck && isAuctionWinner(auction, user)))) {
+      triggerAuctionEndNotice(auction);
+    }
+
+    previousAuctionStatusRef.current = currentStatus;
+  }, [auction, user, timeLeft, triggerAuctionEndNotice]);
 
   const refreshAuction = async () => {
     const data = await auctionService.getById(auctionId);
@@ -232,7 +342,7 @@ export default function AuctionDetail() {
         showToast('Payment URL not returned.', 'error');
       }
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to create deposit payment.', 'error');
+      showToast(getApiErrorMessage(error) || 'Failed to create deposit payment.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -245,7 +355,8 @@ export default function AuctionDetail() {
       showToast('A paid deposit is required before bidding.', 'warning');
       return;
     }
-    if (amount < minimumNextBid) {
+    const isBuyNowBid = Boolean(auction.buyNowPrice && amount === Number(auction.buyNowPrice));
+    if (!isBuyNowBid && amount < minimumNextBid) {
       showToast(`Bid must be at least ${formatMoney(minimumNextBid)}.`, 'warning');
       return;
     }
@@ -264,13 +375,14 @@ export default function AuctionDetail() {
       setAuction(result?.auction || auction);
       setBidAmount('');
       if (result?.auctionEnded) {
-        showToast(result.message || 'Auction ended and order was created.', 'success');
+        showToast('Bid matched the buy now price. Auction ended.', 'success');
+        triggerAuctionEndNotice(result?.auction || auction);
       } else {
         showToast('Bid placed successfully.', 'success');
       }
       await refreshAuction();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to place bid.', 'error');
+      showToast(translateBidError(getApiErrorMessage(error)), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -328,7 +440,7 @@ export default function AuctionDetail() {
             ) : (
               <span className="material-symbols-outlined">inventory_2</span>
             )}
-            <em className={`auction-card-status ${String(auction.status || '').toLowerCase()}`}>{auction.status}</em>
+            <em className={`auction-card-status ${String(effectiveStatus || '').toLowerCase()}`}>{effectiveStatus}</em>
           </div>
           {(auction.images || []).length > 1 && (
             <div className="auction-detail-thumbs">
@@ -390,7 +502,7 @@ export default function AuctionDetail() {
             ) : isOwner ? (
               <div className="auction-detail-notice">You cannot bid on your own auction.</div>
             ) : !paidDeposit ? (
-              <form className="auction-deposit-form" onSubmit={handleDepositSubmit}>
+              <form className="auction-deposit-form" onSubmit={handleDepositSubmit} noValidate>
                 <label>
                   <span>Deposit Amount</span>
                   <input
@@ -417,21 +529,24 @@ export default function AuctionDetail() {
                 </button>
               </form>
             ) : (
-              <form className="auction-bid-form" onSubmit={handleBidSubmit}>
+              <form className="auction-bid-form" onSubmit={handleBidSubmit} noValidate>
                 <label>
                   <span>Bid Amount</span>
                   <input
                     type="number"
                     min={minimumNextBid}
-                    max={auction.buyNowPrice || maxBidAmount}
+                    max={highestAllowedBid}
                     value={bidAmount}
                     onChange={(event) => setBidAmount(event.target.value)}
-                    placeholder={`Max ${formatMoney(maxBidAmount)}`}
+                    placeholder={`Max ${formatMoney(highestAllowedBid)}`}
                     disabled={!canBid || actionLoading}
                   />
                 </label>
                 {auction.buyNowPrice && (
-                  <p className="auction-buynow-hint">Bid exactly {formatMoney(auction.buyNowPrice)} to buy now and end the auction.</p>
+                  <p className="auction-buynow-hint">
+                    Bid exactly {formatMoney(auction.buyNowPrice)} to buy now and end the auction.
+                    {buyNowAmount > maxBidAmount ? ` Deposit must be at least ${formatMoney(buyNowAmount + AUCTION_ENTRY_FEE)} to buy now.` : ' Your bidding limit covers buy now.'}
+                  </p>
                 )}
                 <button type="submit" disabled={!canBid || actionLoading}>
                   {actionLoading ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">gavel</span>}
@@ -578,6 +693,37 @@ export default function AuctionDetail() {
               </button>
             </footer>
           </div>
+        </div>
+      )}
+
+      {showAuctionEndNotice && (
+        <div className="auction-celebration-overlay" role="dialog" aria-modal="true">
+          <div className="auction-firework firework-one"></div>
+          <div className="auction-firework firework-two"></div>
+          <div className="auction-firework firework-three"></div>
+          <section className="auction-celebration-card">
+            <span className="material-symbols-outlined">{isWinner ? 'emoji_events' : 'verified'}</span>
+            <h2>{isWinner ? 'Congratulations!' : 'Auction Ended'}</h2>
+            {isWinner ? (
+              <p>You won <strong>{auction.productName}</strong> with a bid of {formatMoney(auction.currentPrice)}.</p>
+            ) : auction.winnerId ? (
+              <p><strong>{auction.productName}</strong> ended at {formatMoney(auction.currentPrice)}. Winner: <strong>{auction.winnerName || 'Anonymous'}</strong>.</p>
+            ) : Number(auction.bidCount || 0) > 0 ? (
+              <p><strong>{auction.productName}</strong> has ended. Final results are being confirmed.</p>
+            ) : (
+              <p><strong>{auction.productName}</strong> has ended with no winning bid.</p>
+            )}
+            <div className="auction-celebration-actions">
+              {isWinner && (
+                <Link to="/purchase-history" className="btn-view-order" onClick={closeAuctionEndNotice}>
+                  View Order
+                </Link>
+              )}
+              <button type="button" onClick={closeAuctionEndNotice}>
+                Keep Browsing
+              </button>
+            </div>
+          </section>
         </div>
       )}
     </div>

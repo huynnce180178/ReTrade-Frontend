@@ -34,7 +34,7 @@ export function formatAuctionDateTime(value, options = {}) {
   const date = parseAuctionDateTime(value);
   if (!date || Number.isNaN(date.getTime())) return '-';
 
-  return `${new Intl.DateTimeFormat(options.locale || 'vi-VN', {
+  return new Intl.DateTimeFormat(options.locale || 'vi-VN', {
     timeZone: AUCTION_TIME_ZONE,
     day: options.day || '2-digit',
     month: options.month || '2-digit',
@@ -43,7 +43,7 @@ export function formatAuctionDateTime(value, options = {}) {
     minute: '2-digit',
     hour12: false,
     hourCycle: 'h23',
-  }).format(date)} GMT+7`;
+  }).format(date);
 }
 
 export function toAuctionDateTimeLocal(value = new Date()) {
@@ -53,7 +53,11 @@ export function toAuctionDateTimeLocal(value = new Date()) {
     return result;
   }, {});
 
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  return [
+    parts.year,
+    parts.month,
+    parts.day,
+  ].join('-') + `T${parts.hour}:${parts.minute}`;
 }
 
 export function getFutureAuctionDateTimeLocal(offsetMs) {

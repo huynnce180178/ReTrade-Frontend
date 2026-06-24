@@ -45,18 +45,98 @@ function formatDuration(ms) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+function getEffectiveAuctionStatus(auction, now = Date.now()) {
+  const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
+  const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
+  const status = auction.status;
+
+  if (['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid', 'Cancelled'].includes(status)) {
+    return status;
+  }
+
+  if (end && end <= now) return 'Ended';
+  if (start && start > now) return 'Upcoming';
+  return 'Ongoing';
+}
+
 function getTimeLabel(auction, now) {
   const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
   const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
-  if (auction.status === 'Upcoming' && start > now) {
+  const effectiveStatus = getEffectiveAuctionStatus(auction, now);
+
+  if (effectiveStatus === 'Upcoming' && start > now) {
     const diff = start - now;
     return `Starts in ${formatDuration(diff)}`;
   }
-  if (auction.status === 'Ongoing' && end > now) {
+  if (effectiveStatus === 'Ongoing' && end > now) {
     const diff = end - now;
     return `Ends in ${formatDuration(diff)}`;
   }
-  return auction.status || 'Auction';
+  return effectiveStatus || auction.status || 'Auction';
+}
+
+function splitDuration(ms) {
+  const totalSecs = Math.max(0, Math.floor(ms / 1000));
+  return {
+    days: Math.floor(totalSecs / 86400),
+    hours: Math.floor((totalSecs % 86400) / 3600),
+    minutes: Math.floor((totalSecs % 3600) / 60),
+    seconds: totalSecs % 60,
+  };
+}
+
+function CountdownUnit({ value, label }) {
+  return (
+    <span className="auction-countdown-unit">
+      <strong>{String(value).padStart(2, '0')}</strong>
+      <small>{label}</small>
+    </span>
+  );
+}
+
+function AuctionCountdown({ auction, now }) {
+  const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
+  const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
+  const effectiveStatus = getEffectiveAuctionStatus(auction, now);
+  const target = effectiveStatus === 'Upcoming' ? start : end;
+  const remaining = target ? target - now : 0;
+  const parts = splitDuration(remaining);
+
+  if (effectiveStatus === 'Upcoming') {
+    return (
+      <div className="auction-countdown-panel upcoming">
+        <div className="auction-countdown-label">
+          <span className="material-symbols-outlined">hourglass_top</span>
+          Opening countdown
+        </div>
+        <div className="auction-countdown-grid">
+          {parts.days > 0 && <CountdownUnit value={parts.days} label="Days" />}
+          <CountdownUnit value={parts.hours} label="Hours" />
+          <CountdownUnit value={parts.minutes} label="Mins" />
+          <CountdownUnit value={parts.seconds} label="Secs" />
+        </div>
+      </div>
+    );
+  }
+
+  if (effectiveStatus === 'Ongoing') {
+    return (
+      <div className="auction-countdown-panel live">
+        <div className="auction-countdown-label">
+          <span className="material-symbols-outlined">bolt</span>
+          Live now
+        </div>
+        <div className="auction-countdown-grid compact">
+          {parts.days > 0 && <CountdownUnit value={parts.days} label="Days" />}
+          <CountdownUnit value={parts.hours} label="Hours" />
+          <CountdownUnit value={parts.minutes} label="Mins" />
+          <CountdownUnit value={parts.seconds} label="Secs" />
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default function Auction() {
@@ -126,7 +206,17 @@ export default function Auction() {
       await connection.invoke('JoinAuctionList');
     };
 
-    const handleListChanged = () => {
+    const handleListChanged = (payload) => {
+      const nextAuction = payload?.auction || payload?.Auction;
+      const eventType = payload?.eventType || payload?.EventType;
+
+      if (eventType === 'BidPlaced' && nextAuction?.auctionId) {
+        setAuctions((current) => current.map((auction) => (
+          auction.auctionId === nextAuction.auctionId ? { ...auction, ...nextAuction } : auction
+        )));
+        return;
+      }
+
       setRealtimeTick((current) => current + 1);
     };
 
@@ -233,20 +323,33 @@ export default function Auction() {
         </div>
       ) : (
         <div className="auction-grid">
-          {auctions.map((auction) => (
-            <article key={auction.auctionId} className="auction-card" onClick={() => navigate(`/auction/${auction.auctionId}`)}>
+          {auctions.map((auction) => {
+            const effectiveStatus = getEffectiveAuctionStatus(auction, currentTime);
+            return (
+            <article
+              key={auction.auctionId}
+              className={`auction-card ${effectiveStatus === 'Upcoming' ? 'is-upcoming' : ''} ${effectiveStatus === 'Ongoing' ? 'is-live' : ''}`}
+              onClick={() => navigate(`/auction/${auction.auctionId}`)}
+            >
               <div className="auction-card-image">
                 {auction.productImageUrl ? (
                   <img src={auction.productImageUrl} alt={auction.productName || 'Auction product'} loading="lazy" />
                 ) : (
                   <span className="material-symbols-outlined">inventory_2</span>
                 )}
-                <em className={`auction-card-status ${String(auction.status || '').toLowerCase()}`}>{auction.status}</em>
+                <em className={`auction-card-status ${String(effectiveStatus || '').toLowerCase()}`}>{effectiveStatus}</em>
+                {effectiveStatus === 'Upcoming' && (
+                  <div className="auction-card-watch-badge">
+                    <span className="material-symbols-outlined">notifications_active</span>
+                    Starting soon
+                  </div>
+                )}
               </div>
               <div className="auction-card-body">
                 <span className="auction-card-category">{auction.categoryName || 'Uncategorized'}</span>
                 <h2>{auction.productName || 'Unnamed auction'}</h2>
                 <p>{auction.sellerName || auction.sellerId || 'Unknown seller'}</p>
+                <AuctionCountdown auction={auction} now={currentTime} />
                 <div className="auction-bid-panel">
                   <div>
                     <small>Current Bid</small>
@@ -267,7 +370,8 @@ export default function Auction() {
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
 

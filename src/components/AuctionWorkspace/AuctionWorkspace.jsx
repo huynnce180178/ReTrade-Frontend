@@ -13,6 +13,7 @@ const moneyFormatter = new Intl.NumberFormat('vi-VN', {
 });
 
 const statusOptions = ['All', 'Upcoming', 'Ongoing', 'Ended'];
+const DEFAULT_AUCTION_START_OFFSET_MS = 0;
 
 function isEndedStatus(status) {
   return ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'].includes(status);
@@ -33,8 +34,8 @@ function getDefaultForm() {
     startingPrice: '',
     minIncrement: '',
     buyNowPrice: '',
-    startTime: getFutureAuctionDateTimeLocal(0),
-    endTime: getFutureAuctionDateTimeLocal(24 * 60 * 60 * 1000),
+    startTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS),
+    endTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS + 24 * 60 * 60 * 1000),
   };
 }
 
@@ -53,7 +54,18 @@ function getStatusClass(status) {
 }
 
 function canEditAuction(auction) {
-  return auction?.status === 'Upcoming' && Number(auction.bidCount || 0) === 0 && (parseAuctionDateTime(auction.startTime)?.getTime() || 0) > Date.now();
+  return !getAuctionEditBlockReason(auction);
+}
+
+function getAuctionEditBlockReason(auction) {
+  if (!auction) return 'Auction data is not available.';
+  if (auction.status !== 'Upcoming') return 'Only upcoming auctions can be updated.';
+  if (Number(auction.bidCount || 0) > 0) return 'Auctions with existing bids cannot be updated.';
+
+  const startTime = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
+  if (!startTime || startTime <= Date.now()) return 'Auction start time has passed.';
+
+  return '';
 }
 
 function toAuctionPayload(form) {
@@ -64,6 +76,27 @@ function toAuctionPayload(form) {
     startTime: auctionDateTimeLocalToApiValue(form.startTime),
     endTime: auctionDateTimeLocalToApiValue(form.endTime),
   };
+}
+
+function validateAuctionForm(form, { requireProduct = false, requireFutureStart = false } = {}) {
+  if (requireProduct && !form.productId) return 'Please select an auction-ready product.';
+
+  const startingPrice = Number(form.startingPrice);
+  const minIncrement = Number(form.minIncrement);
+  const buyNowPrice = form.buyNowPrice === '' ? null : Number(form.buyNowPrice);
+  const start = parseAuctionDateTime(form.startTime);
+  const end = parseAuctionDateTime(form.endTime);
+
+  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return 'Starting bid must be greater than 0.';
+  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return 'Bid step must be greater than 0.';
+  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return 'Buy now price is required.';
+  if (buyNowPrice <= startingPrice) return 'Buy now price must be greater than the starting bid.';
+  if (!form.startTime || !start || Number.isNaN(start.getTime())) return 'Please choose a valid start time.';
+  if (!form.endTime || !end || Number.isNaN(end.getTime())) return 'Please choose a valid end time.';
+  if (requireFutureStart && start <= new Date()) return 'Start time must remain in the future.';
+  if (end <= start) return 'End time must be after start time.';
+
+  return '';
 }
 
 export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
@@ -172,8 +205,9 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
   const handleCreateAuction = async (event) => {
     event.preventDefault();
-    if (!form.productId) {
-      showToast('Please select an auction-ready product.', 'warning');
+    const validationError = validateAuctionForm(form, { requireProduct: true });
+    if (validationError) {
+      showToast(validationError, 'warning');
       return;
     }
 
@@ -199,8 +233,9 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
   };
 
   const openEditModal = (auction) => {
-    if (!canEditAuction(auction)) {
-      showToast('Only upcoming auctions without bids can be updated.', 'warning');
+    const blockReason = getAuctionEditBlockReason(auction);
+    if (blockReason) {
+      showToast(blockReason, 'warning');
       return;
     }
     setEditingAuction(auction);
@@ -227,6 +262,11 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
   const handleUpdateAuction = async (event) => {
     event.preventDefault();
     if (!editingAuction || !editForm) return;
+    const validationError = validateAuctionForm(editForm, { requireFutureStart: true });
+    if (validationError) {
+      showToast(validationError, 'warning');
+      return;
+    }
 
     try {
       setCreating(true);
@@ -302,7 +342,7 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
               </div>
             </div>
 
-            <form onSubmit={handleCreateAuction} className="auction-create-form">
+            <form onSubmit={handleCreateAuction} className="auction-create-form" noValidate>
               <label>
                 <span>Auction Product</span>
                 <select name="productId" value={form.productId} onChange={handleFormChange} required>
@@ -328,13 +368,6 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
               <div className="auction-form-two">
                 <label>
-                  <span>Buy Now Price</span>
-                  <input name="buyNowPrice" type="number" min="0" value={form.buyNowPrice} onChange={handleFormChange} />
-                </label>
-              </div>
-
-              <div className="auction-form-two">
-                <label>
                   <span>Start Time</span>
                   <input name="startTime" type="datetime-local" value={form.startTime} onChange={handleFormChange} required />
                 </label>
@@ -343,6 +376,11 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
                   <input name="endTime" type="datetime-local" value={form.endTime} onChange={handleFormChange} required />
                 </label>
               </div>
+
+              <label>
+                <span>Buy Now Price</span>
+                <input name="buyNowPrice" type="number" min="0" value={form.buyNowPrice} onChange={handleFormChange} />
+              </label>
 
               {eligibleProducts.length === 0 && (
                 <div className="auction-create-empty">
@@ -418,7 +456,12 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
                     <button type="button" onClick={() => navigate(`/auction/${auction.auctionId}`)} title="View detail">
                       <span className="material-symbols-outlined">visibility</span>
                     </button>
-                    <button type="button" onClick={() => openEditModal(auction)} disabled={!canEditAuction(auction)} title="Update auction">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(auction)}
+                      aria-disabled={!canEditAuction(auction)}
+                      title={getAuctionEditBlockReason(auction) || 'Update auction'}
+                    >
                       <span className="material-symbols-outlined">edit</span>
                     </button>
                   </div>
@@ -431,7 +474,7 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
       {editingAuction && editForm && (
         <div className="auction-workspace-modal" role="dialog" aria-modal="true">
-          <form className="auction-workspace-modal-card" onSubmit={handleUpdateAuction}>
+          <form className="auction-workspace-modal-card" onSubmit={handleUpdateAuction} noValidate>
             <header>
               <div>
                 <h2>Update Auction</h2>
@@ -455,13 +498,6 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
             <div className="auction-form-two">
               <label>
-                <span>Buy Now Price</span>
-                <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditFormChange} />
-              </label>
-            </div>
-
-            <div className="auction-form-two">
-              <label>
                 <span>Start Time</span>
                 <input name="startTime" type="datetime-local" value={editForm.startTime} onChange={handleEditFormChange} required />
               </label>
@@ -470,6 +506,11 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
                 <input name="endTime" type="datetime-local" value={editForm.endTime} onChange={handleEditFormChange} required />
               </label>
             </div>
+
+            <label>
+              <span>Buy Now Price</span>
+              <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditFormChange} />
+            </label>
 
             <footer>
               <button type="button" className="auction-secondary-action" onClick={closeEditModal}>Cancel</button>

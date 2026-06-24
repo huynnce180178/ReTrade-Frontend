@@ -160,6 +160,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  align-items: end;
 }
 
 .seller-auctions-field {
@@ -184,6 +185,7 @@
 .seller-auctions-toolbar input,
 .seller-auctions-toolbar select {
   width: 100%;
+  min-width: 0;
   min-height: 42px;
   padding: 0 12px;
   border: 1px solid var(--border-color);
@@ -192,6 +194,11 @@
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
+}
+
+.seller-auctions-field input[type="datetime-local"] {
+  font-size: 13px;
+  padding-right: 8px;
 }
 
 .seller-auctions-field input:focus,
@@ -229,14 +236,14 @@
 
 .seller-auctions-primary:hover:not(:disabled),
 .seller-auctions-live-link:hover,
-.seller-auctions-actions button:hover:not(:disabled) {
+.seller-auctions-actions button:hover:not([aria-disabled="true"]) {
   transform: translateY(-1px);
 }
 
 .seller-auctions-primary:disabled,
-.seller-auctions-actions button:disabled {
+.seller-auctions-actions button[aria-disabled="true"] {
   opacity: 0.5;
-  cursor: not-allowed;
+  cursor: help;
 }
 
 .seller-auctions-secondary {
@@ -342,13 +349,15 @@
 }
 
 .seller-auctions-status.upcoming {
-  color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.13);
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
 }
 
 .seller-auctions-status.ongoing {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.13);
+  color: #ffffff;
+  background: linear-gradient(135deg, #059669, #10b981);
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.2);
 }
 
 .seller-auctions-status.ended {
@@ -399,7 +408,7 @@
   background: rgba(15, 118, 110, 0.1);
 }
 
-.seller-auctions-actions button:hover:not(:disabled) {
+.seller-auctions-actions button:hover:not([aria-disabled="true"]) {
   color: #ffffff;
   background: var(--accent);
 }

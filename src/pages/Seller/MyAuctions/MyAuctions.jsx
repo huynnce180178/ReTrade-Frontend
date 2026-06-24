@@ -13,6 +13,7 @@ const moneyFormatter = new Intl.NumberFormat('vi-VN', {
 });
 
 const statusOptions = ['All', 'Upcoming', 'Ongoing', 'Ended'];
+const DEFAULT_AUCTION_START_OFFSET_MS = 0;
 
 function isEndedStatus(status) {
   return ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'].includes(status);
@@ -33,8 +34,8 @@ function getDefaultCreateForm() {
     startingPrice: '',
     minIncrement: '',
     buyNowPrice: '',
-    startTime: getFutureAuctionDateTimeLocal(0),
-    endTime: getFutureAuctionDateTimeLocal(24 * 60 * 60 * 1000),
+    startTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS),
+    endTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS + 24 * 60 * 60 * 1000),
   };
 }
 
@@ -59,7 +60,39 @@ function getProgress(auction) {
 }
 
 function canEditAuction(auction) {
-  return auction?.status === 'Upcoming' && Number(auction.bidCount || 0) === 0 && (parseAuctionDateTime(auction.startTime)?.getTime() || 0) > Date.now();
+  return !getAuctionEditBlockReason(auction);
+}
+
+function getAuctionEditBlockReason(auction) {
+  if (!auction) return 'Auction data is not available.';
+  if (auction.status !== 'Upcoming') return 'Only upcoming auctions can be updated.';
+  if (Number(auction.bidCount || 0) > 0) return 'Auctions with existing bids cannot be updated.';
+
+  const startTime = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
+  if (!startTime || startTime <= Date.now()) return 'Auction start time has passed.';
+
+  return '';
+}
+
+function validateAuctionForm(form, { requireProduct = false, requireFutureStart = false } = {}) {
+  if (requireProduct && !form.productId) return 'Please select a ready auction product.';
+
+  const startingPrice = Number(form.startingPrice);
+  const minIncrement = Number(form.minIncrement);
+  const buyNowPrice = form.buyNowPrice === '' ? null : Number(form.buyNowPrice);
+  const start = parseAuctionDateTime(form.startTime);
+  const end = parseAuctionDateTime(form.endTime);
+
+  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return 'Starting bid must be greater than 0.';
+  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return 'Bid step must be greater than 0.';
+  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return 'Buy now price is required.';
+  if (buyNowPrice <= startingPrice) return 'Buy now price must be greater than the starting bid.';
+  if (!form.startTime || !start || Number.isNaN(start.getTime())) return 'Please choose a valid start time.';
+  if (!form.endTime || !end || Number.isNaN(end.getTime())) return 'Please choose a valid end time.';
+  if (requireFutureStart && start <= new Date()) return 'Start time must remain in the future.';
+  if (end <= start) return 'End time must be after start time.';
+
+  return '';
 }
 
 export default function MyAuctions() {
@@ -161,8 +194,9 @@ export default function MyAuctions() {
 
   const handleCreate = async (event) => {
     event.preventDefault();
-    if (!createForm.productId) {
-      showToast('Please select a ready auction product.', 'warning');
+    const validationError = validateAuctionForm(createForm, { requireProduct: true });
+    if (validationError) {
+      showToast(validationError, 'warning');
       return;
     }
 
@@ -183,8 +217,9 @@ export default function MyAuctions() {
   };
 
   const openEditModal = (auction) => {
-    if (!canEditAuction(auction)) {
-      showToast('Only upcoming auctions without bids can be updated.', 'warning');
+    const blockReason = getAuctionEditBlockReason(auction);
+    if (blockReason) {
+      showToast(blockReason, 'warning');
       return;
     }
     setEditingAuction(auction);
@@ -206,6 +241,11 @@ export default function MyAuctions() {
   const handleUpdate = async (event) => {
     event.preventDefault();
     if (!editingAuction || !editForm) return;
+    const validationError = validateAuctionForm(editForm, { requireFutureStart: true });
+    if (validationError) {
+      showToast(validationError, 'warning');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -259,7 +299,7 @@ export default function MyAuctions() {
             <p>Only products approved as Ready for Auction appear here.</p>
           </div>
 
-          <form onSubmit={handleCreate} className="seller-auctions-form">
+          <form onSubmit={handleCreate} className="seller-auctions-form" noValidate>
             <label className="seller-auctions-field wide">
               <span>Auction Product</span>
               <select name="productId" value={createForm.productId} onChange={handleCreateChange} required>
@@ -282,16 +322,16 @@ export default function MyAuctions() {
                 <input name="minIncrement" type="number" min="1" value={createForm.minIncrement} onChange={handleCreateChange} required />
               </label>
               <label className="seller-auctions-field">
-                <span>Buy Now Price</span>
-                <input name="buyNowPrice" type="number" min="0" value={createForm.buyNowPrice} onChange={handleCreateChange} />
-              </label>
-              <label className="seller-auctions-field">
                 <span>Start Time</span>
                 <input name="startTime" type="datetime-local" value={createForm.startTime} onChange={handleCreateChange} required />
               </label>
               <label className="seller-auctions-field">
                 <span>End Time</span>
                 <input name="endTime" type="datetime-local" value={createForm.endTime} onChange={handleCreateChange} required />
+              </label>
+              <label className="seller-auctions-field wide">
+                <span>Buy Now Price</span>
+                <input name="buyNowPrice" type="number" min="0" value={createForm.buyNowPrice} onChange={handleCreateChange} />
               </label>
             </div>
 
@@ -370,7 +410,12 @@ export default function MyAuctions() {
                       <button type="button" onClick={() => navigate(`/auction/${auction.auctionId}`)} title="View detail">
                         <span className="material-symbols-outlined">visibility</span>
                       </button>
-                      <button type="button" onClick={() => openEditModal(auction)} disabled={!canEditAuction(auction)} title="Update auction">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(auction)}
+                        aria-disabled={!canEditAuction(auction)}
+                        title={getAuctionEditBlockReason(auction) || 'Update auction'}
+                      >
                         <span className="material-symbols-outlined">edit</span>
                       </button>
                     </div>
@@ -384,7 +429,7 @@ export default function MyAuctions() {
 
       {editingAuction && editForm && (
         <div className="seller-auctions-modal" role="dialog" aria-modal="true">
-          <form className="seller-auctions-modal-card" onSubmit={handleUpdate}>
+          <form className="seller-auctions-modal-card" onSubmit={handleUpdate} noValidate>
             <header>
               <div>
                 <h2>Update Auction</h2>
@@ -405,16 +450,16 @@ export default function MyAuctions() {
                 <input name="minIncrement" type="number" min="1" value={editForm.minIncrement} onChange={handleEditChange} required />
               </label>
               <label className="seller-auctions-field">
-                <span>Buy Now Price</span>
-                <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditChange} />
-              </label>
-              <label className="seller-auctions-field">
                 <span>Start Time</span>
                 <input name="startTime" type="datetime-local" value={editForm.startTime} onChange={handleEditChange} required />
               </label>
               <label className="seller-auctions-field">
                 <span>End Time</span>
                 <input name="endTime" type="datetime-local" value={editForm.endTime} onChange={handleEditChange} required />
+              </label>
+              <label className="seller-auctions-field wide">
+                <span>Buy Now Price</span>
+                <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditChange} />
               </label>
             </div>
 

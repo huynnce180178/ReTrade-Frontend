@@ -1,6 +1,6 @@
 .refund-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 28px;
   align-items: start;
   margin-top: 0px;
@@ -11,6 +11,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
 }
 
 .refund-hero-card {
@@ -25,6 +26,13 @@
   border: 1px solid rgba(113, 121, 117, 0.14);
   border-radius: 8px;
   box-shadow: 0 8px 22px rgba(0, 27, 20, 0.04);
+}
+
+.refund-summary-card,
+.refund-insights-card {
+  min-width: 0;
+  overflow: hidden;
+  padding: 22px;
 }
 
 .refund-filter-card {
@@ -346,6 +354,10 @@
 }
 
 @media (max-width: 1180px) {
+  .refund-layout {
+    grid-template-columns: 1fr;
+  }
+
   .refund-summary-card,
   .refund-insights-card {
     position: static;
@@ -409,7 +421,9 @@
   color: #000805;
   font-family: var(--font-main, 'Manrope', sans-serif);
   font-weight: 800;
-  font-size: 24px;
+  font-size: clamp(18px, 2.1vw, 24px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .refund-summary-grid {
