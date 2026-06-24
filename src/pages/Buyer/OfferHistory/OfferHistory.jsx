@@ -27,6 +27,7 @@ function getOfferStatusConfig(status) {
   switch (status) {
     case 'Pending': return { label: 'Pending', color: '#f59e0b', bg: '#fef3c7', icon: 'schedule' };
     case 'Accepted': return { label: 'Accepted', color: '#0f7b5f', bg: '#e6f5ef', icon: 'check_circle' };
+    case 'CounterOffer': return { label: 'Counter Offer', color: '#6366f1', bg: '#e0e7ff', icon: 'swap_horiz' };
     case 'Rejected': return { label: 'Rejected', color: '#dc2626', bg: '#fee2e2', icon: 'cancel' };
     case 'Cancelled': return { label: 'Cancelled', color: '#6b7280', bg: '#f3f4f6', icon: 'block' };
     case 'Completed': return { label: 'Completed', color: '#2563eb', bg: '#dbeafe', icon: 'verified' };
@@ -128,7 +129,7 @@ function OfferCheckoutModal({ offer, onClose, onSuccess }) {
             <span className="material-symbols-outlined offer-modal-icon" style={{ background: 'linear-gradient(135deg,#0f7b5f,#02241b)' }}>shopping_cart_checkout</span>
             <div>
               <h2 className="offer-modal-title">Checkout with Offer</h2>
-              <p className="offer-modal-subtitle">Your offer was accepted — complete the purchase</p>
+              <p className="offer-modal-subtitle">Complete the purchase at the agreed offer price</p>
             </div>
           </div>
           <button className="offer-modal-close" onClick={onClose}>
@@ -332,7 +333,7 @@ export default function OfferHistory() {
                             >
                               <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{status.icon}</span>
                               {status.label}
-                              {isExpired && offer.status === 'Accepted' && (
+                              {isExpired && (offer.status === 'Accepted' || offer.status === 'CounterOffer') && (
                                 <span className="offer-expired-badge">Expired</span>
                               )}
                             </div>
@@ -371,7 +372,7 @@ export default function OfferHistory() {
                                 }
                               </button>
                             )}
-                            {offer.status === 'Accepted' && !isExpired && (
+                            {(offer.status === 'Accepted' || offer.status === 'CounterOffer') && !isExpired && (
                               <button
                                 className="offer-history-btn offer-history-btn-checkout"
                                 onClick={() => setCheckoutOffer(offer)}
