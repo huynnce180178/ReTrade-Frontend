@@ -20,9 +20,12 @@ import AddressBook from './pages/Buyer/AddressBook/AddressBook';
 import PurchaseHistory from './pages/Buyer/PurchaseHistory/PurchaseHistory';
 import PurchaseDetail from './pages/Buyer/PurchaseHistory/PurchaseDetail';
 import BidHistory from './pages/Buyer/BidHistory/BidHistory';
+import RefundHistory from './pages/Buyer/RefundHistory/RefundHistory';
+import OfferHistory from './pages/Buyer/OfferHistory/OfferHistory';
 import Product from './pages/Buyer/Product/Product';
 import ProductDetail from './pages/Buyer/ProductDetail/ProductDetail';
 import Auction from './pages/Buyer/Auction/Auction';
+import AuctionDetail from './pages/Buyer/Auction/AuctionDetail';
 import PaymentResult from './pages/Buyer/PaymentResult/PaymentResult';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Checkout from './pages/Buyer/Checkout/Checkout';
@@ -40,8 +43,12 @@ import OrderManagement from './pages/Seller/OrderManagement/OrderManagement';
 import OrderDetail from './pages/Seller/OrderDetail/OrderDetail';
 import OrderStatusUpdate from './pages/Seller/OrderStatusUpdate/OrderStatusUpdate';
 import SalesStatistics from './pages/Seller/SalesStatistics/SalesStatistics';
+import MyAuctions from './pages/Seller/MyAuctions/MyAuctions';
+import OfferList from './pages/Seller/OfferList/OfferList';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 import Listings from './pages/Admin/Listings/Listings';
+import AuctionControl from './pages/Admin/Auctions/AuctionControl';
+import ManageRefunds from './pages/Admin/Refunds/ManageRefunds';
 
 function App() {
   return (
@@ -55,6 +62,7 @@ function App() {
                 <Route path="product" element={<Product />} />
                 <Route path="product/:productId" element={<ProductDetail />} />
                 <Route path="auction" element={<Auction />} />
+                <Route path="auction/:auctionId" element={<AuctionDetail />} />
                 <Route path="wishlist" element={<Wishlist />} />
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="checkout/:productId" element={<Checkout />} />
@@ -68,9 +76,11 @@ function App() {
                   <Route path="products/new" element={<ProductForm />} />
                   <Route path="products/edit/:productId" element={<ProductForm />} />
                   <Route path="sales-statistics" element={<SalesStatistics />} />
+                  <Route path="auctions" element={<MyAuctions />} />
                   <Route path="orders" element={<OrderManagement />} />
                   <Route path="orders/:orderId/status" element={<OrderStatusUpdate />} />
                   <Route path="orders/:orderId" element={<OrderDetail />} />
+                  <Route path="offers" element={<OfferList />} />
                 </Route>
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
@@ -83,6 +93,8 @@ function App() {
                 <Route path="purchase-history" element={<PurchaseHistory />} />
                 <Route path="purchase-history/:orderId" element={<PurchaseDetail />} />
                 <Route path="bid-history" element={<BidHistory />} />
+                <Route path="refund-history" element={<RefundHistory />} />
+                <Route path="offer-history" element={<OfferHistory />} />
                 <Route path="payment/vnpay-return" element={<PaymentResult />} />
                 <Route path="category" element={<CategoryList />} />
                 <Route path="category/:categoryId" element={<CategoryProductList />} />
@@ -95,6 +107,8 @@ function App() {
                 <Route path="category" element={<Category />} />
                 <Route path="users" element={<UserAccounts />} />
                 <Route path="listings" element={<Listings />} />
+                <Route path="auctions" element={<AuctionControl />} />
+                <Route path="refunds" element={<ManageRefunds />} />
                 <Route path="*" element={
                   <div className="admin-placeholder-page">
                     <span className="material-symbols-outlined admin-placeholder-icon">construction</span>

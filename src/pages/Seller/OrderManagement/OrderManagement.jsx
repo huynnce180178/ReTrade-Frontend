@@ -34,6 +34,8 @@ const statusMeta = {
   Completed: { label: 'Completed', className: 'completed' },
   DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
   Returned: { label: 'Returned', className: 'returned' },
+  ReturnRequested: { label: 'Return Requested', className: 'return-requested' },
+  ReturnRejected: { label: 'Return Rejected', className: 'return-rejected' },
   Cancelled: { label: 'Cancelled', className: 'cancelled' },
 };
 
@@ -264,6 +266,36 @@ export default function OrderManagement() {
     }
   };
 
+  const handleApproveReturn = async (orderId) => {
+    if (!sellerId) return;
+
+    try {
+      setUpdatingOrderId(orderId);
+      await orderService.approveReturn(orderId, sellerId);
+      showToast('Return approved successfully.', 'success');
+      fetchOrders();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to approve return.', 'error');
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
+  const handleRejectReturn = async (orderId) => {
+    if (!sellerId) return;
+
+    try {
+      setUpdatingOrderId(orderId);
+      await orderService.rejectReturn(orderId, sellerId);
+      showToast('Return rejected successfully.', 'success');
+      fetchOrders();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to reject return.', 'error');
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
   const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
 
   if (authLoading) {
@@ -386,7 +418,10 @@ export default function OrderManagement() {
                           <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
                           <div>
                             <strong>{order.productName || 'Untitled product'}</strong>
-                            <span>Qty {order.quantity || 0}</span>
+                              <span>Qty {order.quantity || 0}</span>
+                              {order.returnReason ? (
+                                <div className="om-return-reason">Return reason: {order.returnReason}</div>
+                              ) : null}
                           </div>
                         </div>
                       </td>
@@ -403,7 +438,26 @@ export default function OrderManagement() {
                           >
                             Details
                           </button>
-                          {action ? (
+                          {order.status === 'ReturnRequested' ? (
+                            <>
+                              <button
+                                type="button"
+                                className="om-primary-action primary"
+                                disabled={isUpdating}
+                                onClick={() => handleApproveReturn(order.orderId)}
+                              >
+                                {isUpdating === order.orderId ? 'Processing...' : 'Approve Return'}
+                              </button>
+                              <button
+                                type="button"
+                                className="om-primary-action danger"
+                                disabled={isUpdating}
+                                onClick={() => handleRejectReturn(order.orderId)}
+                              >
+                                {isUpdating === order.orderId ? 'Processing...' : 'Reject Return'}
+                              </button>
+                            </>
+                          ) : action ? (
                             <button
                               type="button"
                               className={`om-primary-action ${action.tone || 'primary'}`}

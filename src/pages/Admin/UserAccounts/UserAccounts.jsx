@@ -3,16 +3,10 @@ import accountService from '../../../services/accountService';
 import accountRoleService from '../../../services/accountRoleService';
 import profileService from '../../../services/profileService';
 import { useToast } from '../../../context/ToastContext';
+import { formatDateTimeGmt7 } from '../../../utils/dateTime';
 import './UserAccounts.css';
 
 const moneyFormatter = new Intl.NumberFormat('vi-VN');
-const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 
 const statusPalette = {
   Active: 'success',
@@ -480,7 +474,7 @@ export default function UserAccounts() {
                             {user.status || 'Unknown'}
                           </span>
                         </td>
-                        <td>{user.lastLoginAt ? dateTimeFormatter.format(new Date(user.lastLoginAt)) : 'Never'}</td>
+                        <td>{user.lastLoginAt ? formatDateTimeGmt7(user.lastLoginAt) : 'Never'}</td>
                         <td>
                           <div className="admin-action-group">
                             <button type="button" className="admin-action-btn ghost" onClick={(e) => { e.stopPropagation(); handleActionStub('Audit logs'); }}>
@@ -564,7 +558,7 @@ export default function UserAccounts() {
                 </div>
                 <div>
                   <span>Last Login</span>
-                  <strong>{selectedUser.lastLoginAt ? dateTimeFormatter.format(new Date(selectedUser.lastLoginAt)) : 'Never'}</strong>
+                  <strong>{selectedUser.lastLoginAt ? formatDateTimeGmt7(selectedUser.lastLoginAt) : 'Never'}</strong>
                 </div>
               </div>
 
@@ -755,8 +749,8 @@ export default function UserAccounts() {
                     <div><span>User ID</span><strong>{selectedUserDetail.userId}</strong></div>
                     <div><span>Username</span><strong>{selectedUserDetail.username || '-'}</strong></div>
                     <div><span>Phone</span><strong>{selectedUserDetail.phone || '-'}</strong></div>
-                    <div><span>Created At</span><strong>{selectedUserDetail.createdAt ? dateTimeFormatter.format(new Date(selectedUserDetail.createdAt)) : '-'}</strong></div>
-                    <div><span>Updated At</span><strong>{selectedUserDetail.updatedAt ? dateTimeFormatter.format(new Date(selectedUserDetail.updatedAt)) : '-'}</strong></div>
+                    <div><span>Created At</span><strong>{formatDateTimeGmt7(selectedUserDetail.createdAt)}</strong></div>
+                    <div><span>Updated At</span><strong>{formatDateTimeGmt7(selectedUserDetail.updatedAt)}</strong></div>
                     <div><span>Deleted</span><strong>{selectedUserDetail.isDeleted ? 'Yes' : 'No'}</strong></div>
                     <div><span>Default Address</span><strong>{selectedUserDetail.defaultAddress?.street || 'No default address'}</strong></div>
                   </div>

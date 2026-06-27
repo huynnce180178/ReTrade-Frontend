@@ -1150,14 +1150,16 @@
 
 .status-accepted,
 .status-ready {
-  background: rgba(16, 185, 129, 0.12);
-  color: #047857;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.18);
 }
 
 .status-pending,
 .status-waiting {
-  background: rgba(217, 119, 6, 0.12);
-  color: #a16207;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.18);
 }
 
 .status-rejected,
@@ -1507,8 +1509,9 @@
 }
 
 .seller-order-status.returned {
-  background: rgba(217, 119, 6, 0.12);
-  color: #a16207;
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.08);
 }
 
 .seller-order-status.cancelled {

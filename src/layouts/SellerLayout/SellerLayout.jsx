@@ -73,13 +73,27 @@ export default function SellerLayout() {
             <span className="material-symbols-outlined">inventory_2</span>My Products
           </NavLink>
           <NavLink
+            to="/seller-dashboard/offers"
+            onClick={closeSidebar}
+            className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/offers') ? 'active' : ''}`}
+          >
+            <span className="material-symbols-outlined">local_offer</span>Offers
+          </NavLink>
+          <NavLink
             to="/seller-dashboard/sales-statistics"
             onClick={closeSidebar}
             className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
           >
             <span className="material-symbols-outlined">monitoring</span>Sales Statistics
           </NavLink>
-          <Link to="/auction" onClick={closeSidebar}><span className="material-symbols-outlined">gavel</span>Auction Room</Link>
+          <NavLink
+            to="/seller-dashboard/auctions"
+            onClick={closeSidebar}
+            className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
+          >
+            <span className="material-symbols-outlined">gavel</span>My Auctions
+          </NavLink>
+          <Link to="/auction" onClick={closeSidebar}><span className="material-symbols-outlined">meeting_room</span>Auction Room</Link>
           <NavLink
             to="/seller-dashboard/orders"
             onClick={closeSidebar}

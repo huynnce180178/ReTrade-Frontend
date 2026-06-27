@@ -4,18 +4,12 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
+import { formatDateTimeGmt7, parseBackendUtcDate } from '../../../utils/dateTime';
 import './OrderStatusUpdate.css';
 
 const SHIPPING_PROVIDER = 'GHN';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 const awaitingPaymentCancelDelayMs = 15 * 60 * 1000;
 
 const statusTransitions = {
@@ -32,6 +26,7 @@ const statusLabels = {
   Delivered: 'Delivered',
   DeliveryFailed: 'Delivery Failed',
   Returned: 'Returned',
+  ReturnRequested: 'Return Requested',
   Cancelled: 'Cancelled',
 };
 
@@ -43,6 +38,8 @@ const statusClass = {
   Delivered: 'delivered',
   DeliveryFailed: 'delivery-failed',
   Returned: 'returned',
+  ReturnRequested: 'return-requested',
+  ReturnRejected: 'return-rejected',
   Cancelled: 'cancelled',
 };
 
@@ -187,6 +184,44 @@ export default function OrderStatusUpdate() {
     }
   };
 
+  const handleApproveReturn = async () => {
+    if (!user?.userId) {
+      showToast('SellerId is missing. Please sign in again.', 'error');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const updated = await orderService.approveReturn(orderId, user.userId);
+      showToast('Return approved successfully.', 'success');
+      if (updated) setOrder(updated);
+      else loadOrder();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to approve return.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRejectReturn = async () => {
+    if (!user?.userId) {
+      showToast('SellerId is missing. Please sign in again.', 'error');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const updated = await orderService.rejectReturn(orderId, user.userId);
+      showToast('Return rejected successfully.', 'success');
+      if (updated) setOrder(updated);
+      else loadOrder();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to reject return.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (authLoading) {
     return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading order...</p></div>;
   }
@@ -229,6 +264,27 @@ export default function OrderStatusUpdate() {
                     {statusLabels[order.status] || order.status || '-'}
                   </em>
                 </div>
+
+                  {order.status === 'ReturnRequested' && (
+                    <div className="osu-return-actions">
+                      <button
+                        type="button"
+                        className="osu-return-approve primary"
+                        onClick={handleApproveReturn}
+                        disabled={saving}
+                      >
+                        {saving ? 'Processing...' : 'Approve Return'}
+                      </button>
+                      <button
+                        type="button"
+                        className="osu-return-reject danger"
+                        onClick={handleRejectReturn}
+                        disabled={saving}
+                      >
+                        {saving ? 'Processing...' : 'Reject Return'}
+                      </button>
+                    </div>
+                  )}
 
                 {availableStatusOptions.length > 0 ? (
                   <form onSubmit={handleSubmit}>
@@ -310,6 +366,12 @@ export default function OrderStatusUpdate() {
                   {order.trackingCode && <div><dt>Tracking</dt><dd>{order.trackingCode}</dd></div>}
                   <div><dt>Expected</dt><dd>{formatDateTime(order.expectedDeliveryTime)}</dd></div>
                   <div><dt>Total</dt><dd>{formatVnd(order.finalAmount || 0)}</dd></div>
+                  {order.returnReason && (
+                    <div className="osu-return-reason">
+                      <dt>Return Reason</dt>
+                      <dd>{order.returnReason}</dd>
+                    </div>
+                  )}
                 </dl>
               </section>
             </aside>
@@ -321,8 +383,7 @@ export default function OrderStatusUpdate() {
 }
 
 function formatDateTime(value) {
-  if (!value) return '-';
-  return dateTimeFormatter.format(new Date(value));
+  return formatDateTimeGmt7(value);
 }
 
 function formatVnd(value) {
@@ -331,8 +392,8 @@ function formatVnd(value) {
 
 function isAwaitingPaymentExpired(order) {
   if (!order?.createdAt) return false;
-  const createdAt = new Date(order.createdAt);
-  if (Number.isNaN(createdAt.getTime())) return false;
+  const createdAt = parseBackendUtcDate(order.createdAt);
+  if (!createdAt || Number.isNaN(createdAt.getTime())) return false;
   return Date.now() - createdAt.getTime() >= awaitingPaymentCancelDelayMs;
 }
 

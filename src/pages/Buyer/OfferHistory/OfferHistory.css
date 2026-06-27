@@ -1,0 +1,526 @@
+/* ============================================
+   Offer Checkout Modal body
+   ============================================ */
+.offer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 21, 18, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 24px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.offer-modal {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 40px 80px rgba(2, 36, 27, 0.28);
+  display: flex;
+  flex-direction: column;
+  animation: offerModalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.offer-checkout-modal {
+  max-width: 460px;
+}
+
+@keyframes offerModalIn {
+  from { transform: scale(0.92) translateY(20px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.offer-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 24px;
+  border-bottom: 1px solid rgba(2, 36, 27, 0.07);
+}
+
+.offer-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.offer-modal-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.offer-modal-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #10251f;
+  margin: 0;
+}
+
+.offer-modal-subtitle {
+  font-size: 12px;
+  color: #78908a;
+  margin: 2px 0 0;
+}
+
+.offer-modal-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: #f4f7f6;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: #5c706b;
+}
+
+.offer-modal-close:hover {
+  background: #e6f0ed;
+  color: #10251f;
+  transform: scale(1.08);
+}
+
+.offer-checkout-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.offer-checkout-summary {
+  background: #f0fdf8;
+  border: 1px solid rgba(15, 123, 95, 0.12);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.offer-checkout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: #5c706b;
+}
+
+.offer-checkout-row strong {
+  color: #10251f;
+  font-weight: 700;
+}
+
+.offer-checkout-highlight {
+  color: #0f7b5f !important;
+  font-size: 16px !important;
+}
+
+.offer-checkout-total {
+  padding-top: 10px;
+  border-top: 1px solid rgba(15, 123, 95, 0.15);
+  font-size: 15px;
+  font-weight: 700;
+  color: #10251f;
+}
+
+.offer-checkout-total strong {
+  font-size: 18px;
+  color: #0f7b5f !important;
+}
+
+.offer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.offer-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #5c706b;
+}
+
+.offer-select {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid rgba(2, 36, 27, 0.12);
+  border-radius: 10px;
+  font-size: 14px;
+  color: #334943;
+  background: #f9fcfb;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.offer-select:focus {
+  border-color: #0f7b5f;
+  box-shadow: 0 0 0 3px rgba(15, 123, 95, 0.08);
+}
+
+.offer-no-address {
+  font-size: 13px;
+  color: #78908a;
+  font-style: italic;
+}
+
+.offer-payment-options {
+  display: flex;
+  gap: 10px;
+}
+
+.offer-payment-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1.5px solid rgba(2, 36, 27, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5c706b;
+  background: #f9fcfb;
+  transition: all 0.2s ease;
+}
+
+.offer-payment-opt input { display: none; }
+
+.offer-payment-opt.active {
+  border-color: #0f7b5f;
+  background: #e6f5ef;
+  color: #0f7b5f;
+}
+
+.offer-payment-opt:hover:not(.active) {
+  border-color: rgba(15, 123, 95, 0.2);
+  background: #f0fdf8;
+}
+
+.offer-modal-actions {
+  display: flex;
+  gap: 10px;
+  padding: 16px 24px 22px;
+  border-top: 1px solid rgba(2, 36, 27, 0.06);
+}
+
+.offer-btn-cancel {
+  flex: 0 0 auto;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(2, 36, 27, 0.12);
+  background: #ffffff;
+  color: #5c706b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.offer-btn-cancel:hover {
+  background: #f4f7f6;
+  border-color: rgba(2, 36, 27, 0.2);
+}
+
+.offer-btn-submit {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: none;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(15, 123, 95, 0.25);
+}
+
+.offer-btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15, 123, 95, 0.35);
+}
+
+.offer-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.offer-btn-checkout {
+  background: linear-gradient(135deg, #0f7b5f, #02241b);
+}
+
+.offer-btn-checkout:hover:not(:disabled) {
+  background: linear-gradient(135deg, #12936f, #0a3626);
+}
+
+/* ============================================
+   Offer History List
+   ============================================ */
+.offer-history-loading,
+.offer-history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 0;
+  color: #78908a;
+  font-size: 14px;
+  text-align: center;
+}
+
+.offer-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.offer-history-card {
+  border: 1px solid rgba(2, 36, 27, 0.07);
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: #fbfdfc;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.offer-history-card:hover {
+  border-color: rgba(15, 123, 95, 0.15);
+  box-shadow: 0 4px 16px rgba(2, 36, 27, 0.04);
+}
+
+/* New Product Strip in History Page */
+.offer-history-product-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed rgba(2, 36, 27, 0.1);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.offer-history-product-strip:hover {
+  opacity: 0.8;
+}
+
+.offer-product-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.offer-product-thumb-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: #f0f4f3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.offer-product-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.offer-product-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #10251f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.offer-product-link {
+  font-size: 11px;
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.offer-history-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.offer-history-prices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.offer-history-offer-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: #10251f;
+}
+
+.offer-history-offer-price span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #78908a;
+  margin-left: 2px;
+}
+
+.offer-history-original {
+  font-size: 12px;
+  color: #78908a;
+}
+
+.offer-history-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.offer-expired-badge {
+  margin-left: 4px;
+  font-size: 9px;
+  background: rgba(255,255,255,0.6);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.offer-history-message {
+  font-size: 13px;
+  color: #5c706b;
+  line-height: 1.5;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  background: #f4f7f6;
+  border-radius: 8px;
+  margin: 0;
+  font-style: italic;
+}
+
+.offer-history-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #78908a;
+}
+
+.offer-history-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.offer-history-card-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.offer-history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.offer-history-btn-cancel {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.offer-history-btn-cancel:hover:not(:disabled) {
+  background: #fecaca;
+  transform: translateY(-1px);
+}
+
+.offer-history-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.offer-history-btn-checkout {
+  background: linear-gradient(135deg, #0f7b5f, #02241b);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 123, 95, 0.2);
+}
+
+.offer-history-btn-checkout:hover {
+  background: linear-gradient(135deg, #12936f, #0a3626);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 123, 95, 0.3);
+}
+
+/* Spinners */
+.offer-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.offer-spinner-sm {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.offer-spinner-lg {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(15, 123, 95, 0.15);
+  border-top-color: #0f7b5f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

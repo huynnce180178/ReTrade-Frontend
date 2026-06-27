@@ -12,6 +12,8 @@ import '../../../styles/MyAccount.css';
 import './PurchaseHistory.css';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
+const returnRequestWindowMs = 7 * 24 * 60 * 60 * 1000;
+
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
   month: 'short',
@@ -25,11 +27,14 @@ const statusTabs = [
   { key: 'Shipping', label: 'Shipping' },
   { key: 'Delivered', label: 'Delivered' },
   { key: 'Completed', label: 'Completed' },
+  { key: 'ReturnRequested', label: 'Return Requested' },
+  { key: 'Returned', label: 'Returned' },
+  { key: 'ReturnRejected', label: 'Return Rejected' },
   { key: 'DeliveryFailed', label: 'Delivery Failed' },
   { key: 'Cancelled', label: 'Cancelled' },
 ];
 
-  const statusMeta = {
+const statusMeta = {
   AwaitingPayment: { label: 'Waiting for Payment', className: 'awaiting' },
   Pending: { label: 'Processing', className: 'pending' },
   Confirmed: { label: 'Confirmed', className: 'confirmed' },
@@ -38,6 +43,8 @@ const statusTabs = [
   Completed: { label: 'Completed', className: 'completed' },
   DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
   Cancelled: { label: 'Cancelled', className: 'cancelled' },
+  ReturnRequested: { label: 'Return Requested', className: 'return-requested' },
+  ReturnRejected: { label: 'Return Rejected', className: 'return-rejected' },
   Returned: { label: 'Returned', className: 'returned' },
 };
 
@@ -58,6 +65,10 @@ export default function PurchaseHistory() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnTarget, setReturnTarget] = useState(null);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   const buyerId = user?.userId;
 
@@ -221,9 +232,10 @@ export default function PurchaseHistory() {
     const transit = source.filter((purchase) => purchase.status === 'Shipping').length;
     const delivered = source.filter((purchase) => purchase.status === 'Delivered').length;
     const completed = source.filter((purchase) => purchase.status === 'Completed').length;
+    const returns = source.filter((purchase) => ['ReturnRequested', 'Returned', 'ReturnRejected'].includes(purchase.status)).length;
     const averageOrder = source.length ? totalSpent / source.length : 0;
 
-    return { totalSpent, pending, transit, delivered, completed, averageOrder };
+    return { totalSpent, pending, transit, delivered, completed, returns, averageOrder };
   }, [purchases, allPurchases, allPurchasesGlobal]);
 
   const statusCounts = useMemo(() => {
@@ -270,6 +282,46 @@ export default function PurchaseHistory() {
   const handleOpenReview = (purchase) => {
     setReviewTarget(purchase);
     setReviewModalOpen(true);
+  };
+
+  const handleOpenReturn = (purchase) => {
+    setReturnTarget(purchase);
+    setReturnReason('');
+    setReturnModalOpen(true);
+  };
+
+  const handleCloseReturn = () => {
+    if (returnSubmitting) return;
+    setReturnModalOpen(false);
+    setReturnTarget(null);
+    setReturnReason('');
+  };
+
+  const handleSubmitReturn = async (event) => {
+    event.preventDefault();
+    if (!buyerId || !returnTarget?.orderId) return;
+
+    const reason = returnReason.trim();
+    if (!reason) {
+      showToast('Please enter a return reason.', 'warning');
+      return;
+    }
+
+    try {
+      setReturnSubmitting(true);
+      setUpdatingId(returnTarget.orderId);
+      await purchaseService.requestReturn(buyerId, returnTarget.orderId, reason);
+      showToast('Return request submitted.', 'success');
+      setReturnModalOpen(false);
+      setReturnTarget(null);
+      setReturnReason('');
+      loadPurchases();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to submit return request.', 'error');
+    } finally {
+      setReturnSubmitting(false);
+      setUpdatingId('');
+    }
   };
 
   const handleSubmitReview = async ({ rating, comment }) => {
@@ -403,6 +455,7 @@ export default function PurchaseHistory() {
                       onCancel={() => updatePurchase(purchase, 'cancel')}
                       onComplete={() => updatePurchase(purchase, 'complete')}
                       onWriteReview={() => handleOpenReview(purchase)}
+                      onRequestReturn={() => handleOpenReturn(purchase)}
                       onPayAgain={() => handlePayAgain(purchase)}
                     />
                   ))
@@ -453,6 +506,10 @@ export default function PurchaseHistory() {
                     <span>Completed</span>
                     <strong>{summary.completed} Orders</strong>
                   </div>
+                  <div>
+                    <span>Returns</span>
+                    <strong>{summary.returns} Orders</strong>
+                  </div>
                 </div>
                 <div style={{ marginTop: 14, color: '#5c706b', fontSize: 13 }}>
                   <span>Avg. Order Value: </span>
@@ -472,6 +529,7 @@ export default function PurchaseHistory() {
                       <InsightBar label={`Shipping (${summary.transit})`} value={getPercent(summary.transit, insightsTotal)} />
                       <InsightBar label={`Delivered (${summary.delivered})`} value={getPercent(summary.delivered, insightsTotal)} />
                       <InsightBar label={`Completed (${summary.completed})`} value={getPercent(summary.completed, insightsTotal)} muted />
+                      <InsightBar label={`Returns (${summary.returns})`} value={getPercent(summary.returns, insightsTotal)} muted />
                     </>
                   );
                 })()}
@@ -495,17 +553,29 @@ export default function PurchaseHistory() {
             }}
             onSubmit={handleSubmitReview}
           />
+
+          {returnModalOpen && (
+            <ReturnRequestModal
+              purchase={returnTarget}
+              reason={returnReason}
+              submitting={returnSubmitting}
+              onReasonChange={setReturnReason}
+              onClose={handleCloseReturn}
+              onSubmit={handleSubmitReturn}
+            />
+          )}
         </main>
       </div>
     </div>
   );
 }
 
-function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onPayAgain }) {
+function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain }) {
   const meta = statusMeta[purchase.status] || { label: purchase.status || 'Unknown', className: 'default' };
   const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
   const canComplete = purchase.status === 'Delivered';
   const canReview = purchase.status === 'Completed' && !purchase.hasReview;
+  const canRequestReturn = purchase.status === 'Completed' && isWithinReturnRequestWindow(purchase);
   const canPay = purchase.status === 'AwaitingPayment';
 
   return (
@@ -557,6 +627,12 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
               </strong>
             </div>
           </div>
+          {purchase.returnReason && (
+            <div className="purchase-return-note">
+              <span className="material-symbols-outlined">assignment_return</span>
+              <p>{purchase.returnReason}</p>
+            </div>
+          )}
         </div>
       </Link>
 
@@ -572,8 +648,13 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
           </button>
         )}
         {canReview && (
-          <button type="button" className="purchase-detail-btn" onClick={onWriteReview}>
+          <button type="button" className="purchase-primary-btn" onClick={onWriteReview}>
             Write Review
+          </button>
+        )}
+        {canRequestReturn && (
+          <button type="button" className="purchase-detail-btn request-return" disabled={updating} onClick={onRequestReturn}>
+            Request Return
           </button>
         )}
         <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-detail-btn">
@@ -589,6 +670,43 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
   );
 }
 
+function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onClose, onSubmit }) {
+  return (
+    <div className="purchase-return-modal-overlay" role="presentation" onMouseDown={onClose}>
+      <div className="purchase-return-modal" role="dialog" aria-modal="true" aria-labelledby="return-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" className="purchase-return-modal-close" onClick={onClose} disabled={submitting} aria-label="Close return request form">
+          <span className="material-symbols-outlined">close</span>
+        </button>
+        <header>
+          <h2 id="return-modal-title">Request Return</h2>
+          <p>Order #{purchase?.orderCode || purchase?.orderId}</p>
+        </header>
+        <form onSubmit={onSubmit}>
+          <label className="purchase-return-reason">
+            <span>Return reason</span>
+            <textarea
+              value={reason}
+              onChange={(event) => onReasonChange(event.target.value)}
+              placeholder="Describe why you want to return this purchase..."
+              rows={5}
+              maxLength={1000}
+              disabled={submitting}
+            />
+          </label>
+          <div className="purchase-return-modal-actions">
+            <button type="button" className="purchase-detail-btn" onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button type="submit" className="purchase-primary-btn" disabled={submitting || !reason.trim()}>
+              {submitting ? 'Submitting...' : 'Submit Request'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function InsightBar({ label, value, muted = false }) {
   return (
     <div className="purchase-insight-row">
@@ -601,6 +719,14 @@ function InsightBar({ label, value, muted = false }) {
       </div>
     </div>
   );
+}
+
+function isWithinReturnRequestWindow(purchase) {
+  const updatedAt = Date.parse(purchase?.updatedAt || '');
+  if (Number.isNaN(updatedAt)) return false;
+
+  const elapsed = Date.now() - updatedAt;
+  return elapsed >= 0 && elapsed <= returnRequestWindowMs;
 }
 
 function normalizeODataList(data) {

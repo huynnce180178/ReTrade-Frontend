@@ -207,6 +207,14 @@ export default function AdminLayout() {
               </NavLink>
 
               <NavLink 
+                to="/admin/refunds" 
+                className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
+              >
+                <span className="material-symbols-outlined admin-menu-item-icon">payments</span>
+                Manage Refunds
+              </NavLink>
+
+              <NavLink 
                 to="/admin/promos" 
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >

@@ -10,6 +10,8 @@ const orderService = {
   getAllOrders: (params) => get('/Order/admin', { params }),
   getById: (orderId, params) => get(`/Order/${orderId}`, { params }),
   updateStatus: (orderId, payload, params) => patch(`/Order/${orderId}/status`, payload, { params }),
+  approveReturn: (orderId, sellerId) => patch(`/Order/${orderId}/return/approve`, null, { params: { sellerId } }),
+  rejectReturn: (orderId, sellerId) => patch(`/Order/${orderId}/return/reject`, null, { params: { sellerId } }),
 };
 
 export default orderService;

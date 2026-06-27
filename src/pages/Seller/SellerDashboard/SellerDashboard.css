@@ -783,13 +783,27 @@
 }
 
 .seller-order-status.returned {
-  background: #fef3c7;
+  background: rgba(217, 119, 6, 0.12);
   color: #a16207;
+  box-shadow: 0 8px 16px rgba(217, 119, 6, 0.08);
 }
 
 .seller-order-status.cancelled {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+/* Return states */
+.seller-order-status.return-requested {
+  background: #7c3aed;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.08);
+}
+
+.seller-order-status.return-rejected {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.08);
 }
 
 .seller-order-status.default {
