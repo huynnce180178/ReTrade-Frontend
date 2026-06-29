@@ -45,27 +45,29 @@ const filterTabs = [
 ];
 
 function resolveBidOutcome(bidStatus, auctionStatus) {
-  const isTerminal = ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'].includes(auctionStatus);
+  const normalizedBidStatus = String(bidStatus || '').toLowerCase();
+  const normalizedAuctionStatus = String(auctionStatus || '').toLowerCase();
+  const isTerminal = ['ended', 'endedbybuynow', 'endedbytime', 'endednobid'].includes(normalizedAuctionStatus);
 
-  if (auctionStatus === 'Cancelled') {
+  if (normalizedAuctionStatus === 'cancelled') {
     return { label: 'Cancelled', className: 'cancelled' };
   }
-  if (auctionStatus === 'Ongoing') {
-    if (bidStatus === 'Highest') {
+  if (normalizedAuctionStatus === 'ongoing') {
+    if (normalizedBidStatus === 'highest' || normalizedBidStatus === 'winning' || normalizedBidStatus === 'won') {
       return { label: 'Winning', className: 'winning' };
     }
-    if (bidStatus === 'Outbid') {
+    if (normalizedBidStatus === 'outbid' || normalizedBidStatus === 'lost') {
       return { label: 'Outbid', className: 'outbid' };
     }
   }
-  if (auctionStatus === 'Upcoming') {
+  if (normalizedAuctionStatus === 'upcoming') {
     return { label: 'Upcoming', className: 'upcoming' };
   }
   if (isTerminal) {
-    if (bidStatus === 'Highest') {
+    if (normalizedBidStatus === 'highest' || normalizedBidStatus === 'winning' || normalizedBidStatus === 'won') {
       return { label: 'Won', className: 'won' };
     }
-    if (bidStatus === 'Outbid') {
+    if (normalizedBidStatus === 'outbid' || normalizedBidStatus === 'lost') {
       return { label: 'Lost', className: 'lost' };
     }
   }
