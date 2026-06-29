@@ -9,10 +9,13 @@ const auctionService = {
   getById: (id) => get(`/Auction/${id}`),
   getMyAuctions: (params) => get('/Auction/my', { params }),
   getMyBids: () => get('/Auction/my-bids'),
+  getMyDepositHistory: (params) => get('/Auction/my-deposit-history', { params }),
   getEligibleProducts: (params) => get('/Auction/eligible-products', { params }),
   create: (data) => post('/Auction', data),
   update: (id, data) => put(`/Auction/${id}`, data),
   getMyDeposit: (id) => get(`/Auction/${id}/my-deposit`),
+  getMyAuctionDepositHistory: (id) => get(`/Auction/${id}/my-deposit-history`),
+  getAuctionDepositHistory: (id) => get(`/Auction/${id}/deposit-history`),
   createDepositPaymentUrl: (id, data) => post(`/Auction/${id}/deposit/payment-url`, data),
   placeBid: (id, data) => post(`/Auction/${id}/bid`, data),
 };
