@@ -24,17 +24,6 @@ function formatDateTime(value) {
   return formatAuctionDateTime(value);
 }
 
-function formatDepositTransactionType(value) {
-  const type = String(value || '');
-  const labels = {
-    InitialDeposit: 'Initial Deposit',
-    TopUp: 'Top Up',
-    AppliedToOrder: 'Applied to Order',
-    RefundPending: 'Refund Pending',
-  };
-  return labels[type] || type || 'Deposit';
-}
-
 function formatDuration(ms) {
   if (ms <= 0) return '00:00:00';
   const totalSecs = Math.floor(ms / 1000);
@@ -125,9 +114,7 @@ export default function AuctionDetail() {
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
   const [deposit, setDeposit] = useState(null);
-  const [depositHistory, setDepositHistory] = useState([]);
   const [depositAmount, setDepositAmount] = useState('');
-  const [topUpAmount, setTopUpAmount] = useState('');
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -213,14 +200,10 @@ export default function AuctionDetail() {
         try {
           const myDeposit = await auctionService.getMyDeposit(auctionId);
           setDeposit(myDeposit);
+          setPolicyAccepted(Boolean(myDeposit?.policyAccepted));
         } catch {
           setDeposit(null);
-        }
-        try {
-          const myDepositHistory = await auctionService.getMyAuctionDepositHistory(auctionId);
-          setDepositHistory(Array.isArray(myDepositHistory) ? myDepositHistory : []);
-        } catch {
-          setDepositHistory([]);
+          setPolicyAccepted(false);
         }
       } catch (error) {
         showToast(error?.response?.data || 'Failed to load auction detail.', 'error');
@@ -266,15 +249,11 @@ export default function AuctionDetail() {
       const eventType = payload?.eventType || payload?.EventType || '';
       if (!nextDeposit || nextDeposit.auctionId !== auctionId) return;
       setDeposit(nextDeposit);
-      auctionService.getMyAuctionDepositHistory(auctionId)
-        .then((items) => setDepositHistory(Array.isArray(items) ? items : []))
-        .catch(() => {});
-      if (eventType === 'DepositToppedUp') {
-        showToast('Auction deposit topped up successfully.', 'success');
-      } else if (eventType === 'DepositTopUpFailed') {
-        showToast('Deposit top-up failed. Your existing deposit is still active.', 'error');
-      } else if (nextDeposit.status === 'Paid') {
+      setPolicyAccepted(Boolean(nextDeposit.policyAccepted));
+      if (eventType === 'DepositPaid') {
         showToast('Auction deposit confirmed. You can place bids now.', 'success');
+      } else if (eventType === 'DepositToppedUp') {
+        showToast('Auction deposit added successfully.', 'success');
       }
     };
 
@@ -312,14 +291,19 @@ export default function AuctionDetail() {
   const isOwner = Boolean(user && auction && (auction.sellerId === user.userId || auction.sellerId === user.id));
   const isOngoing = effectiveStatus === 'Ongoing';
   const paidDeposit = deposit?.status === 'Paid' && deposit?.policyAccepted;
-  const depositPaidAmount = Number(deposit?.depositAmount || 0);
-  const fallbackMaxBidAmount = Math.max(0, depositPaidAmount - AUCTION_ENTRY_FEE);
+  const availableDepositAmount = Number(deposit?.depositAmount || 0);
+  const totalDepositAmount = Number(deposit?.totalDepositAmount ?? availableDepositAmount);
+  const heldBidAmount = Number(deposit?.heldBidAmount || 0);
+  const fallbackMaxBidAmount = Math.max(0, availableDepositAmount - AUCTION_ENTRY_FEE);
   const maxBidAmount = Number(deposit?.maxBidAmount ?? fallbackMaxBidAmount);
   const buyNowAmount = Number(auction?.buyNowPrice || 0);
+  const additionalDepositNeededForBuyNow = Math.max(0, buyNowAmount - maxBidAmount);
+  const additionalDepositNeededForNextBid = Math.max(0, minimumNextBid - maxBidAmount);
   const highestAllowedBid = buyNowAmount ? Math.min(maxBidAmount, buyNowAmount) : maxBidAmount;
+  const enteredBidAmount = Number(bidAmount || 0);
+  const bidExceedsLimit = Boolean(bidAmount && enteredBidAmount > highestAllowedBid);
   const canBid = Boolean(user && auction && isOngoing && !isOwner && paidDeposit);
   const canDeposit = Boolean(user && auction && !isOwner && ![...ENDED_AUCTION_STATUSES, 'Cancelled'].includes(effectiveStatus));
-  const canTopUpDeposit = Boolean(canDeposit && paidDeposit);
   const isEnded = isEndedAuctionStatus(effectiveStatus);
   const isWinner = isAuctionWinner(auction, user);
 
@@ -344,8 +328,6 @@ export default function AuctionDetail() {
     setAuction(data);
     const myDeposit = await auctionService.getMyDeposit(auctionId);
     setDeposit(myDeposit);
-    const myDepositHistory = await auctionService.getMyAuctionDepositHistory(auctionId);
-    setDepositHistory(Array.isArray(myDepositHistory) ? myDepositHistory : []);
   };
 
   const handleDepositSubmit = async (event) => {
@@ -355,7 +337,7 @@ export default function AuctionDetail() {
       showToast('Deposit must be at least 20,000 VND.', 'warning');
       return;
     }
-    if (!policyAccepted) {
+    if (!paidDeposit && !policyAccepted) {
       showToast('Please accept the auction policy before paying deposit.', 'warning');
       return;
     }
@@ -364,7 +346,7 @@ export default function AuctionDetail() {
       setActionLoading(true);
       const result = await auctionService.createDepositPaymentUrl(auctionId, {
         depositAmount: amount,
-        policyAccepted,
+        policyAccepted: paidDeposit ? true : policyAccepted,
       });
       if (result?.paymentUrl) {
         window.location.href = result.paymentUrl;
@@ -373,32 +355,6 @@ export default function AuctionDetail() {
       }
     } catch (error) {
       showToast(getApiErrorMessage(error) || 'Failed to create deposit payment.', 'error');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleTopUpSubmit = async (event) => {
-    event.preventDefault();
-    const amount = Number(topUpAmount);
-    if (amount < 20000) {
-      showToast('Top-up amount must be at least 20,000 VND.', 'warning');
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      const result = await auctionService.createDepositPaymentUrl(auctionId, {
-        depositAmount: amount,
-        policyAccepted: true,
-      });
-      if (result?.paymentUrl) {
-        window.location.href = result.paymentUrl;
-      } else {
-        showToast('Payment URL not returned.', 'error');
-      }
-    } catch (error) {
-      showToast(getApiErrorMessage(error) || 'Failed to create deposit top-up payment.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -429,6 +385,9 @@ export default function AuctionDetail() {
       setActionLoading(true);
       const result = await auctionService.placeBid(auctionId, { bidAmount: amount });
       setAuction(result?.auction || auction);
+      if (result?.deposit) {
+        setDeposit(result.deposit);
+      }
       setBidAmount('');
       if (result?.auctionEnded) {
         showToast('Bid matched the buy now price. Auction ended.', 'success');
@@ -518,13 +477,18 @@ export default function AuctionDetail() {
               </div>
               <div>
                 <span>Your Deposit</span>
-                <strong>{deposit?.status === 'Paid' ? formatMoney(deposit.depositAmount) : '-'}</strong>
+                <strong>{deposit?.status === 'Paid' ? formatMoney(totalDepositAmount) : '-'}</strong>
               </div>
-              <div>
+              <div className={paidDeposit && maxBidAmount <= 0 ? 'auction-limit-empty' : ''}>
                 <span>Bidding Limit</span>
                 <strong>{deposit?.status === 'Paid' ? formatMoney(maxBidAmount) : '-'}</strong>
               </div>
             </div>
+            {paidDeposit && heldBidAmount > 0 && (
+              <p className="auction-limit-note">
+                You already bid {formatMoney(heldBidAmount)}. Remaining bidding limit: {formatMoney(maxBidAmount)}.
+              </p>
+            )}
 
              {isEnded ? (
               <div className={`auction-detail-status-card ${isWinner ? 'winner-card' : 'ended-card'}`}>
@@ -602,7 +566,17 @@ export default function AuctionDetail() {
                   {auction.buyNowPrice && (
                     <p className="auction-buynow-hint">
                       Bid exactly {formatMoney(auction.buyNowPrice)} to buy now and end the auction.
-                      {buyNowAmount > maxBidAmount ? ` Deposit must be at least ${formatMoney(buyNowAmount + AUCTION_ENTRY_FEE)} to buy now.` : ' Your bidding limit covers buy now.'}
+                      {buyNowAmount > maxBidAmount ? ` Add ${formatMoney(additionalDepositNeededForBuyNow)} more deposit to reach the buy now limit.` : ' Your bidding limit covers buy now.'}
+                    </p>
+                  )}
+                  {paidDeposit && additionalDepositNeededForNextBid > 0 && (
+                    <p className="auction-bid-limit-warning">
+                      Add {formatMoney(additionalDepositNeededForNextBid)} more deposit to reach the next bid.
+                    </p>
+                  )}
+                  {bidExceedsLimit && (
+                    <p className="auction-bid-limit-warning">
+                      Current maximum bid: {formatMoney(highestAllowedBid)}.
                     </p>
                   )}
                   <button type="submit" disabled={!canBid || actionLoading}>
@@ -611,55 +585,27 @@ export default function AuctionDetail() {
                   </button>
                 </form>
 
-                <form className="auction-deposit-form auction-topup-form" onSubmit={handleTopUpSubmit} noValidate>
+                <form className="auction-deposit-form auction-topup-form" onSubmit={handleDepositSubmit} noValidate>
                   <label>
-                    <span>Top Up Deposit</span>
+                    <span>Add More Deposit</span>
                     <input
                       type="number"
                       min="20000"
-                      value={topUpAmount}
-                      onChange={(event) => setTopUpAmount(event.target.value)}
-                      placeholder="Add at least 20000"
-                      disabled={!canTopUpDeposit || actionLoading}
+                      value={depositAmount}
+                      onChange={(event) => setDepositAmount(event.target.value)}
+                      placeholder="Min 20000"
+                      disabled={!canDeposit || actionLoading}
                     />
                   </label>
-                  <small className="auction-topup-note">
-                    Your bidding limit increases by the top-up amount. The 20,000 VND participation fee is charged only once.
-                  </small>
-                  <button type="submit" disabled={!canTopUpDeposit || actionLoading}>
-                    {actionLoading ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">add_card</span>}
-                    Top Up Deposit
+                  <p className="auction-topup-note">
+                    The 20,000 VND participation fee is only deducted on your first successful deposit. Any extra deposit is added directly to your bidding limit.
+                  </p>
+                  <button type="submit" disabled={!canDeposit || actionLoading}>
+                    {actionLoading ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">account_balance_wallet</span>}
+                    Add Deposit
                   </button>
                 </form>
               </>
-            )}
-          </section>
-
-          <section className="auction-detail-card auction-deposit-history-card">
-            <div className="auction-deposit-history-head">
-              <h2>Deposit History</h2>
-              <span>{depositHistory.length} transaction{depositHistory.length === 1 ? '' : 's'}</span>
-            </div>
-            {depositHistory.length === 0 ? (
-              <p>No deposit transactions yet.</p>
-            ) : (
-              <div className="auction-deposit-history-list">
-                {depositHistory.map((item) => (
-                  <div key={item.auctionDepositTransactionId} className="auction-deposit-history-row">
-                    <div>
-                      <strong>{formatDepositTransactionType(item.transactionType)}</strong>
-                      <small>{formatDateTime(item.completedAt || item.createdAt)}</small>
-                      {item.note && <em>{item.note}</em>}
-                    </div>
-                    <div>
-                      <strong>{formatMoney(item.amount)}</strong>
-                      <span className={`auction-deposit-history-status ${String(item.status || '').toLowerCase()}`}>
-                        {item.status || 'Pending'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
           </section>
 

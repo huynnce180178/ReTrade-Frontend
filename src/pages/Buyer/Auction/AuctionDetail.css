@@ -33,6 +33,7 @@
 }
 
 .auction-detail-page .auction-detail-action-head {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -51,9 +52,51 @@
   font-size: 15px;
 }
 
+.auction-detail-page .auction-detail-action-head .auction-limit-empty {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: rgba(254, 242, 242, 0.92);
+}
+
+.auction-detail-page .auction-detail-action-head .auction-limit-empty strong {
+  color: #991b1b;
+}
+
+.auction-detail-page .auction-limit-note {
+  margin: -2px 0 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .auction-detail-page .auction-deposit-form,
 .auction-detail-page .auction-bid-form {
   gap: 9px;
+}
+
+.auction-detail-page .auction-topup-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.auction-detail-page .auction-topup-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.auction-detail-page .auction-bid-limit-warning {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 8px;
+  background: rgba(254, 242, 242, 0.92);
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .auction-detail-page .auction-deposit-form input[type="number"],
@@ -131,109 +174,6 @@
   text-transform: none;
   letter-spacing: 0;
   line-height: 1.45;
-}
-
-.auction-detail-page .auction-topup-form {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(15, 23, 42, 0.1);
-}
-
-.auction-detail-page .auction-topup-note {
-  display: block;
-  margin-top: -4px;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.auction-detail-page .auction-deposit-history-card {
-  order: 3;
-  padding: 14px;
-}
-
-.auction-detail-page .auction-deposit-history-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.auction-detail-page .auction-deposit-history-card h2 {
-  margin: 0;
-  color: var(--primary);
-  font-family: var(--font-title);
-  font-size: 17px;
-}
-
-.auction-detail-page .auction-deposit-history-head span {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.auction-detail-page .auction-deposit-history-list {
-  display: grid;
-  gap: 8px;
-  max-height: 190px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.auction-detail-page .auction-deposit-history-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
-  padding: 9px 10px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 8px;
-  background: rgba(15, 118, 110, 0.04);
-}
-
-.auction-detail-page .auction-deposit-history-row strong,
-.auction-detail-page .auction-deposit-history-row small,
-.auction-detail-page .auction-deposit-history-row em,
-.auction-detail-page .auction-deposit-history-row span {
-  display: block;
-}
-
-.auction-detail-page .auction-deposit-history-row small {
-  margin-top: 2px;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.auction-detail-page .auction-deposit-history-row em {
-  display: none;
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-style: normal;
-  line-height: 1.4;
-}
-
-.auction-detail-page .auction-deposit-history-row > div:last-child {
-  text-align: right;
-}
-
-.auction-detail-page .auction-deposit-history-status {
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.auction-detail-page .auction-deposit-history-status.success,
-.auction-detail-page .auction-deposit-history-status.completed {
-  color: #047857;
-}
-
-.auction-detail-page .auction-deposit-history-status.failed {
-  color: #b91c1c;
 }
 
 .auction-celebration-overlay {
@@ -440,9 +380,6 @@
     font-size: 22px;
   }
 
-  .auction-detail-page .auction-deposit-history-list {
-    max-height: 220px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
