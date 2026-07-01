@@ -7,7 +7,16 @@ import wishlistService from '../../../services/wishlistService';
 import { useAuth } from '../../../context/AuthContext';
 import '../../../styles/Product.css';
 
-const CONDITIONS = ['New (Sealed)', 'Like New (99%)', 'Used', 'Heavily Used'];
+const CONDITIONS = [
+  { value: 'New', label: 'New (Sealed)' },
+  { value: 'LikeNew', label: 'Like New (99%)' },
+  { value: 'Excellent', label: 'Excellent' },
+  { value: 'Good', label: 'Good' },
+  { value: 'Fair', label: 'Fair' },
+  { value: 'Used', label: 'Used' },
+  { value: 'Damaged', label: 'Damaged' },
+  { value: 'ForParts', label: 'For Parts' }
+];
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest First' },
   { value: 'oldest', label: 'Oldest First' },
@@ -332,11 +341,11 @@ export default function Product() {
                 </button>
                 {CONDITIONS.map(c => (
                   <button
-                    key={c}
-                    className={`condition-chip ${condition === c ? 'active' : ''}`}
-                    onClick={() => updateParams({ condition: condition === c ? '' : c })}
+                    key={c.value}
+                    className={`condition-chip ${condition === c.value ? 'active' : ''}`}
+                    onClick={() => updateParams({ condition: condition === c.value ? '' : c.value })}
                   >
-                    {c}
+                    {c.label}
                   </button>
                 ))}
               </div>
@@ -359,9 +368,7 @@ export default function Product() {
             {/* Active Search Display */}
             {searchTerm && (
               <div className="active-search-display">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--text-muted)', marginRight: '6px' }}>search</span>
                 Search results for: <strong>"{searchTerm}"</strong>
                 <button className="active-search-clear" onClick={handleClearSearch}>Clear Search</button>
               </div>
@@ -395,7 +402,7 @@ export default function Product() {
               </div>
             ) : products.length === 0 ? (
               <div className="product-empty-state">
-                <span className="product-empty-icon">🔍</span>
+                <span className="material-symbols-outlined product-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>search</span>
                 <h3>No Products Found</h3>
                 <p>
                   {searchTerm

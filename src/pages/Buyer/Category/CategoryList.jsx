@@ -86,7 +86,7 @@ export default function CategoryList() {
                 {cat.imageUrl ? (
                   <img src={cat.imageUrl} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 ) : (
-                  <span style={{ fontSize: '36px' }}>🏷️</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '36px', color: 'var(--text-muted)' }}>sell</span>
                 )}
               </div>
               <span style={{ 

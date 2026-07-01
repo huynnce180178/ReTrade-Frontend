@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import CategoryList from './pages/Buyer/Category/CategoryList';
 import CategoryProductList from './pages/Buyer/Category/CategoryProductList';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -36,6 +36,7 @@ import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import SellerLayout from './layouts/SellerLayout/SellerLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
+import MyVouchers from './pages/Buyer/MyVouchers/MyVouchers';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
 import MyProducts from './pages/Seller/MyProducts/MyProducts';
 import ProductForm from './pages/Seller/ProductForm/ProductForm';
@@ -50,12 +51,31 @@ import Listings from './pages/Admin/Listings/Listings';
 import AuctionControl from './pages/Admin/Auctions/AuctionControl';
 import ManageRefunds from './pages/Admin/Refunds/ManageRefunds';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Immediate scroll
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    // Fallback after paint to catch lazy-rendered layouts
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    });
+  }, [pathname]);
+
+  return null;
+}
+
 function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <AuthProvider>
         <ToastProvider>
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
               <Route path="/" element={<MainLayout />}>
                 <Route index element={<Home />} />
@@ -87,6 +107,7 @@ function App() {
                 <Route path="forgot-password" element={<ForgotPassword />} />
                 <Route path="reset-password" element={<ResetPassword />} />
                 <Route path="profile" element={<MyAccount />} />
+                <Route path="vouchers" element={<MyVouchers />} />
                 <Route path="my-account" element={<Navigate to="/profile" replace />} />
                 <Route path="change-password" element={<ChangePassword />} />
                 <Route path="address-book" element={<AddressBook />} />

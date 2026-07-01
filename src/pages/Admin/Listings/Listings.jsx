@@ -18,6 +18,9 @@ export default function Listings() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Pending', 'Approved', 'Rejected', 'Sold', 'Inactive'
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const pageSize = 5;
 
   // Modal Detail states
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -36,7 +39,7 @@ export default function Listings() {
   // Fetch products automatically when filters or search terms change
   useEffect(() => {
     fetchProducts();
-  }, [statusFilter, categoryFilter, searchTerm]);
+  }, [statusFilter, categoryFilter, searchTerm, page]);
 
   const fetchProducts = async () => {
     try {
@@ -75,11 +78,22 @@ export default function Listings() {
 
       // Default sorting by CreatedAt Desc
       params['$orderby'] = 'CreatedAt desc';
+      params['$top'] = pageSize;
+      params['$skip'] = (page - 1) * pageSize;
+      params['$count'] = 'true';
 
       const res = await productService.getForApproval(params);
       // Map OData value array or flat array
       const items = Array.isArray(res) ? res : (res?.value || res?.items || []);
       setProducts(items);
+      
+      if (res && res['@odata.count']) {
+        setTotalItems(parseInt(res['@odata.count'], 10));
+      } else if (res && res.totalCount !== undefined) {
+        setTotalItems(res.totalCount);
+      } else {
+        setTotalItems(items.length);
+      }
     } catch (error) {
       const msg = typeof error?.response?.data === 'string' ? error.response.data : error?.message || 'Failed to load products.';
       showToast(msg, 'error');
@@ -123,6 +137,15 @@ export default function Listings() {
 
   const handleApprove = async () => {
     if (!selectedProduct) return;
+    const category = categories.find(c => 
+      (selectedProduct.categoryId && c.categoryId === selectedProduct.categoryId) || 
+      (selectedProduct.categoryName && c.name === selectedProduct.categoryName)
+    );
+    const isCategoryActive = category?.status === 'Active';
+    if (!isCategoryActive) {
+      showToast('Cannot approve product because its category is not active', 'error');
+      return;
+    }
     try {
       setActionLoading(true);
       await productService.approve(selectedProduct.productId, true, null);
@@ -160,6 +183,34 @@ export default function Listings() {
     }
   };
 
+  const handleQuickApprove = async (product) => {
+    const category = categories.find(c => 
+      (product.categoryId && c.categoryId === product.categoryId) || 
+      (product.categoryName && c.name === product.categoryName)
+    );
+    const isCategoryActive = category?.status === 'Active';
+    if (!isCategoryActive) {
+      showToast('Cannot approve product because its category is not active', 'error');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      await productService.approve(product.productId, true, null);
+      showToast('Product listing approved successfully.', 'success');
+      await fetchProducts();
+    } catch (error) {
+      showToast(error?.response?.data || error?.message || 'An error occurred during approval.', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleQuickRejectClick = (product) => {
+    setSelectedProduct(product);
+    setShowRejectInput(true);
+    setShowDetailModal(true);
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Pending':
@@ -182,6 +233,10 @@ export default function Listings() {
         return <span className="badge badge-unknown">{status}</span>;
     }
   };
+
+  const isCategoryApproved = selectedProduct 
+    ? categories.find(c => c.categoryId === selectedProduct.categoryId)?.status === 'Active'
+    : true;
 
   return (
     <div className="admin-listings-page animate-fade-in">
@@ -210,13 +265,13 @@ export default function Listings() {
                   type="text"
                   placeholder="Search by product name, seller..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                 />
               </label>
 
               <label className="admin-select-box">
                 <span className="material-symbols-outlined">filter_alt</span>
-                <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}>
                   <option value="All">All Categories</option>
                   {categories.map((c) => (
                     <option key={c.categoryId} value={c.name}>
@@ -230,42 +285,42 @@ export default function Listings() {
             <div className="admin-pill-group">
               <button
                 className={`admin-pill ${statusFilter === 'All' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('All')}
+                onClick={() => { setStatusFilter('All'); setPage(1); }}
                 type="button"
               >
                 All
               </button>
               <button
                 className={`admin-pill ${statusFilter === 'Pending' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('Pending')}
+                onClick={() => { setStatusFilter('Pending'); setPage(1); }}
                 type="button"
               >
                 Pending
               </button>
               <button
                 className={`admin-pill ${statusFilter === 'Approved' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('Approved')}
+                onClick={() => { setStatusFilter('Approved'); setPage(1); }}
                 type="button"
               >
                 Approved
               </button>
               <button
                 className={`admin-pill ${statusFilter === 'Rejected' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('Rejected')}
+                onClick={() => { setStatusFilter('Rejected'); setPage(1); }}
                 type="button"
               >
                 Rejected
               </button>
               <button
                 className={`admin-pill ${statusFilter === 'Sold' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('Sold')}
+                onClick={() => { setStatusFilter('Sold'); setPage(1); }}
                 type="button"
               >
                 Sold
               </button>
               <button
                 className={`admin-pill ${statusFilter === 'Inactive' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('Inactive')}
+                onClick={() => { setStatusFilter('Inactive'); setPage(1); }}
                 type="button"
               >
                 Inactive
@@ -290,21 +345,21 @@ export default function Listings() {
             <table className="admin-listings-table">
               <thead>
                 <tr>
+                  <th>STT</th>
                   <th>Product</th>
                   <th>Category</th>
                   <th>Price / Type</th>
-                  <th>Stock</th>
                   <th>Status</th>
-                  <th>Seller</th>
-                  <th>Date Posted</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => {
+                {products.map((p, index) => {
                   const isAuction = p.status === 'Waiting' || p.status === 'Ready' || p.status === 'AuctionRejected';
+                  const isCategoryApproved = categories.find(c => c.categoryId === p.categoryId)?.status === 'Active';
                   return (
                     <tr key={p.productId} className="clickable-row" onClick={() => openProductDetail(p)}>
+                      <td>{(page - 1) * pageSize + index + 1}</td>
                       <td>
                         <div className="admin-listing-identity">
                           <div className="admin-listing-thumbnail">
@@ -328,27 +383,95 @@ export default function Listings() {
                           <strong>{p.price ? moneyFormatter.format(p.price) : 'Contact'}</strong>
                         )}
                       </td>
-                      <td>{p.stockQuantity}</td>
                       <td>{getStatusBadge(p.status)}</td>
-                      <td>{p.sellerName || 'N/A'}</td>
-                      <td>{formatDateTimeGmt7(p.createdAt)}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="admin-action-btn outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openProductDetail(p);
-                          }}
-                        >
-                          Details
-                        </button>
+                        {(p.status === 'Pending' || p.status === 'Waiting') ? (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="admin-action-btn success"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQuickApprove(p);
+                              }}
+                              disabled={actionLoading}
+                              style={{ padding: '4px 8px', fontSize: '12px' }}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-action-btn danger"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQuickRejectClick(p);
+                              }}
+                              disabled={actionLoading}
+                              style={{ padding: '4px 8px', fontSize: '12px' }}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#888' }}>Processed</span>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          )}
+          
+          {products.length > 0 && totalItems > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '30px', paddingBottom: '30px' }}>
+              <button 
+                disabled={page === 1} 
+                onClick={() => setPage(p => p - 1)}
+                style={{ 
+                  width: '36px', height: '36px', 
+                  display: 'flex', justifyContent: 'center', alignItems: 'center', 
+                  backgroundColor: 'white', border: '1px solid #eaeaea', 
+                  borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer',
+                  color: page === 1 ? '#ccc' : '#333'
+                }}
+              >
+                &lt;
+              </button>
+              
+              {Array.from({ length: Math.ceil(totalItems / pageSize) || 1 }, (_, i) => i + 1).map(num => (
+                <button
+                  key={num}
+                  onClick={() => setPage(num)}
+                  style={{
+                    width: '36px', height: '36px', 
+                    display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    backgroundColor: page === num ? '#0a2a1f' : 'white',
+                    color: page === num ? 'white' : '#333',
+                    border: page === num ? 'none' : '1px solid #eaeaea',
+                    borderRadius: '6px',
+                    fontWeight: page === num ? '600' : 'normal',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {num}
+                </button>
+              ))}
+
+              <button 
+                disabled={page >= Math.ceil(totalItems / pageSize)} 
+                onClick={() => setPage(p => p + 1)}
+                style={{ 
+                  width: '36px', height: '36px', 
+                  display: 'flex', justifyContent: 'center', alignItems: 'center', 
+                  backgroundColor: 'white', border: '1px solid #eaeaea', 
+                  borderRadius: '6px', cursor: page >= Math.ceil(totalItems / pageSize) ? 'not-allowed' : 'pointer',
+                  color: page >= Math.ceil(totalItems / pageSize) ? '#ccc' : '#333'
+                }}
+              >
+                &gt;
+              </button>
+            </div>
           )}
         </div>
       </section>
@@ -406,7 +529,12 @@ export default function Listings() {
                       <tbody>
                         <tr>
                           <td>Category:</td>
-                          <td><strong>{selectedProduct.categoryName}</strong></td>
+                          <td>
+                            <strong>{selectedProduct.categoryName}</strong>
+                            {!isCategoryApproved && (
+                              <span className="badge badge-pending" style={{ marginLeft: '8px', fontSize: '11px' }}>Category Not Active</span>
+                            )}
+                          </td>
                         </tr>
                         <tr>
                           <td>Price:</td>

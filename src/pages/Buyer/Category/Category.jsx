@@ -377,6 +377,28 @@ export default function Category() {
     }
   };
 
+  const handleApproveCategory = async (category) => {
+    try {
+      showToast('Approving category...', 'info');
+      await categoryService.restore(category.categoryId);
+      showToast('Category approved and active now.', 'success');
+      await fetchCategories();
+    } catch (err) {
+      showToast('Failed to approve category.', 'error');
+    }
+  };
+
+  const handleRejectCategory = async (category) => {
+    try {
+      showToast('Rejecting category...', 'info');
+      await categoryService.inactive(category.categoryId);
+      showToast('Category rejected (marked as Inactive).', 'success');
+      await fetchCategories();
+    } catch (err) {
+      showToast('Failed to reject category.', 'error');
+    }
+  };
+
   return (
     <div className="category-page-wrapper container animate-fade-in">
       <div className="category-header-section">
@@ -415,7 +437,7 @@ export default function Category() {
               <div className="filter-group-status">
                 <span className="filter-toolbar-label">Status:</span>
                 <div className="status-btn-group">
-                  {['All', 'Active', 'Inactive'].map((status) => (
+                  {['All', 'Active', 'Pending', 'Inactive'].map((status) => (
                     <button
                       key={status}
                       type="button"
@@ -511,7 +533,10 @@ export default function Category() {
                   />
                   <div className="detail-title-block">
                     {isAdminView && (
-                      <span className={`badge ${selectedCategory.status === 'Active' ? 'badge-success' : 'badge-danger'}`} style={{ marginBottom: '8px' }}>
+                      <span className={`badge ${
+                        selectedCategory.status === 'Active' ? 'badge-success' : 
+                        selectedCategory.status === 'Pending' ? 'badge-warning' : 'badge-danger'
+                      }`} style={{ marginBottom: '8px' }}>
                         {selectedCategory.status}
                       </span>
                     )}
@@ -524,15 +549,36 @@ export default function Category() {
                       <span className="material-symbols-outlined">edit</span>
                       Edit
                     </button>
-                    <button 
-                      className={`btn ${selectedCategory.status === 'Active' ? 'btn-secondary' : 'btn-primary'}`}
-                      onClick={() => handleToggleStatus(selectedCategory)}
-                    >
-                      <span className="material-symbols-outlined">
-                        {selectedCategory.status === 'Active' ? 'do_not_disturb_on' : 'check_circle'}
-                      </span>
-                      {selectedCategory.status === 'Active' ? 'Deactivate' : 'Restore'}
-                    </button>
+                    {selectedCategory.status === 'Pending' ? (
+                      <>
+                        <button 
+                          className="btn btn-success"
+                          onClick={() => handleApproveCategory(selectedCategory)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
+                          Approve
+                        </button>
+                        <button 
+                          className="btn btn-danger"
+                          onClick={() => handleRejectCategory(selectedCategory)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>cancel</span>
+                          Reject
+                        </button>
+                      </>
+                    ) : (
+                      <button 
+                        className={`btn ${selectedCategory.status === 'Active' ? 'btn-secondary' : 'btn-primary'}`}
+                        onClick={() => handleToggleStatus(selectedCategory)}
+                      >
+                        <span className="material-symbols-outlined">
+                          {selectedCategory.status === 'Active' ? 'do_not_disturb_on' : 'check_circle'}
+                        </span>
+                        {selectedCategory.status === 'Active' ? 'Deactivate' : 'Restore'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

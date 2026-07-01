@@ -1,0 +1,444 @@
+.voucher-tabs-card {
+  padding: 8px;
+  margin-bottom: 24px;
+}
+
+.voucher-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.v-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.v-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(2, 36, 27, 0.04);
+}
+
+.v-tab-btn.active {
+  color: white;
+  background: var(--primary);
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.voucher-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+.voucher-empty {
+  padding: 48px;
+  color: var(--text-muted);
+}
+
+.vouchers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.voucher-card {
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  min-height: 120px;
+  border: 1px solid var(--border-color);
+  transition: var(--transition-smooth);
+}
+
+.voucher-card.clickable {
+  cursor: pointer;
+}
+
+.voucher-card.clickable:hover {
+  transform: translateY(-2px);
+  border-color: var(--secondary);
+  box-shadow: 0 8px 20px rgba(6, 95, 70, 0.1);
+}
+
+.voucher-card.used, 
+.voucher-card.expired {
+  opacity: 0.6;
+}
+
+.voucher-card.used:hover, 
+.voucher-card.expired:hover {
+  transform: none;
+  border-color: var(--border-color);
+}
+
+.voucher-left {
+  width: 140px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  color: white;
+  padding: 16px;
+  text-align: center;
+}
+
+.voucher-card.used .voucher-left, 
+.voucher-card.expired .voucher-left {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+.discount-badge .val {
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  font-family: var(--font-title);
+}
+
+.discount-badge .lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.9;
+}
+
+/* Ticket notch cutout */
+.ticket-cutout {
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  background: var(--bg-primary, #f5f5f5);
+  border-radius: 50%;
+  z-index: 2;
+  border: 1px solid var(--border-color);
+  clip-path: circle(50% at 50% 50%);
+}
+
+.voucher-right {
+  flex: 1;
+  display: flex;
+  padding: 16px 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+@media (max-width: 576px) {
+  .voucher-card {
+    flex-direction: column;
+  }
+  .voucher-left {
+    width: 100%;
+    padding: 12px;
+  }
+  .ticket-cutout {
+    display: none;
+  }
+  .voucher-right {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+
+.voucher-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.v-code-tag {
+  background: rgba(6, 95, 70, 0.08);
+  border: 1px dashed var(--secondary);
+  color: var(--secondary);
+  padding: 4px 10px;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.voucher-card.used .v-code-tag, 
+.voucher-card.expired .v-code-tag {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: var(--text-muted);
+}
+
+.v-shop-name {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.v-limits {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.v-expiry {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.v-expiry strong,
+.v-limits strong {
+  color: var(--text-primary);
+}
+
+.voucher-action {
+  flex-shrink: 0;
+}
+
+.v-copy-btn {
+  min-width: 110px;
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.v-status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--border-radius-sm);
+  letter-spacing: 0.5px;
+}
+
+.v-status-badge.used {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+}
+
+.v-status-badge.expired {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--error);
+  border: 1px solid rgba(220, 38, 38, 0.15);
+}
+
+/* Modal Overlay Styling */
+.v-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(2, 36, 27, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+}
+
+.v-modal-card {
+  width: 100%;
+  max-width: 720px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+  position: relative;
+  padding: 32px;
+  box-shadow: 0 20px 50px rgba(2, 36, 27, 0.2);
+}
+
+.v-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.v-modal-close:hover {
+  color: var(--text-primary);
+  transform: rotate(90deg);
+}
+
+.v-modal-ticket {
+  display: flex;
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  margin-top: 12px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .v-modal-ticket {
+    flex-direction: column;
+  }
+  .v-modal-left {
+    width: 100% !important;
+    padding: 24px !important;
+  }
+  .v-modal-right {
+    padding: 24px !important;
+  }
+}
+
+.v-modal-left {
+  width: 200px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  color: white;
+  text-align: center;
+}
+
+.v-modal-ticket.used .v-modal-left,
+.v-modal-ticket.expired .v-modal-left {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+.v-modal-discount .amount {
+  display: block;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  font-family: var(--font-title);
+  margin-bottom: 8px;
+}
+
+.v-modal-discount .label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.v-modal-status-badge {
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.v-modal-right {
+  flex: 1;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.v-modal-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  font-family: var(--font-title);
+}
+
+.v-modal-desc-text {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.v-modal-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.v-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+  align-items: center;
+}
+
+.v-info-lbl {
+  color: var(--text-muted);
+}
+
+.v-info-val {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.v-info-val-code {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.v-info-val-code .code-font {
+  font-family: monospace;
+  font-weight: 700;
+  background: rgba(6, 95, 70, 0.08);
+  border: 1px dashed var(--secondary);
+  color: var(--secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.v-detail-copy-btn {
+  background: var(--primary);
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.v-detail-copy-btn:hover {
+  background: var(--primary-hover);
+}
+
+.v-modal-terms h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  font-family: var(--font-title);
+}
+
+.v-modal-terms ul {
+  padding-left: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}

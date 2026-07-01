@@ -38,8 +38,8 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
       if (next.has(categoryId)) {
         next.delete(categoryId);
       } else {
-        if (next.size >= 5) {
-          showToast('Maximum 5 favorite categories allowed.', 'warning');
+        if (next.size >= 3) {
+          showToast('Maximum 3 favorite categories allowed.', 'warning');
           return prev;
         }
         next.add(categoryId);
@@ -91,7 +91,7 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
 
         <div className="modal-body">
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Select up to 5 categories to personalize your homepage. Products from these categories will appear on your feed.
+            Select up to 3 categories to personalize your homepage. Products from these categories will appear on your feed.
           </p>
 
           {loading ? (
@@ -145,7 +145,7 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
 
         <div className="modal-footer">
           <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: 'auto' }}>
-            {selectedIds.size}/5 selected
+            {selectedIds.size}/3 selected
           </span>
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>

@@ -64,10 +64,11 @@ export default function ManageRefunds() {
   // Calculations for stats
   const stats = useMemo(() => {
     const total = refunds.length;
+    const notReady = refunds.filter(r => r.status === 'NotReady').length;
     const pending = refunds.filter(r => r.status === 'Pending').length;
     const processed = refunds.filter(r => r.status === 'Processed').length;
     const completed = refunds.filter(r => r.status === 'Completed').length;
-    return { total, pending, processed, completed };
+    return { total, notReady, pending, processed, completed };
   }, [refunds]);
 
   // Client-side filtering & search
@@ -92,7 +93,8 @@ export default function ManageRefunds() {
   }, [refunds, activeFilter, searchTerm]);
 
   return (
-    <div className="admin-refund-page animate-fade-in">
+    <>
+      <div className="admin-refund-page animate-fade-in">
       <header className="admin-refund-hero">
         <div>
           <p className="admin-eyebrow" style={{ textTransform: 'uppercase', fontSize: '11px', color: '#0f766e', fontWeight: 800, letterSpacing: '0.08em' }}>Platform Controller</p>
@@ -105,6 +107,10 @@ export default function ManageRefunds() {
         <article className="admin-refund-stat-card">
           <span>Total Requests</span>
           <strong>{stats.total}</strong>
+        </article>
+        <article className="admin-refund-stat-card" style={{ borderLeft: '4px solid #6b7280' }}>
+          <span>Not Ready</span>
+          <strong>{stats.notReady}</strong>
         </article>
         <article className="admin-refund-stat-card" style={{ borderLeft: '4px solid #d97706' }}>
           <span>Pending Done</span>
@@ -123,14 +129,18 @@ export default function ManageRefunds() {
       <section className="admin-refund-panel">
         <div className="admin-refund-toolbar">
           <div className="admin-refund-tabs">
-            {['All', 'Pending', 'Processed', 'Completed'].map((tab) => (
+            {['All', 'NotReady', 'Pending', 'Processed', 'Completed'].map((tab) => (
               <button
                 key={tab}
                 type="button"
                 className={activeFilter === tab ? 'active' : ''}
                 onClick={() => setActiveFilter(tab)}
               >
-                {tab === 'All' ? `All (${refunds.length})` : tab}
+                {tab === 'All' ? `All (${refunds.length})` :
+                 tab === 'NotReady' ? `Not Ready (${stats.notReady})` :
+                 tab === 'Pending' ? `Pending (${stats.pending})` :
+                 tab === 'Processed' ? `Processed (${stats.processed})` :
+                 `Completed (${stats.completed})`}
               </button>
             ))}
           </div>
@@ -163,23 +173,23 @@ export default function ManageRefunds() {
             <table className="admin-refund-table">
               <thead>
                 <tr>
+                  <th>STT</th>
                   <th>User Profile</th>
                   <th>Amount</th>
-                  <th>Reason / Note</th>
-                  <th>Transfer Account</th>
                   <th>Request Date</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRefunds.map((refund) => {
+                {filteredRefunds.map((refund, index) => {
                   const initials = refund.userName
                     ? refund.userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                     : 'U';
                   
                   return (
-                    <tr key={refund.refundRequestId}>
+                    <tr key={refund.refundRequestId} onClick={() => setProcessingRefund(refund)} style={{ cursor: 'pointer' }}>
+                      <td>{index + 1}</td>
                       <td>
                         <div className="admin-user-identity">
                           <div className="admin-user-avatar">
@@ -194,45 +204,43 @@ export default function ManageRefunds() {
                       <td className="refund-amount-cell">
                         {formatVnd(refund.amount)}
                       </td>
-                      <td style={{ maxWidth: '240px', wordBreak: 'break-word', color: '#4b5563' }}>
-                        {refund.note || '-'}
-                      </td>
-                      <td>
-                        {refund.bankName ? (
-                          <div className="bank-details-wrapper">
-                            <span>Ngân hàng: <strong>{refund.bankName}</strong></span>
-                            <span>Số TK: <strong>{refund.bankAccountNumber}</strong></span>
-                            <span>Chủ TK: <strong>{refund.bankAccountHolder}</strong></span>
-                          </div>
-                        ) : (
-                          <em style={{ color: '#b45309', fontSize: '13px', fontWeight: 600 }}>
-                            Chưa cập nhật tài khoản
-                          </em>
-                        )}
-                      </td>
                       <td style={{ color: '#6b7280' }}>
                         {formatDate(refund.requestedAt)}
                       </td>
                       <td>
-                        <span className={`refund-status-badge ${refund.status.toLowerCase()}`}>
-                          {refund.status === 'Pending' ? 'Chờ chuyển tiền' : refund.status === 'Processed' ? 'Đã chuyển' : 'Hoàn tất'}
+                        <span className={`refund-status-badge ${refund.status ? refund.status.toLowerCase() : ''}`}>
+                          {refund.status === 'NotReady' ? 'Not Ready' :
+                           refund.status === 'Pending' ? 'Pending' :
+                           refund.status === 'Processed' ? 'Processed' : 'Completed'}
                         </span>
                       </td>
                       <td>
+                        {refund.status === 'NotReady' && (
+                          <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: 600 }}>
+                            Awaiting Info
+                          </span>
+                        )}
                         {refund.status === 'Pending' && (
                           <button
                             type="button"
                             className="admin-refund-action-btn"
-                            disabled={!refund.bankName}
-                            onClick={() => setProcessingRefund(refund)}
-                            title={!refund.bankName ? "User must update their bank info first" : "Mark as manual transfer completed"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProcessingRefund(refund);
+                            }}
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
-                            Done
+                            Confirm
                           </button>
                         )}
-                        {refund.status !== 'Pending' && (
-                          <span style={{ fontSize: '13px', color: '#9ca3af' }}>Processed</span>
+                        {refund.status === 'Processed' && (
+                          <span style={{ fontSize: '13px', color: '#2563eb', fontWeight: 600 }}>
+                            Awaiting Receipt
+                          </span>
+                        )}
+                        {refund.status === 'Completed' && (
+                          <span style={{ fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>
+                            Completed
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -243,30 +251,64 @@ export default function ManageRefunds() {
           )}
         </div>
       </section>
+    </div>
 
-      {processingRefund && (
+    {processingRefund && (
         <div className="admin-refund-modal-overlay" onClick={() => setProcessingRefund(null)}>
           <div className="admin-refund-modal" onClick={(e) => e.stopPropagation()}>
             <header className="admin-refund-modal-header">
-              <h3>Confirm Offline Transfer Completion</h3>
+              <h3>Refund Request Details</h3>
               <button type="button" className="admin-refund-modal-close" onClick={() => setProcessingRefund(null)} disabled={actionLoading}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
 
-            <div className="admin-refund-modal-body">
-              <p>
-                Have you manually transferred the funds offline to this user's bank account? 
-                Marking this as **Done** will notify the user that their money has been sent, and await their confirmation.
-              </p>
+            <div className="admin-refund-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Status</span>
+                <span className={`refund-status-badge ${processingRefund.status.toLowerCase()}`}>
+                  {processingRefund.status === 'NotReady' ? 'Not Ready' :
+                   processingRefund.status === 'Pending' ? 'Pending' :
+                   processingRefund.status === 'Processed' ? 'Processed' : 'Completed'}
+                </span>
+              </div>
 
-              <div className="admin-refund-modal-target">
-                <span>Refund Amount</span>
-                <strong>{formatVnd(processingRefund.amount)}</strong>
-                <span style={{ marginTop: '8px' }}>Recipient Account</span>
-                <strong style={{ fontSize: '14px' }}>
-                  {processingRefund.bankName} - {processingRefund.bankAccountNumber} ({processingRefund.bankAccountHolder})
-                </strong>
+              <div className="admin-refund-modal-target" style={{ margin: 0, padding: '16px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>User Profile</span>
+                  <strong style={{ fontSize: '14px', color: '#111827' }}>{processingRefund.userName}</strong>
+                  <span style={{ fontSize: '12px', color: '#4b5563', display: 'block' }}>{processingRefund.userEmail}</span>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Refund Amount</span>
+                  <strong style={{ fontSize: '18px', color: 'var(--primary)' }}>{formatVnd(processingRefund.amount)}</strong>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Note / Reason</span>
+                  <span style={{ fontSize: '13px', color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{processingRefund.note || 'No notes provided.'}</span>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Transfer Account</span>
+                  {processingRefund.bankName ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px', color: '#111827', marginTop: '4px' }}>
+                      <span>Bank: <strong>{processingRefund.bankName}</strong></span>
+                      <span>Account No: <strong>{processingRefund.bankAccountNumber}</strong></span>
+                      <span>Holder: <strong>{processingRefund.bankAccountHolder}</strong></span>
+                    </div>
+                  ) : (
+                    <em style={{ color: '#ef4444', fontSize: '13px', fontWeight: 600 }}>
+                      Account information not updated yet.
+                    </em>
+                  )}
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Requested At</span>
+                  <span style={{ fontSize: '13px', color: '#4b5563' }}>{formatDate(processingRefund.requestedAt)}</span>
+                </div>
               </div>
             </div>
 
@@ -277,20 +319,22 @@ export default function ManageRefunds() {
                 onClick={() => setProcessingRefund(null)}
                 disabled={actionLoading}
               >
-                Cancel
+                Close
               </button>
-              <button
-                type="button"
-                className="admin-refund-action-btn"
-                onClick={handleMarkDone}
-                disabled={actionLoading}
-              >
-                {actionLoading ? <span className="page-btn-spinner"></span> : 'Done, Transferred'}
-              </button>
+              {processingRefund.status === 'Pending' && (
+                <button
+                  type="button"
+                  className="admin-refund-action-btn"
+                  onClick={handleMarkDone}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? <span className="page-btn-spinner"></span> : 'Confirm Sent'}
+                </button>
+              )}
             </footer>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
