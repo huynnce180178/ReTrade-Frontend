@@ -218,6 +218,11 @@
   background: #fef3c7;
 }
 
+.refund-status-badge.notready {
+  color: #4b5563;
+  background: #f3f4f6;
+}
+
 .refund-status-badge.processed {
   color: #1d4ed8;
   background: #dbeafe;
