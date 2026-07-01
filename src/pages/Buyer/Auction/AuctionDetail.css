@@ -1,6 +1,152 @@
 .auction-detail-page .auction-detail-action-card {
+  order: 1;
   position: relative;
   z-index: 1;
+  gap: 10px;
+  padding: 14px;
+}
+
+.auction-detail-page .auction-detail-layout {
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 20px;
+}
+
+.auction-detail-page .auction-detail-main-image {
+  min-height: clamp(340px, 43vw, 460px);
+}
+
+.auction-detail-page .auction-detail-main-image img {
+  min-height: clamp(340px, 43vw, 460px);
+}
+
+.auction-detail-page .auction-detail-thumbs {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.auction-detail-page .auction-detail-thumbs button {
+  height: 68px;
+}
+
+.auction-detail-page .auction-detail-side {
+  gap: 12px;
+}
+
+.auction-detail-page .auction-detail-action-head {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auction-detail-page .auction-detail-action-head div {
+  padding: 10px;
+}
+
+.auction-detail-page .auction-detail-action-head span,
+.auction-detail-page .auction-deposit-form label > span,
+.auction-detail-page .auction-bid-form label > span {
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.auction-detail-page .auction-detail-action-head strong {
+  font-size: 15px;
+}
+
+.auction-detail-page .auction-detail-action-head .auction-limit-empty {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: rgba(254, 242, 242, 0.92);
+}
+
+.auction-detail-page .auction-detail-action-head .auction-limit-empty strong {
+  color: #991b1b;
+}
+
+.auction-detail-page .auction-limit-note {
+  margin: -2px 0 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.auction-detail-page .auction-deposit-form,
+.auction-detail-page .auction-bid-form {
+  gap: 9px;
+}
+
+.auction-detail-page .auction-topup-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.auction-detail-page .auction-topup-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.auction-detail-page .auction-bid-limit-warning {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 8px;
+  background: rgba(254, 242, 242, 0.92);
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.auction-detail-page .auction-deposit-form input[type="number"],
+.auction-detail-page .auction-bid-form input {
+  min-height: 38px;
+}
+
+.auction-detail-page .auction-deposit-form button,
+.auction-detail-page .auction-bid-form button {
+  min-height: 40px;
+}
+
+.auction-detail-page .auction-detail-info {
+  order: 2;
+  padding: 18px;
+}
+
+.auction-detail-page .auction-detail-info h1 {
+  margin: 6px 0;
+  font-size: 24px;
+  line-height: 1.18;
+}
+
+.auction-detail-page .auction-detail-info > p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.auction-detail-page .auction-detail-bidbox {
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.auction-detail-page .auction-detail-bidbox div,
+.auction-detail-page .auction-detail-timeline div {
+  padding: 10px;
+}
+
+.auction-detail-page .auction-detail-progress,
+.auction-detail-page .auction-detail-timeline {
+  margin-bottom: 12px;
+}
+
+.auction-detail-page .auction-detail-seller {
+  padding: 10px;
 }
 
 .auction-detail-page .auction-deposit-form input[type="number"],
@@ -201,6 +347,10 @@
 }
 
 @media (max-width: 520px) {
+  .auction-detail-page .auction-detail-layout {
+    gap: 14px;
+  }
+
   .auction-celebration-card {
     padding: 28px 20px;
   }
@@ -212,6 +362,24 @@
   .auction-celebration-actions {
     display: grid;
   }
+}
+
+@media (max-width: 1080px) {
+  .auction-detail-page .auction-detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .auction-detail-page .auction-detail-main-image,
+  .auction-detail-page .auction-detail-main-image img {
+    min-height: 300px;
+  }
+
+  .auction-detail-page .auction-detail-info h1 {
+    font-size: 22px;
+  }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -24,6 +24,7 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState('vnpay');
   const [voucherCode, setVoucherCode] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState('');
 
   const [fullAddressNames, setFullAddressNames] = useState({ province: '', districtWard: '' });
 
@@ -109,6 +110,44 @@ const Checkout = () => {
     await calculateFee(selectedAddr.addressId || selectedAddr.id || selectedAddr.AddressId);
   };
 
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      showToast('Please enter a voucher code', 'warning');
+      return;
+    }
+    try {
+      const res = await checkoutService.validateVoucher(voucherCode.trim(), productId);
+      let discount = 0;
+      if (res.discountType === 'Percentage') {
+        discount = subtotal * (res.discountValue / 100);
+      } else if (res.discountType === 'Fixed') {
+        discount = res.discountValue;
+      }
+      if (res.maxDiscountValue && discount > res.maxDiscountValue) {
+        discount = res.maxDiscountValue;
+      }
+      if (discount > subtotal + shippingFee) {
+        discount = subtotal + shippingFee;
+      }
+      setDiscountAmount(discount);
+      setAppliedVoucherCode(res.code);
+      showToast('Voucher applied successfully!', 'success');
+    } catch (error) {
+      console.error(error);
+      setDiscountAmount(0);
+      setAppliedVoucherCode('');
+      const errMsg = error.response?.data?.message || 'Invalid or inactive voucher code.';
+      showToast(errMsg, 'error');
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setDiscountAmount(0);
+    setAppliedVoucherCode('');
+    setVoucherCode('');
+    showToast('Voucher removed', 'info');
+  };
+
   const handleCheckout = async () => {
     if (!address) {
       showToast('Please select a delivery address', 'warning');
@@ -121,7 +160,8 @@ const Checkout = () => {
         productId,
         addressId: address.addressId || address.id || address.AddressId,
         quantity: 1,
-        paymentMethod
+        paymentMethod,
+        voucherCode: appliedVoucherCode || undefined
       });
       showToast('Order placed successfully!', 'success');
 
@@ -331,10 +371,30 @@ const Checkout = () => {
                       placeholder="Enter code manually" 
                       value={voucherCode}
                       onChange={(e) => setVoucherCode(e.target.value)}
-                      className="flex-grow border-t-0 border-x-0 border-b border-outline-variant bg-transparent py-2 text-body-sm focus:border-secondary transition-all" 
+                      disabled={!!appliedVoucherCode}
+                      className="flex-grow border-t-0 border-x-0 border-b border-outline-variant bg-transparent py-2 text-body-sm focus:border-secondary transition-all disabled:opacity-50" 
                     />
-                    <button className="bg-primary text-on-primary px-4 py-2 font-button-text hover:bg-secondary transition-colors uppercase text-[10px] tracking-widest">Apply</button>
+                    {appliedVoucherCode ? (
+                      <button 
+                        onClick={handleRemoveVoucher}
+                        className="bg-red-600 text-white px-4 py-2 font-button-text hover:bg-red-700 transition-colors uppercase text-[10px] tracking-widest"
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={handleApplyVoucher}
+                        className="bg-primary text-on-primary px-4 py-2 font-button-text hover:bg-secondary transition-colors uppercase text-[10px] tracking-widest"
+                      >
+                        Apply
+                      </button>
+                    )}
                   </div>
+                  {appliedVoucherCode && (
+                    <p className="text-green-600 text-xs font-semibold">
+                      Code {appliedVoucherCode} applied (-{discountAmount.toLocaleString('vi-VN')} VND)
+                    </p>
+                  )}
                 </div>
               </div>
             </section>
