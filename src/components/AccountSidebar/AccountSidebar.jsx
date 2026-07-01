@@ -96,6 +96,10 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">local_offer</span>
           Offer History
         </Link>
+        <Link to="/vouchers" className={`menu-item ${isActive('/vouchers')}`}>
+          <span className="material-symbols-outlined">local_activity</span>
+          My Voucher
+        </Link>
 
         {isAdmin && (
           <>

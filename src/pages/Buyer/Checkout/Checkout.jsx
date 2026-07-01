@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import productService from '../../../services/productService';
 import addressService from '../../../services/addressService';
 import checkoutService from '../../../services/checkoutService';
+import voucherService from '../../../services/voucherService';
 import AddressPopup from '../../../components/AddressPopup/AddressPopup';
 import { useToast } from '../../../context/ToastContext';
 import vietnamAddressService from '../../../services/vietnamAddressService';
@@ -25,6 +26,8 @@ const Checkout = () => {
   const [voucherCode, setVoucherCode] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [appliedVoucherCode, setAppliedVoucherCode] = useState('');
+  const [myVouchers, setMyVouchers] = useState([]);
+  const [isOpenVoucherDropdown, setIsOpenVoucherDropdown] = useState(false);
 
   const [fullAddressNames, setFullAddressNames] = useState({ province: '', districtWard: '' });
 
@@ -84,6 +87,19 @@ const Checkout = () => {
         setAddress(defaultAddr);
         await calculateFee(defaultAddr.addressId || defaultAddr.id);
       }
+
+      // Load user claimed vouchers
+      try {
+        const vouchersData = await voucherService.getMyVouchers("$filter=status eq 'Active'");
+        const now = new Date();
+        const activeVouchers = (vouchersData || []).filter(mv => {
+          const isExpired = mv.expirationDate ? new Date(mv.expirationDate) < now : false;
+          return !isExpired;
+        });
+        setMyVouchers(activeVouchers);
+      } catch (err) {
+        console.error("Failed to load user vouchers", err);
+      }
     } catch (error) {
       showToast('Failed to load checkout information', 'error');
     } finally {
@@ -115,8 +131,12 @@ const Checkout = () => {
       showToast('Please enter a voucher code', 'warning');
       return;
     }
+    await applyVoucherByCode(voucherCode.trim());
+  };
+
+  const applyVoucherByCode = async (code) => {
     try {
-      const res = await checkoutService.validateVoucher(voucherCode.trim(), productId);
+      const res = await checkoutService.validateVoucher(code, productId);
       let discount = 0;
       if (res.discountType === 'Percentage') {
         discount = subtotal * (res.discountValue / 100);
@@ -138,6 +158,14 @@ const Checkout = () => {
       setAppliedVoucherCode('');
       const errMsg = error.response?.data?.message || 'Invalid or inactive voucher code.';
       showToast(errMsg, 'error');
+    }
+  };
+
+  const handleSelectVoucherChange = async (e) => {
+    const code = e.target.value;
+    setVoucherCode(code);
+    if (code) {
+      await applyVoucherByCode(code);
     }
   };
 
@@ -363,28 +391,91 @@ const Checkout = () => {
               <div className="pt-stack-md border-t border-outline-variant/30">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
-                    <label className="font-label-caps text-on-surface-variant">Select or Enter Code</label>
+                    <label className="font-label-caps text-on-surface-variant font-bold text-xs uppercase tracking-wider">Select or Enter Voucher</label>
                   </div>
-                  <div className="flex gap-2 mb-2">
+
+                  {!appliedVoucherCode && myVouchers.length > 0 && (
+                    <div className="relative mb-1">
+                      <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider block mb-1">Select from your wallet:</span>
+                      
+                      {/* Dropdown Header Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setIsOpenVoucherDropdown(!isOpenVoucherDropdown)}
+                        className="w-full flex items-center justify-between border border-outline-variant rounded-lg p-3 text-body-sm bg-transparent hover:border-secondary transition-all text-left"
+                        style={{ color: 'var(--secondary)' }}
+                      >
+                        <span className="truncate font-semibold">
+                          {voucherCode ? `Selected: ${voucherCode}` : '-- Select Available Voucher --'}
+                        </span>
+                        <span className="material-symbols-outlined text-[18px] transition-transform duration-200" style={{ transform: isOpenVoucherDropdown ? 'rotate(180deg)' : 'none', color: 'var(--secondary)' }}>
+                          expand_more
+                        </span>
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {isOpenVoucherDropdown && (
+                        <>
+                          {/* Invisible Backdrop to close click */}
+                          <div className="fixed inset-0 z-10" onClick={() => setIsOpenVoucherDropdown(false)} />
+                          
+                          <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-outline-variant rounded-lg shadow-xl z-20 animate-fade-in p-1 space-y-1">
+                            {myVouchers.map((v) => {
+                              const discountText = v.discountType === 'Percentage' 
+                                ? `${v.discountValue}% OFF` 
+                                : `${v.discountValue.toLocaleString('vi-VN')} VND OFF`;
+                              const minSpendText = v.minOrderValue > 0 
+                                ? `Min Spend: ${v.minOrderValue.toLocaleString('vi-VN')} VND` 
+                                : 'No minimum spend';
+
+                              return (
+                                <button
+                                  key={v.userVoucherId}
+                                  type="button"
+                                  onClick={async () => {
+                                    setVoucherCode(v.code);
+                                    setIsOpenVoucherDropdown(false);
+                                    await applyVoucherByCode(v.code);
+                                  }}
+                                  className="w-full text-left p-3 rounded-md hover:bg-secondary/5 transition-all flex flex-col gap-1 border border-transparent hover:border-secondary/20"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold bg-secondary/10 px-2 py-0.5 rounded text-xs font-mono" style={{ color: 'var(--secondary)' }}>{v.code}</span>
+                                    <span className="font-extrabold text-xs" style={{ color: 'var(--secondary)' }}>{discountText}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant font-medium">
+                                    <span>{minSpendText}</span>
+                                    {v.sellerName && <span className="italic text-secondary">Store: {v.sellerName}</span>}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
                     <input 
                       type="text" 
                       placeholder="Enter code manually" 
                       value={voucherCode}
                       onChange={(e) => setVoucherCode(e.target.value)}
                       disabled={!!appliedVoucherCode}
-                      className="flex-grow border-t-0 border-x-0 border-b border-outline-variant bg-transparent py-2 text-body-sm focus:border-secondary transition-all disabled:opacity-50" 
+                      className="flex-grow border border-outline-variant rounded-lg px-3 py-2 text-body-sm bg-transparent focus:border-secondary focus:ring-1 focus:ring-secondary transition-all disabled:opacity-50" 
                     />
                     {appliedVoucherCode ? (
                       <button 
                         onClick={handleRemoveVoucher}
-                        className="bg-red-600 text-white px-4 py-2 font-button-text hover:bg-red-700 transition-colors uppercase text-[10px] tracking-widest"
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-button-text transition-colors uppercase text-[10px] tracking-widest font-bold"
                       >
                         Remove
                       </button>
                     ) : (
                       <button 
                         onClick={handleApplyVoucher}
-                        className="bg-primary text-on-primary px-4 py-2 font-button-text hover:bg-secondary transition-colors uppercase text-[10px] tracking-widest"
+                        className="bg-secondary hover:bg-primary text-white px-4 py-2 rounded-lg font-button-text transition-colors uppercase text-[10px] tracking-widest font-bold"
                       >
                         Apply
                       </button>

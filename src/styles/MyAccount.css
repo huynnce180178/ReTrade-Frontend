@@ -1,3 +1,9 @@
+.profile-page-wrapper.container {
+  max-width: 1600px;
+  padding: 0 40px;
+  margin: 0 auto;
+}
+
 .profile-page-wrapper {
   padding-top: 40px;
 }

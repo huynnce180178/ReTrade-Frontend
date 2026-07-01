@@ -36,6 +36,7 @@ import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import SellerLayout from './layouts/SellerLayout/SellerLayout';
 import UserProfile from './pages/Buyer/UserProfile/UserProfile';
 import SellerProfile from './pages/Buyer/SellerProfile/SellerProfile';
+import MyVouchers from './pages/Buyer/MyVouchers/MyVouchers';
 import SellerDashboard from './pages/Seller/SellerDashboard/SellerDashboard';
 import MyProducts from './pages/Seller/MyProducts/MyProducts';
 import ProductForm from './pages/Seller/ProductForm/ProductForm';
@@ -87,6 +88,7 @@ function App() {
                 <Route path="forgot-password" element={<ForgotPassword />} />
                 <Route path="reset-password" element={<ResetPassword />} />
                 <Route path="profile" element={<MyAccount />} />
+                <Route path="vouchers" element={<MyVouchers />} />
                 <Route path="my-account" element={<Navigate to="/profile" replace />} />
                 <Route path="change-password" element={<ChangePassword />} />
                 <Route path="address-book" element={<AddressBook />} />
