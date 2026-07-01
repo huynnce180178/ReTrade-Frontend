@@ -319,9 +319,7 @@ export default function Header() {
                 placeholder="Search products..."
               />
               <button type="submit" className="search-btn-inside">
-                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ffffff', fontWeight: 'bold' }}>search</span>
               </button>
             </div>
 

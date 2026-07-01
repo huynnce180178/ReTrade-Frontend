@@ -14,6 +14,13 @@ export default function ProductForm() {
 
   const [productsLoading, setProductsLoading] = useState(false);
   const [categories, setCategories] = useState([]);
+
+  // Category Request Modal States
+  const [isCategoryRequestModalOpen, setIsCategoryRequestModalOpen] = useState(false);
+  const [reqName, setReqName] = useState('');
+  const [reqDescription, setReqDescription] = useState('');
+  const [reqParentId, setReqParentId] = useState('');
+  const [reqAttributes, setReqAttributes] = useState([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -63,10 +70,89 @@ export default function ProductForm() {
 
   const fetchCategories = async () => {
     try {
-      const res = await categoryService.getAll();
+      const res = await categoryService.getAllActive("?$filter=Status eq 'Active'&$orderby=Name asc");
       setCategories(Array.isArray(res) ? res : (res?.value || []));
     } catch (e) {
       showToast('Failed to load categories.', 'error');
+    }
+  };
+
+  const handleAddReqAttributeRow = () => {
+    setReqAttributes((prev) => [
+      ...prev,
+      {
+        name: '',
+        dataType: 'String',
+        isRequired: false,
+        minValue: null,
+        maxValue: null,
+        unit: '',
+        isFilterable: false,
+        isSearchable: false,
+      },
+    ]);
+  };
+
+  const handleRemoveReqAttributeRow = (index) => {
+    setReqAttributes((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleReqAttributeChange = (index, field, val) => {
+    setReqAttributes((prev) =>
+      prev.map((attr, idx) => (idx === index ? { ...attr, [field]: val } : attr))
+    );
+  };
+
+  const handleSaveCategoryRequest = async (e) => {
+    e.preventDefault();
+    if (!reqName.trim()) {
+      showToast('Category name is required.', 'warning');
+      return;
+    }
+
+    // Validate attributes
+    for (let attr of reqAttributes) {
+      if (!attr.name.trim()) {
+        showToast('All attribute names must be filled out.', 'warning');
+        return;
+      }
+    }
+
+    const payload = {
+      name: reqName.trim(),
+      description: reqDescription.trim(),
+      parentId: reqParentId || null,
+      status: 'Pending',
+      attributes: reqAttributes.map((a, index) => ({
+        name: a.name.trim(),
+        dataType: a.dataType,
+        isRequired: a.isRequired,
+        minValue: a.dataType === 'Number' && a.minValue !== '' && a.minValue !== null ? parseFloat(a.minValue) : null,
+        maxValue: a.dataType === 'Number' && a.maxValue !== '' && a.maxValue !== null ? parseFloat(a.maxValue) : null,
+        unit: a.unit?.trim() || null,
+        displayOrder: index + 1,
+        isFilterable: a.isFilterable || false,
+        isSearchable: a.isSearchable || false
+      }))
+    };
+
+    try {
+      showToast('Submitting category request...', 'info');
+      const newCategory = await categoryService.create(payload);
+      showToast('Category request submitted successfully! Waiting for Admin approval.', 'success');
+      
+      setCategories(prev => [...prev, newCategory]);
+      setFormData(prev => ({ ...prev, categoryId: newCategory.categoryId }));
+
+      // Reset request states
+      setReqName('');
+      setReqDescription('');
+      setReqParentId('');
+      setReqAttributes([]);
+      setIsCategoryRequestModalOpen(false);
+    } catch (err) {
+      const errMsg = err?.response?.data || 'Failed to submit category request.';
+      showToast(errMsg, 'error');
     }
   };
 
@@ -172,6 +258,16 @@ export default function ProductForm() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    if (name === 'categoryId' && value === 'other_request') {
+      setIsCategoryRequestModalOpen(true);
+      setFormData((prev) => ({
+        ...prev,
+        categoryId: '',
+      }));
+      return;
+    }
+
     const finalValue = type === 'checkbox' ? checked : value;
     setFormData((prev) => ({
       ...prev,
@@ -391,11 +487,14 @@ export default function ProductForm() {
               <div className="form-group-row">
                 <div className="form-group">
                   <label>Product Category *</label>
-                  <select name="categoryId" value={formData.categoryId} onChange={handleInputChange} required className={validationErrors.categoryId ? 'has-error' : ''}>
+                   <select name="categoryId" value={formData.categoryId} onChange={handleInputChange} required className={validationErrors.categoryId ? 'has-error' : ''}>
                     <option value="">-- Select Category --</option>
-                    {categories.map((c) => (
-                      <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
+                    {categories.filter(c => c.status === 'Active' || c.status === 'Pending').map((c) => (
+                      <option key={c.categoryId} value={c.categoryId}>
+                        {c.name} {c.status === 'Pending' ? '(Pending Approval)' : ''}
+                      </option>
                     ))}
+                    <option value="other_request" style={{ fontWeight: '600', color: 'var(--primary-color)' }}>+ Request New Category...</option>
                   </select>
                   {validationErrors.categoryId && <span className="input-error-msg">{validationErrors.categoryId}</span>}
                 </div>
@@ -403,10 +502,14 @@ export default function ProductForm() {
                 <div className="form-group">
                   <label>Product Condition</label>
                   <select name="condition" value={formData.condition} onChange={handleInputChange}>
-                    <option value="New (Sealed)">New (Sealed)</option>
-                    <option value="Like New (99%)">Like New (99%)</option>
+                    <option value="New">New (Sealed)</option>
+                    <option value="LikeNew">Like New (99%)</option>
+                    <option value="Excellent">Excellent</option>
+                    <option value="Good">Good</option>
+                    <option value="Fair">Fair</option>
                     <option value="Used">Used</option>
-                    <option value="Heavily Used">Heavily Used</option>
+                    <option value="Damaged">Damaged</option>
+                    <option value="ForParts">For Parts</option>
                   </select>
                 </div>
               </div>
@@ -607,6 +710,184 @@ export default function ProductForm() {
           </div>
         </form>
       </div>
+
+      {/* Category Request Modal */}
+      {isCategoryRequestModalOpen && (
+        <div className="modal-overlay animate-fade-in" onClick={() => setIsCategoryRequestModalOpen(false)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Request New Category</h3>
+              <button className="modal-close-btn" onClick={() => setIsCategoryRequestModalOpen(false)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveCategoryRequest} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                <div className="form-group">
+                  <label className="form-label">Category Name *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={reqName} 
+                    onChange={(e) => setReqName(e.target.value)} 
+                    required 
+                    placeholder="e.g. Vintage Books"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Parent Category</label>
+                  <select 
+                    className="form-input" 
+                    value={reqParentId} 
+                    onChange={(e) => setReqParentId(e.target.value)}
+                  >
+                    <option value="">None (Root Category)</option>
+                    {categories.map(c => (
+                        <option key={c.categoryId} value={c.categoryId}>
+                          {c.name}
+                        </option>
+                      ))
+                    }
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Description</label>
+                  <textarea 
+                    className="form-input" 
+                    rows="3" 
+                    value={reqDescription} 
+                    onChange={(e) => setReqDescription(e.target.value)}
+                    placeholder="Provide details about the category..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Specifications & Attributes</span>
+                    <button type="button" className="add-attr-trigger" onClick={handleAddReqAttributeRow}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+                      Add Attribute
+                    </button>
+                  </label>
+
+                  <div className="attributes-creator-widget">
+                    {reqAttributes.length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
+                        No attributes configured. Click "Add Attribute" to add specifications.
+                      </p>
+                    ) : (
+                      reqAttributes.map((attr, idx) => (
+                        <div key={idx} className="attribute-card-item">
+                          <div className="attribute-card-header">
+                            <input 
+                              type="text" 
+                              className="form-input attr-name-input" 
+                              placeholder="Attribute Name (e.g. Page Count)" 
+                              value={attr.name}
+                              onChange={(e) => handleReqAttributeChange(idx, 'name', e.target.value)}
+                              required
+                            />
+                            <select 
+                              className="form-input attr-type-select" 
+                              value={attr.dataType}
+                              onChange={(e) => handleReqAttributeChange(idx, 'dataType', e.target.value)}
+                            >
+                              <option value="String">String</option>
+                              <option value="Number">Number</option>
+                              <option value="Boolean">Boolean</option>
+                              <option value="DateTime">DateTime</option>
+                            </select>
+                            <button type="button" className="attr-action-btn" onClick={() => handleRemoveReqAttributeRow(idx)} title="Delete attribute">
+                              <span className="material-symbols-outlined">delete</span>
+                            </button>
+                          </div>
+                          
+                          <div className="attribute-card-settings">
+                            <div className="settings-field">
+                              <label>Unit</label>
+                              <input 
+                                type="text" 
+                                className="form-input input-sm" 
+                                placeholder="e.g. pages, cm" 
+                                value={attr.unit || ''}
+                                onChange={(e) => handleReqAttributeChange(idx, 'unit', e.target.value)}
+                              />
+                            </div>
+                            
+                            {attr.dataType === 'Number' && (
+                              <>
+                                <div className="settings-field">
+                                  <label>Min Value</label>
+                                  <input 
+                                    type="number" 
+                                    step="any"
+                                    className="form-input input-sm" 
+                                    placeholder="Min" 
+                                    value={attr.minValue !== null && attr.minValue !== undefined ? attr.minValue : ''}
+                                    onChange={(e) => handleReqAttributeChange(idx, 'minValue', e.target.value === '' ? null : e.target.value)}
+                                  />
+                                </div>
+                                <div className="settings-field">
+                                  <label>Max Value</label>
+                                  <input 
+                                    type="number" 
+                                    step="any"
+                                    className="form-input input-sm" 
+                                    placeholder="Max" 
+                                    value={attr.maxValue !== null && attr.maxValue !== undefined ? attr.maxValue : ''}
+                                    onChange={(e) => handleReqAttributeChange(idx, 'maxValue', e.target.value === '' ? null : e.target.value)}
+                                  />
+                                </div>
+                              </>
+                            )}
+                            
+                            <div className="checkboxes-group">
+                              <label className="checkbox-label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={attr.isRequired || false}
+                                  onChange={(e) => handleReqAttributeChange(idx, 'isRequired', e.target.checked)}
+                                />
+                                <span>Required</span>
+                              </label>
+                              
+                              <label className="checkbox-label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={attr.isFilterable || false}
+                                  onChange={(e) => handleReqAttributeChange(idx, 'isFilterable', e.target.checked)}
+                                />
+                                <span>Filterable</span>
+                              </label>
+                              
+                              <label className="checkbox-label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={attr.isSearchable || false}
+                                  onChange={(e) => handleReqAttributeChange(idx, 'isSearchable', e.target.checked)}
+                                />
+                                <span>Searchable</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setIsCategoryRequestModalOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Submit Request</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

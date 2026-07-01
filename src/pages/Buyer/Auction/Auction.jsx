@@ -294,11 +294,22 @@ export default function Auction() {
         </form>
 
         <div className="auction-filter-actions">
-          <select value={status} onChange={(e) => updateParams({ status: e.target.value })}>
-            <option value="All">All Active</option>
-            <option value="Ongoing">Ongoing</option>
-            <option value="Upcoming">Upcoming</option>
-          </select>
+          <div className="auction-status-tabs">
+            {[
+              { key: 'All', label: 'All Active' },
+              { key: 'Ongoing', label: 'Ongoing' },
+              { key: 'Upcoming', label: 'Upcoming' }
+            ].map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`auction-status-tab ${status === tab.key ? 'active' : ''}`}
+                onClick={() => updateParams({ status: tab.key })}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <select value={sort} onChange={(e) => updateParams({ sort: e.target.value })}>
             {sortOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
