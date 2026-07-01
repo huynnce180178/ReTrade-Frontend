@@ -105,7 +105,7 @@ export default function Wishlist() {
   if (!user) {
     return (
       <div className="wl-empty-state animate-fade-in">
-        <span className="wl-empty-icon">🔐</span>
+        <span className="material-symbols-outlined wl-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>lock</span>
         <h2 className="wl-empty-title">Sign in to view your Wishlist</h2>
         <p className="wl-empty-desc">Save items you love and come back to them anytime.</p>
         <Link to="/login" className="btn btn-primary">Sign In</Link>
@@ -150,7 +150,7 @@ export default function Wishlist() {
 
       {items.length === 0 ? (
         <div className="wl-empty-state">
-          <span className="wl-empty-icon">💛</span>
+          <span className="material-symbols-outlined wl-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>favorite_border</span>
           <h2 className="wl-empty-title">Your wishlist is empty</h2>
           <p className="wl-empty-desc">Browse products and tap the heart icon to save items you love.</p>
           <Link to="/product" className="btn btn-primary">Browse Products</Link>

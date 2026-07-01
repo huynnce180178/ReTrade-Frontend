@@ -403,10 +403,14 @@ export default function ProductForm() {
                 <div className="form-group">
                   <label>Product Condition</label>
                   <select name="condition" value={formData.condition} onChange={handleInputChange}>
-                    <option value="New (Sealed)">New (Sealed)</option>
-                    <option value="Like New (99%)">Like New (99%)</option>
+                    <option value="New">New (Sealed)</option>
+                    <option value="LikeNew">Like New (99%)</option>
+                    <option value="Excellent">Excellent</option>
+                    <option value="Good">Good</option>
+                    <option value="Fair">Fair</option>
                     <option value="Used">Used</option>
-                    <option value="Heavily Used">Heavily Used</option>
+                    <option value="Damaged">Damaged</option>
+                    <option value="ForParts">For Parts</option>
                   </select>
                 </div>
               </div>

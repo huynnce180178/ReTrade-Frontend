@@ -397,7 +397,7 @@ export default function CategoryProductList() {
             </div>
           ) : products.length === 0 ? (
             <div className="product-empty-state">
-              <span className="product-empty-icon">🔍</span>
+              <span className="material-symbols-outlined product-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>search</span>
               <h3>No Products Found</h3>
               <p>
                 {searchTerm

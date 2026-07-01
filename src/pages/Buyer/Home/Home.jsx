@@ -78,9 +78,14 @@ export default function Home() {
       setFavorites(favs);
 
       if (favs.length === 0) {
-        // Show modal if no favorites
-        if (user && user.userId) {
-          setShowFavModal(true);
+        // Show modal if no favorites and not already dismissed
+        if (user) {
+          const uId = user.userId || user.accountId || 'global';
+          const dismissed = localStorage.getItem(`retrade_dismissed_favorites_modal_${uId}`) ||
+                            localStorage.getItem('retrade_dismissed_favorites_modal_global');
+          if (!dismissed) {
+            setShowFavModal(true);
+          }
         }
       } else {
         // Fetch products for each favorite category
@@ -240,7 +245,7 @@ export default function Home() {
               {categories.map(cat => (
                 <Link to={`/category/${cat.categoryId}`} key={cat.categoryId} className="home-category-card">
                   <div className="home-category-icon">
-                    {cat.imageUrl ? <img src={cat.imageUrl} alt={cat.name} /> : <span>🏷️</span>}
+                    {cat.imageUrl ? <img src={cat.imageUrl} alt={cat.name} /> : <span className="material-symbols-outlined" style={{ fontSize: '20px', color: 'var(--text-muted)' }}>sell</span>}
                   </div>
                   <span className="home-category-name">{cat.name}</span>
                 </Link>
@@ -419,9 +424,23 @@ export default function Home() {
       {/* Favorite Categories Modal */}
       <FavoriteCategoriesModal
         isOpen={showFavModal}
-        onClose={() => setShowFavModal(false)}
+        onClose={() => {
+          setShowFavModal(false);
+          if (user) {
+            const uId = user.userId || user.accountId || 'global';
+            localStorage.setItem(`retrade_dismissed_favorites_modal_${uId}`, "true");
+            localStorage.setItem('retrade_dismissed_favorites_modal_global', "true");
+          }
+        }}
         currentFavorites={favorites}
-        onUpdate={fetchFavorites}
+        onUpdate={() => {
+          fetchFavorites();
+          if (user) {
+            const uId = user.userId || user.accountId || 'global';
+            localStorage.setItem(`retrade_dismissed_favorites_modal_${uId}`, "true");
+            localStorage.setItem('retrade_dismissed_favorites_modal_global', "true");
+          }
+        }}
       />
     </div>
   );
