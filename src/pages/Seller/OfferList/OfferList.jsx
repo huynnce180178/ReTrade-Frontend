@@ -469,16 +469,7 @@ export default function OfferList() {
                                     </button>
                                   </>
                                 ) : offer.status === 'CounterOffer' ? (
-                                  <>
-                                    <button
-                                      onClick={() => openCounterModal(offer)}
-                                      className="p-1.5 hover:bg-indigo-50 text-indigo-700 rounded-lg transition-colors border border-transparent hover:border-indigo-200"
-                                      title="Adjust Counter Price"
-                                    >
-                                      <span className="material-symbols-outlined text-lg font-bold">swap_horiz</span>
-                                    </button>
-                                    <span className="text-[11px] text-gray-400 italic flex items-center pr-2">Awaiting buyer response</span>
-                                  </>
+                                  <span className="text-[11px] text-gray-400 italic flex items-center pr-2">Awaiting buyer response</span>
                                 ) : (
                                   <span className="text-gray-400 text-xs italic pr-2 select-none">Archived</span>
                                 )}
