@@ -157,6 +157,26 @@
   font-size: 19px;
 }
 
+.seller-menu-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-menu-badge {
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #d92d20;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .seller-dash-main {
   padding: 52px 54px 64px;
 }
