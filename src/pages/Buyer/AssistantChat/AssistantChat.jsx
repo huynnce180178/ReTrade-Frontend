@@ -7,7 +7,7 @@ import './AssistantChat.css';
 const SESSION_KEY = 'retrade_assistant_session_id';
 
 function formatCurrency(value) {
-  if (value === null || value === undefined) return 'Lien he';
+  if (value === null || value === undefined) return 'Liên hệ';
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND',
@@ -40,7 +40,7 @@ export default function AssistantChat() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Chao ban, minh la tro ly ReTrade. Ban can tim san pham nao, khoang gia bao nhieu?',
+      content: 'Hello! I am ReTrade AI Assistant. What product or price range are you looking for today?',
       products: [],
       createdAt: new Date().toISOString(),
     },
@@ -87,7 +87,7 @@ export default function AssistantChat() {
       {
         id: 'welcome',
         role: 'assistant',
-        content: 'Minh da mo mot cuoc tro chuyen moi. Ban muon tim san pham nao tren ReTrade?',
+        content: 'Mình đã mở một cuộc trò chuyện mới. Bạn muốn tìm sản phẩm nào trên ReTrade?',
         products: [],
         createdAt: new Date().toISOString(),
       },
@@ -123,7 +123,7 @@ export default function AssistantChat() {
         {
           id: response?.messageId || `assistant-${Date.now()}`,
           role: 'assistant',
-          content: response?.content || 'Minh chua co cau tra loi phu hop. Ban thu hoi lai ngan gon hon nhe.',
+          content: response?.content || 'Mình chưa có câu trả lời phù hợp. Bạn thử hỏi lại ngắn gọn hơn nhé.',
           products: Array.isArray(response?.products) ? response.products : [],
           createdAt: response?.createdAt || new Date().toISOString(),
         },
@@ -136,7 +136,7 @@ export default function AssistantChat() {
         {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: 'Xin loi, hien minh chua ket noi duoc voi tro ly AI. Ban thu lai sau it phut nhe.',
+          content: 'Xin lỗi, hiện mình chưa kết nối được với trợ lý AI. Bạn thử lại sau ít phút nhé.',
           products: [],
           createdAt: new Date().toISOString(),
         },
@@ -156,17 +156,17 @@ export default function AssistantChat() {
           <div>
             <span className="assistant-kicker">ReTrade AI</span>
             <h1>Gemini Assistant</h1>
-            <p>Hoi ve san pham, tam gia, tinh trang hang va goi y mua sam.</p>
+            <p>Hỏi về sản phẩm, tầm giá, tình trạng hàng và gợi ý mua sắm.</p>
           </div>
           <button type="button" className="assistant-new-chat-btn" onClick={handleNewChat}>
             <span className="material-symbols-outlined">add_comment</span>
-            New chat
+            Trò chuyện mới
           </button>
         </header>
 
         <div className="assistant-messages">
           {loadingHistory ? (
-            <div className="assistant-state">Loading assistant history...</div>
+            <div className="assistant-state">Đang tải lịch sử trò chuyện...</div>
           ) : (
             messages.map((message) => (
               <div key={message.id} className={`assistant-message-row ${message.role === 'user' ? 'mine' : 'assistant'}`}>
@@ -187,16 +187,16 @@ export default function AssistantChat() {
                         >
                           <div className="assistant-product-image">
                             {product.mainImageUrl ? (
-                              <img src={product.mainImageUrl} alt={product.name || 'Product'} />
+                              <img src={product.mainImageUrl} alt={product.name || 'Sản phẩm'} />
                             ) : (
                               <span className="material-symbols-outlined">inventory_2</span>
                             )}
                           </div>
                           <div className="assistant-product-info">
-                            <strong>{product.name || 'San pham ReTrade'}</strong>
-                            <span>{product.categoryName || 'Chua co danh muc'}</span>
+                            <strong>{product.name || 'Sản phẩm ReTrade'}</strong>
+                            <span>{product.categoryName || 'Chưa có danh mục'}</span>
                             <b>{formatCurrency(product.price)}</b>
-                            <small>{product.condition || 'Condition unknown'} - Con {product.stockQuantity ?? 0}</small>
+                            <small>{product.condition || 'Chưa xác định'} - Còn {product.stockQuantity ?? 0}</small>
                           </div>
                         </Link>
                       ))}
@@ -226,7 +226,7 @@ export default function AssistantChat() {
           <textarea
             value={messageText}
             onChange={(event) => setMessageText(event.target.value)}
-            placeholder="Vi du: Tim giup toi dien thoai duoi 5 trieu..."
+            placeholder="e.g., Find a phone under 5,000,000 VND..."
             rows={1}
             maxLength={2000}
             onKeyDown={(event) => {
