@@ -4,9 +4,11 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import chatService from '../../../services/chatService';
 import { createChatHubConnection } from '../../../services/chatRealtimeService';
+import productService from '../../../services/productService';
 import './Chat.css';
 
 const PAGE_SIZE = 30;
+const QUICK_REACTIONS = ['\u{1F44D}', '\u{2764}\u{FE0F}', '\u{1F60A}', '\u{1F525}', '\u{1F389}'];
 
 function getDisplayName(participant) {
   return participant?.displayName || participant?.email || 'ReTrade User';
@@ -30,11 +32,42 @@ function formatRoomTime(value) {
   return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
 
+function formatCurrency(value) {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function initials(name) {
   if (!name) return 'RT';
   const parts = name.trim().split(/\s+/);
   if (parts.length > 1) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
   return parts[0].slice(0, 2).toUpperCase();
+}
+
+function getRoomTitle(room) {
+  if (!room) return 'Conversation';
+  if (room.roomType === 'Business') return getDisplayName(room.otherParticipant);
+  return room.productName || getDisplayName(room.otherParticipant) || 'Product conversation';
+}
+
+function getRoomSubtitle(room) {
+  if (!room) return '';
+  if (room.roomType === 'Business') return 'Business';
+  return getDisplayName(room.otherParticipant);
+}
+
+function getMessagePreview(message) {
+  if (!message) return 'No messages yet';
+  if (message.isRecalled || message.messageType === 'Recall') return 'Tin nhan da bi thu hoi';
+  if (message.messageType === 'Image') return 'Image';
+  return message.message || 'No messages yet';
+}
+
+function shouldShowProductIntro(message, room) {
+  return room?.roomType === 'Product' && message?.messageType === 'Auto' && room.productName;
 }
 
 export default function Chat({ basePath = '/chat' }) {
@@ -53,6 +86,7 @@ export default function Chat({ basePath = '/chat' }) {
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [connectionReady, setConnectionReady] = useState(false);
+  const [productDetailsById, setProductDetailsById] = useState({});
   const connectionRef = useRef(null);
   const messagesRef = useRef(null);
   const bottomRef = useRef(null);
@@ -68,6 +102,32 @@ export default function Chat({ basePath = '/chat' }) {
     () => rooms.find((room) => room.roomId === roomId) || null,
     [rooms, roomId]
   );
+
+  const getProductPrice = useCallback((room) => {
+    if (!room?.productId) return null;
+    return room.productPrice ?? productDetailsById[room.productId]?.price ?? null;
+  }, [productDetailsById]);
+
+  useEffect(() => {
+    if (!activeRoom?.productId || activeRoom.productPrice !== undefined || productDetailsById[activeRoom.productId]) {
+      return undefined;
+    }
+
+    let disposed = false;
+    productService.getById(activeRoom.productId)
+      .then((product) => {
+        if (disposed || !product) return;
+        setProductDetailsById((current) => ({
+          ...current,
+          [activeRoom.productId]: product,
+        }));
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+    };
+  }, [activeRoom?.productId, activeRoom?.productPrice, productDetailsById]);
 
   const loadRooms = useCallback(async () => {
     if (!user) return;
@@ -191,9 +251,30 @@ export default function Chat({ basePath = '/chat' }) {
       ));
     };
 
+    const handleMessageRecalled = (message) => {
+      if (!message?.chatId) return;
+      setMessages((current) => current.map((item) =>
+        item.chatId === message.chatId ? { ...item, ...message, isRecalled: true } : item
+      ));
+      setRooms((current) => current.map((room) =>
+        room.roomId === message.roomId && room.lastMessage?.chatId === message.chatId
+          ? { ...room, lastMessage: { ...room.lastMessage, ...message, isRecalled: true } }
+          : room
+      ));
+    };
+
+    const handleMessageDeleted = (payload) => {
+      const chatId = payload?.chatId || payload?.ChatId;
+      const payloadRoomId = payload?.roomId || payload?.RoomId;
+      if (!chatId || payloadRoomId !== activeRoomRef.current) return;
+      setMessages((current) => current.filter((message) => message.chatId !== chatId));
+    };
+
     connection.on('ReceiveMessage', upsertMessage);
     connection.on('ChatNotification', handleNotification);
     connection.on('MessagesRead', handleMessagesRead);
+    connection.on('MessageRecalled', handleMessageRecalled);
+    connection.on('MessageDeleted', handleMessageDeleted);
 
     const start = async () => {
       try {
@@ -215,6 +296,8 @@ export default function Chat({ basePath = '/chat' }) {
       connection.off('ReceiveMessage', upsertMessage);
       connection.off('ChatNotification', handleNotification);
       connection.off('MessagesRead', handleMessagesRead);
+      connection.off('MessageRecalled', handleMessageRecalled);
+      connection.off('MessageDeleted', handleMessageDeleted);
       connection.stop().catch(() => {});
     };
   }, [user]);
@@ -300,6 +383,46 @@ export default function Chat({ basePath = '/chat' }) {
     }
   };
 
+  const handleDeleteMessage = async (message) => {
+    if (!roomId || !message?.chatId) return;
+
+    try {
+      await chatService.deleteMessage(roomId, message.chatId);
+      setMessages((current) => current.filter((item) => item.chatId !== message.chatId));
+      setRooms((current) => current.map((room) =>
+        room.roomId === roomId && room.lastMessage?.chatId === message.chatId
+          ? { ...room, lastMessage: null }
+          : room
+      ));
+    } catch (error) {
+      const msg = error.response?.data || error.message || 'Failed to delete message.';
+      showToast(String(msg), 'error');
+    }
+  };
+
+  const handleRecallMessage = async (message) => {
+    if (!roomId || !message?.chatId) return;
+
+    try {
+      const recalled = await chatService.recallMessage(roomId, message.chatId);
+      setMessages((current) => current.map((item) =>
+        item.chatId === recalled.chatId ? { ...item, ...recalled, isRecalled: true } : item
+      ));
+      setRooms((current) => current.map((room) =>
+        room.roomId === roomId && room.lastMessage?.chatId === recalled.chatId
+          ? { ...room, lastMessage: { ...room.lastMessage, ...recalled, isRecalled: true } }
+          : room
+      ));
+    } catch (error) {
+      const msg = error.response?.data || error.message || 'Messages can only be recalled within 3 minutes.';
+      showToast(String(msg), 'error');
+    }
+  };
+
+  const handleQuickReaction = (reaction) => {
+    setMessageText((current) => `${current}${current ? ' ' : ''}${reaction}`);
+  };
+
   if (!authLoading && !user) {
     return <Navigate to="/login" replace />;
   }
@@ -328,7 +451,8 @@ export default function Chat({ basePath = '/chat' }) {
             </div>
           ) : (
             rooms.map((room) => {
-              const title = getDisplayName(room.otherParticipant) || room.productName || 'Conversation';
+              const title = getRoomTitle(room);
+              const subtitle = getRoomSubtitle(room);
               const active = room.roomId === roomId;
               return (
                 <button
@@ -338,17 +462,17 @@ export default function Chat({ basePath = '/chat' }) {
                   onClick={() => navigate(`${basePath}/${room.roomId}`)}
                 >
                   <div className="chat-room-avatar">
-                    {room.productImageUrl ? <img src={room.productImageUrl} alt={room.productName || 'Product'} /> : initials(title)}
+                    {room.productImageUrl ? <img src={room.productImageUrl} alt={room.productName || title} /> : initials(title)}
                   </div>
                   <div className="chat-room-main">
                     <div className="chat-room-topline">
                       <span>{title}</span>
                       <time>{formatRoomTime(room.lastMessage?.createdAt || room.updatedAt)}</time>
                     </div>
-                    <div className="chat-room-product">{room.productName || 'Support conversation'}</div>
-                    <div className="chat-room-preview">
-                      {room.lastMessage?.messageType === 'Image' ? 'Image' : (room.lastMessage?.message || 'No messages yet')}
+                    <div className={`chat-room-product ${room.roomType === 'Business' ? 'business' : ''}`}>
+                      {subtitle}
                     </div>
+                    <div className="chat-room-preview">{getMessagePreview(room.lastMessage)}</div>
                   </div>
                   {room.unreadCount > 0 && <span className="chat-unread-badge">{room.unreadCount}</span>}
                 </button>
@@ -370,14 +494,14 @@ export default function Chat({ basePath = '/chat' }) {
             <header className="chat-panel-header">
               <div className="chat-peer-avatar">
                 {activeRoom?.productImageUrl ? (
-                  <img src={activeRoom.productImageUrl} alt={activeRoom.productName || 'Product'} />
+                  <img src={activeRoom.productImageUrl} alt={activeRoom.productName || getRoomTitle(activeRoom)} />
                 ) : (
-                  initials(getDisplayName(activeRoom?.otherParticipant))
+                  initials(getRoomTitle(activeRoom))
                 )}
               </div>
               <div>
-                <h2>{getDisplayName(activeRoom?.otherParticipant)}</h2>
-                <p>{activeRoom?.productName || 'Conversation'}</p>
+                <h2>{getRoomTitle(activeRoom)}</h2>
+                <p>{activeRoom?.roomType === 'Business' ? 'Business chat' : `Chat with ${getDisplayName(activeRoom?.otherParticipant)}`}</p>
               </div>
               <div className={`chat-live-pill ${connectionReady ? 'online' : ''}`}>
                 <span />
@@ -403,6 +527,7 @@ export default function Chat({ basePath = '/chat' }) {
               ) : (
                 messages.map((message) => {
                   const mine = message.senderId === user?.userId;
+                  const productPrice = shouldShowProductIntro(message, activeRoom) ? getProductPrice(activeRoom) : null;
                   return (
                     <div key={message.chatId} className={`chat-message-row ${mine ? 'mine' : 'theirs'}`}>
                       {!mine && (
@@ -411,7 +536,27 @@ export default function Chat({ basePath = '/chat' }) {
                         </div>
                       )}
                       <div className="chat-message-bubble">
-                        {message.messageType === 'Image' ? (
+                        {shouldShowProductIntro(message, activeRoom) && (
+                          <div className="chat-product-intro-card">
+                            <div className="chat-product-intro-image">
+                              {activeRoom.productImageUrl ? (
+                                <img src={activeRoom.productImageUrl} alt={activeRoom.productName || 'Product'} />
+                              ) : (
+                                <span className="material-symbols-outlined">inventory_2</span>
+                              )}
+                            </div>
+                            <div className="chat-product-intro-info">
+                              <span>San pham dang quan tam</span>
+                              <strong>{activeRoom.productName}</strong>
+                              {productPrice !== null && productPrice !== undefined && (
+                                <b>{formatCurrency(productPrice)}</b>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {message.isRecalled || message.messageType === 'Recall' ? (
+                          <p className="chat-message-recalled">Tin nhắn đã bị thu hồi</p>
+                        ) : message.messageType === 'Image' ? (
                           <a href={message.message} target="_blank" rel="noreferrer" className="chat-image-link">
                             <img src={message.message} alt="Chat attachment" className="chat-message-image" />
                           </a>
@@ -425,6 +570,16 @@ export default function Chat({ basePath = '/chat' }) {
                               {message.isRead ? 'done_all' : 'done'}
                             </span>
                           )}
+                        </div>
+                        <div className="chat-message-actions">
+                          {mine && message.canRecall && !message.isRecalled && (
+                            <button type="button" onClick={() => handleRecallMessage(message)}>
+                              Thu hồi
+                            </button>
+                          )}
+                          <button type="button" onClick={() => handleDeleteMessage(message)}>
+                            Xóa
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -451,6 +606,18 @@ export default function Chat({ basePath = '/chat' }) {
               >
                 <span className="material-symbols-outlined">{uploadingImage ? 'hourglass_empty' : 'image'}</span>
               </button>
+              <div className="chat-reaction-strip" aria-label="Quick reactions">
+                {QUICK_REACTIONS.map((reaction) => (
+                  <button
+                    key={reaction}
+                    type="button"
+                    onClick={() => handleQuickReaction(reaction)}
+                    title="Add reaction"
+                  >
+                    {reaction}
+                  </button>
+                ))}
+              </div>
               <textarea
                 value={messageText}
                 onChange={(event) => setMessageText(event.target.value)}

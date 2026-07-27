@@ -1,15 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import React from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import Header from '../../components/Header/Header';
 import Footer from '../../components/Footer/Footer';
+import AssistantChatWidget from '../../components/AssistantChatWidget/AssistantChatWidget';
 // TwoFactor removed
 import '../../styles/MainLayout.css';
 
 export default function MainLayout() {
-  const { user, setUser } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
+  const hideAssistantWidget =
+    location.pathname === '/assistant-chat' ||
+    location.pathname.startsWith('/chat') ||
+    location.pathname.startsWith('/seller-dashboard/messages');
   
 
   return (
@@ -19,6 +21,7 @@ export default function MainLayout() {
       <main className="main-layout-content">
         <Outlet />
       </main>
+      {!hideAssistantWidget && <AssistantChatWidget />}
       <Footer />
     </div>
   );

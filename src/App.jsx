@@ -30,6 +30,7 @@ import PaymentResult from './pages/Buyer/PaymentResult/PaymentResult';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Checkout from './pages/Buyer/Checkout/Checkout';
 import Chat from './pages/Buyer/Chat/Chat';
+import AssistantChat from './pages/Buyer/AssistantChat/AssistantChat';
 
 import Support from './pages/Buyer/Support/Support';
 import Category from './pages/Buyer/Category/Category';
@@ -85,6 +86,7 @@ function App() {
                 <Route path="auction" element={<Auction />} />
                 <Route path="auction/:auctionId" element={<AuctionDetail />} />
                 <Route path="wishlist" element={<Wishlist />} />
+                <Route path="assistant-chat" element={<AssistantChat />} />
                 <Route path="chat" element={<Chat />} />
                 <Route path="chat/:roomId" element={<Chat />} />
                 <Route path="checkout" element={<Checkout />} />
