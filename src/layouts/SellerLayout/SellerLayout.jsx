@@ -9,9 +9,36 @@ export default function SellerLayout() {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [avatarError, setAvatarError] = useState(false);
   const chatHubRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.avatarUrl]);
+
+  const isValidAvatarUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (
+      !trimmed ||
+      trimmed === 'Avatar' ||
+      trimmed === 'Profile' ||
+      trimmed === 'null' ||
+      trimmed === 'undefined' ||
+      trimmed === '[object Object]'
+    ) {
+      return false;
+    }
+    return (
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.startsWith('/')
+    );
+  };
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
@@ -97,7 +124,11 @@ export default function SellerLayout() {
         </button>
         <div className="seller-dash-profile">
           <div className="seller-dash-avatar">
-            {user.avatarUrl ? <img src={user.avatarUrl} alt={displayName} /> : initials}
+            {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
+              <img src={user.avatarUrl} alt={displayName} onError={() => setAvatarError(true)} />
+            ) : (
+              initials
+            )}
           </div>
           <h3>{displayName}</h3>
           <span>Pro Seller</span>

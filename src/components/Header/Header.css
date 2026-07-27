@@ -69,10 +69,11 @@
 
 /* Search Bar */
 .header-search {
-  flex: 1;
-  max-width: 800px;
+  flex: 0 1 360px;
+  min-width: 220px;
+  max-width: 450px;
   position: relative;
-  margin: 0 32px;
+  margin: 0 16px;
 }
 
 .search-input-wrapper {

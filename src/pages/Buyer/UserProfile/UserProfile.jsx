@@ -25,12 +25,39 @@ const formatAddress = (address) => {
   return parts.length ? parts.join(', ') : 'No default address yet';
 };
 
+const isValidAvatarUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (
+    !trimmed ||
+    trimmed === 'Avatar' ||
+    trimmed === 'Profile' ||
+    trimmed === 'null' ||
+    trimmed === 'undefined' ||
+    trimmed === '[object Object]'
+  ) {
+    return false;
+  }
+  return (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('/')
+  );
+};
+
 export default function UserProfile() {
   const { userId } = useParams();
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [profile?.avatarUrl]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -81,7 +108,11 @@ export default function UserProfile() {
     <div className="buyer-member-page container animate-fade-in">
       <section className="buyer-member-header">
         <div className="buyer-member-avatar">
-          {profile.avatarUrl ? <img src={profile.avatarUrl} alt={getDisplayName(profile)} /> : getInitials(profile)}
+          {isValidAvatarUrl(profile?.avatarUrl) && !avatarError ? (
+            <img src={profile.avatarUrl} alt={getDisplayName(profile)} onError={() => setAvatarError(true)} />
+          ) : (
+            getInitials(profile)
+          )}
           <span className="buyer-member-check">
             <span className="material-symbols-outlined">check</span>
           </span>

@@ -8,7 +8,34 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.avatarUrl]);
+
+  const isValidAvatarUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (
+      !trimmed ||
+      trimmed === 'Avatar' ||
+      trimmed === 'Profile' ||
+      trimmed === 'null' ||
+      trimmed === 'undefined' ||
+      trimmed === '[object Object]'
+    ) {
+      return false;
+    }
+    return (
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.startsWith('/')
+    );
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -92,8 +119,8 @@ export default function AdminLayout() {
           <div className="user-dropdown-wrapper" ref={dropdownRef} style={{ marginLeft: '8px' }}>
             <button className="user-profile-trigger" onClick={() => setDropdownOpen(!dropdownOpen)} style={{ padding: '4px 12px 4px 4px', border: '1px solid #e5e7eb', background: '#ffffff', borderRadius: '40px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <div className="avatar-circle" style={{ width: '30px', height: '30px' }}>
-                {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
+                  <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" onError={() => setAvatarError(true)} />
                 ) : (
                   getInitials()
                 )}
