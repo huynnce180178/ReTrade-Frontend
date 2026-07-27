@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './AccountSidebar.css';
@@ -6,17 +6,50 @@ import './AccountSidebar.css';
 export default function AccountSidebar() {
   const { user } = useAuth();
   const location = useLocation();
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.avatarUrl]);
 
   if (!user) return null;
 
   const isAdmin = user?.roles?.includes('Admin') || false;
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
+  const isValidAvatarUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (
+      !trimmed ||
+      trimmed === 'Avatar' ||
+      trimmed === 'Profile' ||
+      trimmed === 'null' ||
+      trimmed === 'undefined' ||
+      trimmed === '[object Object]'
+    ) {
+      return false;
+    }
+    return (
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.startsWith('/')
+    );
+  };
+
   const getInitials = () => {
     if (user.firstName && user.lastName) {
       return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
     }
-    return user.username.slice(0, 2).toUpperCase();
+    if (user.firstName) {
+      return user.firstName.slice(0, 2).toUpperCase();
+    }
+    if (user.username) {
+      return user.username.slice(0, 2).toUpperCase();
+    }
+    return 'U';
   };
 
   const getDisplayName = () => {
@@ -38,8 +71,13 @@ export default function AccountSidebar() {
     <aside className="profile-sidebar glass-panel">
       <div className="profile-avatar-section">
         <div className="large-avatar-circle">
-          {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt="Avatar" className="large-avatar-img" />
+          {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
+            <img
+              src={user.avatarUrl}
+              alt="Avatar"
+              className="large-avatar-img"
+              onError={() => setAvatarError(true)}
+            />
           ) : (
             getInitials()
           )}
@@ -99,6 +137,10 @@ export default function AccountSidebar() {
         <Link to="/vouchers" className={`menu-item ${isActive('/vouchers')}`}>
           <span className="material-symbols-outlined">local_activity</span>
           My Voucher
+        </Link>
+        <Link to="/subscriptions" className={`menu-item ${isActive('/subscriptions')}`}>
+          <span className="material-symbols-outlined">workspace_premium</span>
+          My Subscriptions
         </Link>
 
         {isAdmin && (

@@ -150,12 +150,46 @@ export default function Header() {
     navigate('/');
   };
 
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.avatarUrl]);
+
+  const isValidAvatarUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (
+      !trimmed ||
+      trimmed === 'Avatar' ||
+      trimmed === 'Profile' ||
+      trimmed === 'null' ||
+      trimmed === 'undefined' ||
+      trimmed === '[object Object]'
+    ) {
+      return false;
+    }
+    return (
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.startsWith('/')
+    );
+  };
+
   const getInitials = () => {
     if (!user) return '';
     if (user.firstName && user.lastName) {
       return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
     }
-    return user.username.slice(0, 2).toUpperCase();
+    if (user.firstName) {
+      return user.firstName.slice(0, 2).toUpperCase();
+    }
+    if (user.username) {
+      return user.username.slice(0, 2).toUpperCase();
+    }
+    return 'U';
   };
 
   const getDisplayName = () => {
@@ -185,11 +219,12 @@ export default function Header() {
           note: ''
         };
       case 'SERVICE_VOUCHER_FEATURE':
+      case 'sub_20260701_100002':
         return {
-          cardClass: 'sub-card',
-          iconWrapClass: 'sub-icon-wrap seller-bg',
-          icon: 'local_offer',
-          tagline: 'Experience voucher features for your shop.',
+          cardClass: 'sub-card featured-card',
+          iconWrapClass: 'sub-icon-wrap member-bg',
+          icon: 'workspace_premium',
+          tagline: 'Receive 30 exclusive discount & freeship vouchers for 30 days of shopping.',
           buttonClass: 'sub-card-btn primary-btn',
           note: ''
         };
@@ -318,9 +353,6 @@ export default function Header() {
               <NavLink to="/product" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
                 Product
               </NavLink>
-              <NavLink to="/assistant-chat" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-                AI Assistant
-              </NavLink>
               <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
                 Auction
               </NavLink>
@@ -356,14 +388,12 @@ export default function Header() {
                 </button>
                 {!user ? (
                   <div className="mobile-auth-links">
-                    <Link to="/assistant-chat" className="nav-link" onClick={() => setMobileMenuOpen(false)}>AI Assistant</Link>
                     <Link to="/login" className="btn-login-link nav-link" onClick={() => setMobileMenuOpen(false)}>Login</Link>
                     <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>Register</Link>
                   </div>
                 ) : (
                   <div className="mobile-auth-links">
                     <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
-                    <Link to="/assistant-chat" className="nav-link" onClick={() => setMobileMenuOpen(false)}>AI Assistant</Link>
                     <Link to={messagesPath} className="nav-link nav-chat-link" onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
                       Messages
                       {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
@@ -465,8 +495,13 @@ export default function Header() {
               <div className="user-dropdown-wrapper" ref={dropdownRef}>
                 <button className="user-profile-trigger" onClick={() => setDropdownOpen(!dropdownOpen)}>
                   <div className="avatar-circle">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                    {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt="Avatar"
+                        className="user-avatar-img"
+                        onError={() => setAvatarError(true)}
+                      />
                     ) : (
                       getInitials()
                     )}

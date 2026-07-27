@@ -30,6 +30,33 @@ export default function MyAccount() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.avatarUrl]);
+
+  const isValidAvatarUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (
+      !trimmed ||
+      trimmed === 'Avatar' ||
+      trimmed === 'Profile' ||
+      trimmed === 'null' ||
+      trimmed === 'undefined' ||
+      trimmed === '[object Object]'
+    ) {
+      return false;
+    }
+    return (
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.startsWith('/')
+    );
+  };
 
   useEffect(() => {
     if (user) {
@@ -311,8 +338,13 @@ export default function MyAccount() {
                 <h4 className="ma-card-title" style={{ marginBottom: '24px' }}>Profile Photo</h4>
                 <div className="ma-profile-photo-section" style={{ flexDirection: 'column', gap: '24px', alignItems: 'flex-start', marginBottom: 0 }}>
                   <div className="ma-photo-wrapper">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Profile" className="ma-photo-img" />
+                    {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt="Profile"
+                        className="ma-photo-img"
+                        onError={() => setAvatarError(true)}
+                      />
                     ) : (
                       <div className="ma-photo-placeholder">{getInitials()}</div>
                     )}

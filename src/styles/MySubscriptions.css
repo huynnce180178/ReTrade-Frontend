@@ -1,0 +1,239 @@
+/* Base Layout & Header Card Styles */
+.ma-card {
+  background-color: var(--bg-secondary, #ffffff);
+  border-radius: var(--border-radius-md, 12px);
+  border: 1px solid var(--border-color, rgba(113, 121, 117, 0.12));
+  box-shadow: 0 4px 16px rgba(2, 36, 27, 0.04);
+  padding: 32px;
+  margin-bottom: 24px;
+}
+
+.ma-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.ma-header-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.ma-header-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background-color: rgba(16, 185, 129, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary, #065f46);
+  flex-shrink: 0;
+}
+
+.ma-header-icon .material-symbols-outlined {
+  font-size: 30px;
+}
+
+.ma-headline {
+  font-family: var(--font-title, 'Playfair Display', Georgia, serif);
+  font-size: 28px;
+  color: var(--text-primary, #000805);
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: -0.3px;
+}
+
+.ma-subtitle {
+  color: var(--text-muted, #414845);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Empty & Loading States */
+.sub-loading-card,
+.sub-empty-card {
+  padding: 48px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-muted, #6b7280);
+  border-radius: var(--border-radius-md, 12px);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+}
+
+.empty-sub-icon {
+  font-size: 52px;
+  color: var(--primary, #065f46);
+  opacity: 0.6;
+}
+
+.sub-empty-card h3 {
+  font-family: var(--font-title, 'Playfair Display', Georgia, serif);
+  font-size: 20px;
+  color: var(--text-primary, #111827);
+  font-weight: 700;
+}
+
+.sub-empty-card p {
+  font-size: 14px;
+  color: var(--text-muted, #6b7280);
+}
+
+/* Subscription Cards List */
+.my-sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.my-sub-card {
+  padding: 28px;
+  background: var(--bg-secondary, #ffffff);
+  border-radius: var(--border-radius-md, 12px);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(2, 36, 27, 0.04);
+}
+
+.my-sub-card:hover {
+  border-color: var(--secondary, #059669);
+  box-shadow: 0 10px 30px rgba(6, 95, 70, 0.08);
+  transform: translateY(-2px);
+}
+
+.my-sub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.my-sub-title-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.my-sub-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary, #065f46) 0%, var(--secondary, #059669) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(6, 95, 70, 0.2);
+}
+
+.my-sub-icon .material-symbols-outlined {
+  font-size: 26px;
+}
+
+.my-sub-name {
+  font-family: var(--font-title, 'Playfair Display', Georgia, serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 4px;
+}
+
+.my-sub-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.my-sub-badge.active {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--primary, #065f46);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.my-sub-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary, #065f46);
+}
+
+.my-sub-remaining {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.rem-num {
+  font-family: var(--font-title, 'Playfair Display', sans-serif);
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--primary, #065f46);
+  line-height: 1;
+}
+
+.rem-lbl {
+  font-size: 11px;
+  color: var(--text-muted, #6b7280);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.my-sub-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+}
+
+.sub-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sub-detail-item .lbl {
+  font-size: 12px;
+  color: var(--text-muted, #6b7280);
+  font-weight: 500;
+}
+
+.sub-detail-item .val {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.my-sub-benefits {
+  padding-top: 18px;
+}
+
+.my-sub-benefits h4 {
+  font-family: var(--font-title, 'Playfair Display', Georgia, serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 6px;
+}
+
+.my-sub-benefits p {
+  font-size: 13px;
+  color: var(--text-muted, #4b5563);
+  line-height: 1.5;
+}

@@ -28,8 +28,27 @@ const Checkout = () => {
   const [appliedVoucherCode, setAppliedVoucherCode] = useState('');
   const [myVouchers, setMyVouchers] = useState([]);
   const [isOpenVoucherDropdown, setIsOpenVoucherDropdown] = useState(false);
-
+  const [selectedDetailVoucher, setSelectedDetailVoucher] = useState(null);
   const [fullAddressNames, setFullAddressNames] = useState({ province: '', districtWard: '' });
+
+  const calculateVoucherDiscount = (v, orderSubtotal, orderShippingFee = 0) => {
+    if (!v) return 0;
+    const minSpend = v.minOrderValue || 0;
+    if (orderSubtotal < minSpend) return 0;
+
+    let discount = 0;
+    if (v.discountType === 'Percentage') {
+      discount = orderSubtotal * ((v.discountValue || 0) / 100);
+    } else if (v.discountType === 'Fixed') {
+      discount = v.discountValue || 0;
+    }
+
+    if (v.maxDiscountValue && v.maxDiscountValue > 0) {
+      discount = Math.min(discount, v.maxDiscountValue);
+    }
+
+    return Math.min(discount, orderSubtotal + orderShippingFee);
+  };
 
   useEffect(() => {
     const fetchAddressNames = async () => {
@@ -88,15 +107,61 @@ const Checkout = () => {
         await calculateFee(defaultAddr.addressId || defaultAddr.id);
       }
 
-      // Load user claimed vouchers
+      // Load user claimed vouchers (Only currently ready/active vouchers)
       try {
-        const vouchersData = await voucherService.getMyVouchers("$filter=status eq 'Active'");
+        const vouchersData = await voucherService.getMyVouchers("$orderby=CreatedAt desc");
+        const items = Array.isArray(vouchersData) ? vouchersData : (vouchersData?.value || vouchersData?.items || []);
         const now = new Date();
-        const activeVouchers = (vouchersData || []).filter(mv => {
+        const activeVouchers = items.filter(mv => {
           const isExpired = mv.expirationDate ? new Date(mv.expirationDate) < now : false;
-          return !isExpired;
+          const isStarted = mv.startDate ? new Date(mv.startDate) <= now : true;
+          const isActive = mv.status === 'Active' && !mv.usedAt;
+          return isActive && isStarted && !isExpired;
         });
-        setMyVouchers(activeVouchers);
+
+        const prodPrice = prodData?.price || 0;
+
+        // Sort vouchers: eligible first (sorted by max calculated discount desc), then ineligible
+        const sortedVouchers = [...activeVouchers].sort((a, b) => {
+          const discA = calculateVoucherDiscount(a, prodPrice, 0);
+          const discB = calculateVoucherDiscount(b, prodPrice, 0);
+          const isEligA = prodPrice >= (a.minOrderValue || 0);
+          const isEligB = prodPrice >= (b.minOrderValue || 0);
+
+          if (isEligA && !isEligB) return -1;
+          if (!isEligA && isEligB) return 1;
+          if (isEligA && isEligB) {
+            return discB - discA;
+          }
+          return (a.minOrderValue || 0) - (b.minOrderValue || 0);
+        });
+
+        setMyVouchers(sortedVouchers);
+
+        // Auto apply best voucher if eligible and discount > 0
+        const bestV = sortedVouchers.find(v => prodPrice >= (v.minOrderValue || 0) && calculateVoucherDiscount(v, prodPrice, 0) > 0);
+        if (bestV) {
+          try {
+            const res = await checkoutService.validateVoucher(bestV.code, productId);
+            let discount = 0;
+            if (res.discountType === 'Percentage') {
+              discount = prodPrice * (res.discountValue / 100);
+            } else if (res.discountType === 'Fixed') {
+              discount = res.discountValue;
+            }
+            if (res.maxDiscountValue && discount > res.maxDiscountValue) {
+              discount = res.maxDiscountValue;
+            }
+            if (discount > prodPrice) {
+              discount = prodPrice;
+            }
+            setDiscountAmount(discount);
+            setAppliedVoucherCode(res.code);
+            setVoucherCode(res.code);
+          } catch (vErr) {
+            console.error("Auto apply best voucher failed", vErr);
+          }
+        }
       } catch (err) {
         console.error("Failed to load user vouchers", err);
       }
@@ -232,6 +297,15 @@ const Checkout = () => {
 
   const subtotal = product.price || 0;
   const total = subtotal + shippingFee - discountAmount;
+
+  const bestVoucher = myVouchers.length > 0 ? (
+    myVouchers.reduce((best, v) => {
+      const d = calculateVoucherDiscount(v, subtotal, shippingFee);
+      const bestD = best ? calculateVoucherDiscount(best, subtotal, shippingFee) : 0;
+      return (subtotal >= (v.minOrderValue || 0) && d > 0 && d > bestD) ? v : best;
+    }, null)
+  ) : null;
+  const bestVoucherCode = bestVoucher?.code || null;
 
   return (
     <div className="bg-background text-on-background font-body-md min-h-screen">
@@ -391,24 +465,56 @@ const Checkout = () => {
               <div className="pt-stack-md border-t border-outline-variant/30">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
-                    <label className="font-label-caps text-on-surface-variant font-bold text-xs uppercase tracking-wider">Select or Enter Voucher</label>
+                    <label className="font-label-caps text-on-surface-variant font-bold text-xs uppercase tracking-wider">
+                      Select or Enter Voucher
+                    </label>
+                    {bestVoucherCode && (
+                      <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1 shadow-sm">
+                        <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                        Best Offer Available
+                      </span>
+                    )}
                   </div>
 
-                  {!appliedVoucherCode && myVouchers.length > 0 && (
+                  {myVouchers.length > 0 && (
                     <div className="relative mb-1">
-                      <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider block mb-1">Select from your wallet:</span>
+                      <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider block mb-1">
+                        Select from your wallet:
+                      </span>
                       
                       {/* Dropdown Header Trigger */}
                       <button
                         type="button"
                         onClick={() => setIsOpenVoucherDropdown(!isOpenVoucherDropdown)}
-                        className="w-full flex items-center justify-between border border-outline-variant rounded-lg p-3 text-body-sm bg-transparent hover:border-secondary transition-all text-left"
-                        style={{ color: 'var(--secondary)' }}
+                        className={`w-full flex items-center justify-between border rounded-lg p-3 text-body-sm bg-white transition-all text-left shadow-sm ${
+                          appliedVoucherCode && appliedVoucherCode === bestVoucherCode
+                            ? 'border-emerald-500 ring-1 ring-emerald-400/40'
+                            : 'border-outline-variant hover:border-secondary'
+                        }`}
                       >
-                        <span className="truncate font-semibold">
-                          {voucherCode ? `Selected: ${voucherCode}` : '-- Select Available Voucher --'}
-                        </span>
-                        <span className="material-symbols-outlined text-[18px] transition-transform duration-200" style={{ transform: isOpenVoucherDropdown ? 'rotate(180deg)' : 'none', color: 'var(--secondary)' }}>
+                        <div className="truncate font-semibold flex items-center gap-2">
+                          {appliedVoucherCode ? (
+                            <>
+                              <span className="material-symbols-outlined text-[18px] text-emerald-600">confirmation_number</span>
+                              <span className="text-gray-800">
+                                Applied: <strong className="font-mono text-secondary">{appliedVoucherCode}</strong>
+                              </span>
+                              {appliedVoucherCode === bestVoucherCode && (
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5 border border-emerald-200">
+                                  ✨ Best Savings
+                                </span>
+                              )}
+                            </>
+                          ) : voucherCode ? (
+                            <span>Selected: <strong>{voucherCode}</strong></span>
+                          ) : (
+                            <span className="text-gray-500">-- Select Available Voucher --</span>
+                          )}
+                        </div>
+                        <span
+                          className="material-symbols-outlined text-[18px] transition-transform duration-200 text-gray-500"
+                          style={{ transform: isOpenVoucherDropdown ? 'rotate(180deg)' : 'none' }}
+                        >
                           expand_more
                         </span>
                       </button>
@@ -419,35 +525,135 @@ const Checkout = () => {
                           {/* Invisible Backdrop to close click */}
                           <div className="fixed inset-0 z-10" onClick={() => setIsOpenVoucherDropdown(false)} />
                           
-                          <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-outline-variant rounded-lg shadow-xl z-20 animate-fade-in p-1 space-y-1">
+                          <div className="absolute left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white border border-outline-variant rounded-xl shadow-2xl z-20 animate-fade-in p-2 space-y-2">
+                            {bestVoucher && (
+                              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs text-emerald-900 flex items-center justify-between shadow-xs">
+                                <div className="flex items-center gap-1.5 font-medium">
+                                  <span className="material-symbols-outlined text-emerald-600 text-[16px]">auto_awesome</span>
+                                  <span>Best offer for {subtotal.toLocaleString('vi-VN')} VND order</span>
+                                </div>
+                                <span className="font-extrabold text-emerald-700 font-mono text-sm">
+                                  -{calculateVoucherDiscount(bestVoucher, subtotal, shippingFee).toLocaleString('vi-VN')} VND
+                                </span>
+                              </div>
+                            )}
+
                             {myVouchers.map((v) => {
+                              const disc = calculateVoucherDiscount(v, subtotal, shippingFee);
+                              const isEligible = subtotal >= (v.minOrderValue || 0);
+                              const isBest = v.code === bestVoucherCode && isEligible && disc > 0;
+                              const isApplied = appliedVoucherCode === v.code;
+
                               const discountText = v.discountType === 'Percentage' 
                                 ? `${v.discountValue}% OFF` 
-                                : `${v.discountValue.toLocaleString('vi-VN')} VND OFF`;
+                                : `${(v.discountValue || 0).toLocaleString('vi-VN')} VND OFF`;
                               const minSpendText = v.minOrderValue > 0 
                                 ? `Min Spend: ${v.minOrderValue.toLocaleString('vi-VN')} VND` 
-                                : 'No minimum spend';
+                                : 'No min spend';
+                              const maxCapText = v.maxDiscountValue > 0 
+                                ? `Max Cap: ${v.maxDiscountValue.toLocaleString('vi-VN')} VND` 
+                                : null;
+                              const expiryText = v.expirationDate 
+                                ? new Date(v.expirationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : 'No expiry';
 
                               return (
-                                <button
-                                  key={v.userVoucherId}
-                                  type="button"
-                                  onClick={async () => {
-                                    setVoucherCode(v.code);
-                                    setIsOpenVoucherDropdown(false);
-                                    await applyVoucherByCode(v.code);
-                                  }}
-                                  className="w-full text-left p-3 rounded-md hover:bg-secondary/5 transition-all flex flex-col gap-1 border border-transparent hover:border-secondary/20"
+                                <div
+                                  key={v.userVoucherId || v.code}
+                                  className={`w-full text-left p-3 rounded-lg transition-all flex flex-col gap-2 border ${
+                                    isBest
+                                      ? 'bg-gradient-to-r from-emerald-50/90 to-teal-50/50 border-emerald-400 shadow-sm'
+                                      : isEligible
+                                      ? 'bg-white border-gray-200 hover:border-secondary/50 hover:bg-gray-50/50'
+                                      : 'bg-gray-50/80 border-gray-200 opacity-60'
+                                  }`}
                                 >
                                   <div className="flex items-center justify-between">
-                                    <span className="font-bold bg-secondary/10 px-2 py-0.5 rounded text-xs font-mono" style={{ color: 'var(--secondary)' }}>{v.code}</span>
-                                    <span className="font-extrabold text-xs" style={{ color: 'var(--secondary)' }}>{discountText}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-bold px-2 py-0.5 rounded text-xs font-mono border ${
+                                        isBest ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-gray-100 text-secondary border-gray-200'
+                                      }`}>
+                                        {v.code}
+                                      </span>
+                                      
+                                      {isBest && (
+                                        <span className="bg-amber-400 text-amber-950 font-black text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm uppercase tracking-wide">
+                                          ✨ BEST SAVINGS
+                                        </span>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedDetailVoucher(v);
+                                        }}
+                                        className="text-[10px] text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 px-1.5 py-0.5 rounded border border-gray-200 hover:border-emerald-300 transition-all flex items-center gap-0.5 font-medium ml-auto md:ml-0"
+                                        title="View Details"
+                                      >
+                                        <span className="material-symbols-outlined text-[12px]">info</span>
+                                        Details
+                                      </button>
+                                    </div>
+                                    <span className={`font-extrabold text-xs ${isBest ? 'text-emerald-700' : 'text-secondary'}`}>
+                                      {discountText}
+                                    </span>
                                   </div>
-                                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant font-medium">
-                                    <span>{minSpendText}</span>
-                                    {v.sellerName && <span className="italic text-secondary">Store: {v.sellerName}</span>}
+
+                                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant font-medium flex-wrap gap-1">
+                                    <span>{minSpendText} {maxCapText && `• ${maxCapText}`}</span>
+                                    <span className="text-gray-500">Exp: <strong className="text-gray-700">{expiryText}</strong></span>
                                   </div>
-                                </button>
+
+                                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 mt-0.5">
+                                    <div className="text-xs font-bold">
+                                      {isEligible ? (
+                                        <span className="text-emerald-600 flex items-center gap-1">
+                                          <span className="material-symbols-outlined text-[14px]">savings</span>
+                                          Savings: -{disc.toLocaleString('vi-VN')} VND
+                                        </span>
+                                      ) : (
+                                        <span className="text-amber-800 text-[11px] font-medium flex items-center gap-1">
+                                          <span className="material-symbols-outlined text-[14px]">warning</span>
+                                          Needs {((v.minOrderValue || 0) - subtotal).toLocaleString('vi-VN')} VND more
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      {isApplied ? (
+                                        <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-md flex items-center gap-1">
+                                          <span className="material-symbols-outlined text-[14px]">check</span>
+                                          Applied
+                                        </span>
+                                      ) : isEligible ? (
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            setVoucherCode(v.code);
+                                            setIsOpenVoucherDropdown(false);
+                                            await applyVoucherByCode(v.code);
+                                          }}
+                                          className={`text-xs font-bold px-3 py-1 rounded-md transition-all shadow-sm flex items-center gap-1 ${
+                                            isBest 
+                                              ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                                              : 'bg-secondary text-white hover:bg-primary'
+                                          }`}
+                                        >
+                                          Apply
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          disabled
+                                          className="text-xs font-semibold bg-gray-200 text-gray-400 px-3 py-1 rounded-md cursor-not-allowed"
+                                        >
+                                          Ineligible
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>
@@ -463,28 +669,40 @@ const Checkout = () => {
                       value={voucherCode}
                       onChange={(e) => setVoucherCode(e.target.value)}
                       disabled={!!appliedVoucherCode}
-                      className="flex-grow border border-outline-variant rounded-lg px-3 py-2 text-body-sm bg-transparent focus:border-secondary focus:ring-1 focus:ring-secondary transition-all disabled:opacity-50" 
+                      className="flex-grow border border-outline-variant rounded-lg px-3 py-2 text-body-sm bg-transparent focus:border-secondary focus:ring-1 focus:ring-secondary transition-all disabled:opacity-60" 
                     />
                     {appliedVoucherCode ? (
                       <button 
+                        type="button"
                         onClick={handleRemoveVoucher}
-                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-button-text transition-colors uppercase text-[10px] tracking-widest font-bold"
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-button-text transition-colors uppercase text-[10px] tracking-widest font-bold flex items-center gap-1 shadow-sm"
                       >
+                        <span className="material-symbols-outlined text-[14px]">close</span>
                         Remove
                       </button>
                     ) : (
                       <button 
+                        type="button"
                         onClick={handleApplyVoucher}
-                        className="bg-secondary hover:bg-primary text-white px-4 py-2 rounded-lg font-button-text transition-colors uppercase text-[10px] tracking-widest font-bold"
+                        className="bg-secondary hover:bg-primary text-white px-4 py-2 rounded-lg font-button-text transition-colors uppercase text-[10px] tracking-widest font-bold shadow-sm"
                       >
                         Apply
                       </button>
                     )}
                   </div>
+
                   {appliedVoucherCode && (
-                    <p className="text-green-600 text-xs font-semibold">
-                      Code {appliedVoucherCode} applied (-{discountAmount.toLocaleString('vi-VN')} VND)
-                    </p>
+                    <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-2.5 text-xs text-green-800 font-medium animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-green-600 text-[18px]">check_circle</span>
+                        <span>Voucher <strong>{appliedVoucherCode}</strong> applied (-{discountAmount.toLocaleString('vi-VN')} VND)</span>
+                      </div>
+                      {appliedVoucherCode === bestVoucherCode && (
+                        <span className="text-[10px] font-extrabold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-xs">
+                          ✨ Best Offer
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -549,6 +767,126 @@ const Checkout = () => {
             onSelect={handleAddressSelect} 
             selectedAddressId={address?.addressId || address?.id}
           />
+        )}
+
+        {selectedDetailVoucher && (
+          <div className="v-modal-overlay" onClick={() => setSelectedDetailVoucher(null)}>
+            <div className="v-modal-card glass-panel animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <button className="v-modal-close" onClick={() => setSelectedDetailVoucher(null)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+              
+              <div className="v-modal-ticket active">
+                <div className="v-modal-left">
+                  <div className="v-modal-discount">
+                    {selectedDetailVoucher.discountType === 'Percentage' ? (
+                      <>
+                        <span className="amount">{selectedDetailVoucher.discountValue}%</span>
+                        <span className="label">OFF</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="amount" style={{ fontSize: '24px' }}>
+                          {(selectedDetailVoucher.discountValue || 0).toLocaleString('vi-VN')} VND
+                        </span>
+                        <span className="label">OFF</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="v-modal-status-badge">
+                    Available
+                  </div>
+                </div>
+
+                <div className="v-modal-right">
+                  <div className="v-modal-header">
+                    <h2>Voucher Details</h2>
+                    <p className="v-modal-desc-text">
+                      {selectedDetailVoucher.discountType === 'Fixed'
+                        ? `Free shipping discount up to ${selectedDetailVoucher.discountValue?.toLocaleString('vi-VN')} VND`
+                        : `${selectedDetailVoucher.discountValue}% discount on eligible orders`}
+                    </p>
+                  </div>
+
+                  <div className="v-modal-info-grid">
+                    <div className="v-info-row">
+                      <span className="v-info-lbl">Voucher Code:</span>
+                      <div className="v-info-val-code">
+                        <span className="code-font">{selectedDetailVoucher.code}</span>
+                      </div>
+                    </div>
+
+                    {selectedDetailVoucher.sellerName && (
+                      <div className="v-info-row">
+                        <span className="v-info-lbl">Applicable Store:</span>
+                        <span className="v-info-val">Only at {selectedDetailVoucher.sellerName}</span>
+                      </div>
+                    )}
+
+                    <div className="v-info-row">
+                      <span className="v-info-lbl">Minimum Order Value:</span>
+                      <span className="v-info-val">{selectedDetailVoucher.minOrderValue ? `${selectedDetailVoucher.minOrderValue.toLocaleString('vi-VN')} VND` : '0 VND'}</span>
+                    </div>
+
+                    <div className="v-info-row">
+                      <span className="v-info-lbl">Maximum Discount Cap:</span>
+                      <span className="v-info-val">{selectedDetailVoucher.maxDiscountValue ? `${selectedDetailVoucher.maxDiscountValue.toLocaleString('vi-VN')} VND` : 'No Cap'}</span>
+                    </div>
+
+                    <div className="v-info-row">
+                      <span className="v-info-lbl">Valid From:</span>
+                      <span className="v-info-val">
+                        {selectedDetailVoucher.startDate 
+                          ? new Date(selectedDetailVoucher.startDate).toLocaleDateString('en-US', { dateStyle: 'long' })
+                          : 'Immediate'}
+                      </span>
+                    </div>
+
+                    <div className="v-info-row">
+                      <span className="v-info-lbl">Expires On:</span>
+                      <span className="v-info-val">
+                        {selectedDetailVoucher.expirationDate 
+                          ? new Date(selectedDetailVoucher.expirationDate).toLocaleDateString('en-US', { dateStyle: 'long' })
+                          : 'No expiry'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v-modal-terms">
+                <h3>Terms & Conditions</h3>
+                <ul>
+                  <li>This voucher is non-transferable and exclusive to your active subscription.</li>
+                  <li>Vouchers must be applied during checkout before completing payment.</li>
+                  <li>Each voucher can only be redeemed once within its validity period.</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDetailVoucher(null)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const code = selectedDetailVoucher.code;
+                    setSelectedDetailVoucher(null);
+                    setVoucherCode(code);
+                    setIsOpenVoucherDropdown(false);
+                    await applyVoucherByCode(code);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-secondary text-white text-sm font-bold hover:bg-primary"
+                >
+                  Apply This Voucher
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
