@@ -29,6 +29,7 @@ import AuctionDetail from './pages/Buyer/Auction/AuctionDetail';
 import PaymentResult from './pages/Buyer/PaymentResult/PaymentResult';
 import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Checkout from './pages/Buyer/Checkout/Checkout';
+import Chat from './pages/Buyer/Chat/Chat';
 
 import Support from './pages/Buyer/Support/Support';
 import Category from './pages/Buyer/Category/Category';
@@ -84,6 +85,8 @@ function App() {
                 <Route path="auction" element={<Auction />} />
                 <Route path="auction/:auctionId" element={<AuctionDetail />} />
                 <Route path="wishlist" element={<Wishlist />} />
+                <Route path="chat" element={<Chat />} />
+                <Route path="chat/:roomId" element={<Chat />} />
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="checkout/:productId" element={<Checkout />} />
 
@@ -96,6 +99,8 @@ function App() {
                   <Route path="products/new" element={<ProductForm />} />
                   <Route path="products/edit/:productId" element={<ProductForm />} />
                   <Route path="sales-statistics" element={<SalesStatistics />} />
+                  <Route path="messages" element={<Chat basePath="/seller-dashboard/messages" />} />
+                  <Route path="messages/:roomId" element={<Chat basePath="/seller-dashboard/messages" />} />
                   <Route path="auctions" element={<MyAuctions />} />
                   <Route path="orders" element={<OrderManagement />} />
                   <Route path="orders/:orderId/status" element={<OrderStatusUpdate />} />

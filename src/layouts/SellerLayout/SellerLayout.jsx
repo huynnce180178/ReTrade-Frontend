@@ -1,15 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import chatService from '../../services/chatService';
+import { createChatHubConnection } from '../../services/chatRealtimeService';
 import '../../styles/SellerDashboard.css';
 
 export default function SellerLayout() {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const chatHubRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
+
+  useEffect(() => {
+    if (!user || !isSeller) {
+      setChatUnreadCount(0);
+      return undefined;
+    }
+
+    let disposed = false;
+
+    const loadUnread = async () => {
+      try {
+        const rooms = await chatService.getRooms();
+        if (!disposed) {
+          setChatUnreadCount((Array.isArray(rooms) ? rooms : []).reduce((sum, room) => sum + (room.unreadCount || 0), 0));
+        }
+      } catch {
+        if (!disposed) setChatUnreadCount(0);
+      }
+    };
+
+    loadUnread();
+
+    const connection = createChatHubConnection();
+    chatHubRef.current = connection;
+
+    const handleNotification = () => {
+      if (!location.pathname.includes('/seller-dashboard/messages')) {
+        setChatUnreadCount((count) => count + 1);
+      }
+    };
+
+    connection.on('ChatNotification', handleNotification);
+    connection.start()
+      .then(() => connection.invoke('JoinUserNotifications'))
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      connection.off('ChatNotification', handleNotification);
+      connection.stop().catch(() => {});
+    };
+  }, [isSeller, location.pathname, user]);
 
   if (loading) {
     return (
@@ -85,6 +131,15 @@ export default function SellerLayout() {
             className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/offers') ? 'active' : ''}`}
           >
             <span className="material-symbols-outlined">local_offer</span>Offers
+          </NavLink>
+          <NavLink
+            to="/seller-dashboard/messages"
+            onClick={() => { setChatUnreadCount(0); closeSidebar(); }}
+            className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/messages') ? 'active' : ''}`}
+          >
+            <span className="material-symbols-outlined">forum</span>
+            <span className="seller-menu-label">Messages</span>
+            {chatUnreadCount > 0 && <span className="seller-menu-badge">{chatUnreadCount}</span>}
           </NavLink>
           <NavLink
             to="/seller-dashboard/auctions"
