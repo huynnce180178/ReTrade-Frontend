@@ -40,12 +40,14 @@ export default function SellerLayout() {
     chatHubRef.current = connection;
 
     const handleNotification = () => {
-      if (!location.pathname.includes('/seller-dashboard/messages')) {
-        setChatUnreadCount((count) => count + 1);
-      }
+      loadUnread();
     };
 
     connection.on('ChatNotification', handleNotification);
+    connection.onreconnected(() => {
+      connection.invoke('JoinUserNotifications').catch(() => {});
+      loadUnread();
+    });
     connection.start()
       .then(() => connection.invoke('JoinUserNotifications'))
       .catch(() => {});

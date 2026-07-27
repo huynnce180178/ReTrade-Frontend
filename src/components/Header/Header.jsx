@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import subscriptionService from '../../services/subscriptionService';
@@ -13,6 +13,7 @@ export default function Header() {
   const { user, logout } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,6 +31,8 @@ export default function Header() {
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   const chatHubRef = useRef(null);
+  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
+  const messagesPath = isSeller ? '/seller-dashboard/messages' : '/chat';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -117,10 +120,18 @@ export default function Header() {
     chatHubRef.current = connection;
 
     const handleNotification = () => {
-      setChatUnreadCount((count) => count + 1);
+      if (location.pathname.startsWith(messagesPath)) {
+        loadUnread();
+        return;
+      }
+      loadUnread();
     };
 
     connection.on('ChatNotification', handleNotification);
+    connection.onreconnected(() => {
+      connection.invoke('JoinUserNotifications').catch(() => {});
+      loadUnread();
+    });
     connection.start()
       .then(() => connection.invoke('JoinUserNotifications'))
       .catch(() => {});
@@ -130,7 +141,7 @@ export default function Header() {
       connection.off('ChatNotification', handleNotification);
       connection.stop().catch(() => {});
     };
-  }, [user]);
+  }, [location.pathname, messagesPath, user]);
 
   const handleLogoutClick = () => {
     logout();
@@ -154,8 +165,6 @@ export default function Header() {
     }
     return user.username;
   };
-
-  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat('vi-VN', {
@@ -309,6 +318,9 @@ export default function Header() {
               <NavLink to="/product" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
                 Product
               </NavLink>
+              <NavLink to="/assistant-chat" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
+                AI Assistant
+              </NavLink>
               <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
                 Auction
               </NavLink>
@@ -319,7 +331,7 @@ export default function Header() {
                 Wishlist
               </NavLink>
               {user && (
-                <NavLink to="/chat" className={({ isActive }) => isActive ? "nav-link active nav-chat-link" : "nav-link nav-chat-link"} onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
+                <NavLink to={messagesPath} className={({ isActive }) => isActive ? "nav-link active nav-chat-link" : "nav-link nav-chat-link"} onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
                   Messages
                   {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
                 </NavLink>
@@ -344,13 +356,15 @@ export default function Header() {
                 </button>
                 {!user ? (
                   <div className="mobile-auth-links">
+                    <Link to="/assistant-chat" className="nav-link" onClick={() => setMobileMenuOpen(false)}>AI Assistant</Link>
                     <Link to="/login" className="btn-login-link nav-link" onClick={() => setMobileMenuOpen(false)}>Login</Link>
                     <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>Register</Link>
                   </div>
                 ) : (
                   <div className="mobile-auth-links">
                     <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
-                    <Link to="/chat" className="nav-link nav-chat-link" onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
+                    <Link to="/assistant-chat" className="nav-link" onClick={() => setMobileMenuOpen(false)}>AI Assistant</Link>
+                    <Link to={messagesPath} className="nav-link nav-chat-link" onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
                       Messages
                       {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
                     </Link>
@@ -490,7 +504,7 @@ export default function Header() {
                       </Link>
                     )}
 
-                    <Link to="/chat" className="dropdown-item" onClick={() => { setDropdownOpen(false); setChatUnreadCount(0); }}>
+                    <Link to={messagesPath} className="dropdown-item" onClick={() => { setDropdownOpen(false); setChatUnreadCount(0); }}>
                       <span className="material-symbols-outlined item-symbol-icon">forum</span>
                       Messages
                       {chatUnreadCount > 0 && <span className="dropdown-chat-badge">{chatUnreadCount}</span>}

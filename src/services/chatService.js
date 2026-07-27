@@ -8,6 +8,10 @@ const chatService = {
     api.get(`/Chat/${roomId}/messages`, { params: { page, limit } }).then((response) => response.data),
   sendMessage: (roomId, message, messageType = 'Text') =>
     api.post(`/Chat/${roomId}/messages`, { message, messageType }).then((response) => response.data),
+  deleteMessage: (roomId, messageId) =>
+    api.delete(`/Chat/${roomId}/messages/${messageId}`).then((response) => response.data),
+  recallMessage: (roomId, messageId) =>
+    api.post(`/Chat/${roomId}/messages/${messageId}/recall`).then((response) => response.data),
   markAsRead: (roomId) => api.put(`/Chat/${roomId}/read`).then((response) => response.data),
   uploadImage: (file) => {
     const form = new FormData();
