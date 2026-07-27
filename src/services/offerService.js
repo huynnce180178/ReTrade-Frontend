@@ -43,11 +43,11 @@ const offerService = {
 
   /** Seller: accept a buyer's offer */
   acceptSellerOffer: (offerId) =>
-    api.patch(`/seller-offers/${offerId}/accept`).then(r => r.data),
+    api.patch(`/seller-offers/${offerId}/response`, { accept: true }).then(r => r.data),
 
   /** Seller: reject a buyer's offer */
   rejectSellerOffer: (offerId) =>
-    api.patch(`/seller-offers/${offerId}/reject`).then(r => r.data),
+    api.patch(`/seller-offers/${offerId}/response`, { accept: false }).then(r => r.data),
 };
 
 export default offerService;

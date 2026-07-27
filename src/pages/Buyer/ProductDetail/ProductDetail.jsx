@@ -9,6 +9,7 @@ import offerService from '../../../services/offerService';
 import addressService from '../../../services/addressService';
 import checkoutService from '../../../services/checkoutService';
 import { createVnPayPaymentUrl } from '../../../services/paymentService';
+import chatService from '../../../services/chatService';
 import '../../../styles/ProductDetail.css';
 
 function formatPrice(price) {
@@ -340,6 +341,29 @@ export default function ProductDetail() {
     navigate(`/checkout/${product.productId}`, { state: { product } });
   };
 
+  const handleContactSeller = async () => {
+    if (!user) {
+      showToast('Please sign in to contact the seller.', 'warning');
+      navigate('/login');
+      return;
+    }
+
+    if (isSeller) {
+      showToast('You cannot chat with yourself about your own product.', 'warning');
+      return;
+    }
+
+    try {
+      const room = await chatService.getOrCreateRoom(product.productId);
+      if (room?.roomId) {
+        navigate(`/chat/${room.roomId}`);
+      }
+    } catch (error) {
+      const msg = error.response?.data || error.message || 'Failed to open chat.';
+      showToast(String(msg), 'error');
+    }
+  };
+
   const handleMakeOfferSuccess = (newOffer) => {
     setMyPendingOffer(newOffer);
   };
@@ -574,7 +598,7 @@ export default function ProductDetail() {
             )}
 
             <div className="pd-actions-icons">
-              <button className="btn btn-outline pd-btn-icon" title="Contact Seller">
+              <button className="btn btn-outline pd-btn-icon" title="Contact Seller" onClick={handleContactSeller}>
                 <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>chat</span>
               </button>
               <button

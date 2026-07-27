@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import profileService from '../../../services/profileService';
 import { createSellerHubConnection } from '../../../services/sellerRealtimeService';
 import wishlistService from '../../../services/wishlistService';
+import chatService from '../../../services/chatService';
 import '../../../styles/ProfileView.css';
 
 const getDisplayName = (seller) => {
@@ -35,6 +36,7 @@ const hasRole = (user, roleName) => {
 
 export default function SellerProfile() {
   const { sellerId } = useParams();
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const [seller, setSeller] = useState(null);
@@ -236,6 +238,29 @@ export default function SellerProfile() {
     }
   };
 
+  const handleMessageSeller = async () => {
+    if (!user) {
+      showToast('Please sign in to message this seller.', 'warning');
+      navigate('/login');
+      return;
+    }
+
+    if (!seller?.sellerId || isOwnSellerPage) {
+      showToast('You cannot message your own seller profile.', 'warning');
+      return;
+    }
+
+    try {
+      const room = await chatService.getOrCreateSellerRoom(seller.sellerId);
+      if (room?.roomId) {
+        navigate(`/chat/${room.roomId}`);
+      }
+    } catch (err) {
+      const msg = err.response?.data || err.message || 'Failed to open chat.';
+      showToast(String(msg), 'error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="profile-view-state">
@@ -394,7 +419,7 @@ export default function SellerProfile() {
                     {followLoading ? 'Updating...' : seller.isFollowing ? 'Unfollow' : 'Follow'}
                   </button>
                 )}
-                <button className="buyer-message-btn" type="button">
+                <button className="buyer-message-btn" type="button" onClick={handleMessageSeller}>
                   <span className="material-symbols-outlined">mail</span>
                   Message
                 </button>
@@ -476,7 +501,7 @@ export default function SellerProfile() {
               </button>
             )}
             {!isOwnSellerPage && (
-              <button className="seller-message-btn" type="button">
+              <button className="seller-message-btn" type="button" onClick={handleMessageSeller}>
                 <span className="material-symbols-outlined">mail</span>
                 Message
               </button>

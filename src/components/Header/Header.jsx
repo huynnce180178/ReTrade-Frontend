@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import subscriptionService from '../../services/subscriptionService';
 import userSearchService from '../../services/userSearchService';
+import chatService from '../../services/chatService';
+import { createChatHubConnection } from '../../services/chatRealtimeService';
 
 import './Header.css';
 
@@ -24,8 +26,10 @@ export default function Header() {
   const [activePackages, setActivePackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [purchaseLoadingId, setPurchaseLoadingId] = useState('');
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
+  const chatHubRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -87,6 +91,46 @@ export default function Header() {
 
     loadData();
   }, [subscriptionModalOpen, user, packages.length, showToast]);
+
+  useEffect(() => {
+    if (!user) {
+      setChatUnreadCount(0);
+      return undefined;
+    }
+
+    let disposed = false;
+
+    const loadUnread = async () => {
+      try {
+        const rooms = await chatService.getRooms();
+        if (!disposed) {
+          setChatUnreadCount((Array.isArray(rooms) ? rooms : []).reduce((sum, room) => sum + (room.unreadCount || 0), 0));
+        }
+      } catch {
+        if (!disposed) setChatUnreadCount(0);
+      }
+    };
+
+    loadUnread();
+
+    const connection = createChatHubConnection();
+    chatHubRef.current = connection;
+
+    const handleNotification = () => {
+      setChatUnreadCount((count) => count + 1);
+    };
+
+    connection.on('ChatNotification', handleNotification);
+    connection.start()
+      .then(() => connection.invoke('JoinUserNotifications'))
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      connection.off('ChatNotification', handleNotification);
+      connection.stop().catch(() => {});
+    };
+  }, [user]);
 
   const handleLogoutClick = () => {
     logout();
@@ -274,6 +318,12 @@ export default function Header() {
               <NavLink to="/wishlist" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
                 Wishlist
               </NavLink>
+              {user && (
+                <NavLink to="/chat" className={({ isActive }) => isActive ? "nav-link active nav-chat-link" : "nav-link nav-chat-link"} onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
+                  Messages
+                  {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
+                </NavLink>
+              )}
 
               <div className="mobile-only-menu-items">
                 <div className="search-input-wrapper mobile-search-wrapper">
@@ -300,6 +350,10 @@ export default function Header() {
                 ) : (
                   <div className="mobile-auth-links">
                     <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
+                    <Link to="/chat" className="nav-link nav-chat-link" onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
+                      Messages
+                      {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
+                    </Link>
                     {isSeller && <Link to="/seller-dashboard" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Seller Dashboard</Link>}
                     <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
                   </div>
@@ -435,6 +489,12 @@ export default function Header() {
                         Seller Dashboard
                       </Link>
                     )}
+
+                    <Link to="/chat" className="dropdown-item" onClick={() => { setDropdownOpen(false); setChatUnreadCount(0); }}>
+                      <span className="material-symbols-outlined item-symbol-icon">forum</span>
+                      Messages
+                      {chatUnreadCount > 0 && <span className="dropdown-chat-badge">{chatUnreadCount}</span>}
+                    </Link>
 
                     {user.roles?.includes('Admin') && (
                       <Link to="/admin" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
