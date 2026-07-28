@@ -188,6 +188,13 @@ export default function SellerLayout() {
           >
             <span className="material-symbols-outlined">orders</span>Order Management
           </NavLink>
+          <NavLink
+            to="/seller-dashboard/reviews"
+            onClick={closeSidebar}
+            className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
+          >
+            <span className="material-symbols-outlined">rate_review</span>View Reviews
+          </NavLink>
           <p>Personal</p>
           <Link to="/profile" onClick={closeSidebar}><span className="material-symbols-outlined">person</span>My Profile</Link>
         </nav>

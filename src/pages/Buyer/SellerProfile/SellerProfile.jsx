@@ -4,10 +4,12 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import profileService from '../../../services/profileService';
+import reviewService from '../../../services/reviewService';
 import { createSellerHubConnection } from '../../../services/sellerRealtimeService';
 import wishlistService from '../../../services/wishlistService';
 import chatService from '../../../services/chatService';
 import '../../../styles/ProfileView.css';
+import './SellerProfileReviews.css';
 
 const getDisplayName = (seller) => {
   const fullName = `${seller?.firstName || ''} ${seller?.lastName || ''}`.trim();
@@ -34,6 +36,25 @@ const hasRole = (user, roleName) => {
   return (user?.roles || []).some((role) => String(role).trim().toLowerCase() === roleName.toLowerCase());
 };
 
+function formatReviewDate(dateStr) {
+  if (!dateStr) return 'N/A';
+  return new Date(dateStr).toLocaleDateString('vi-VN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+function getReviewInitials(name) {
+  const cleanName = String(name || 'Buyer').replace(/\*/g, '').trim();
+  const parts = cleanName.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+
+  return (parts[0] || 'B').slice(0, 2).toUpperCase();
+}
+
 export default function SellerProfile() {
   const { sellerId } = useParams();
   const navigate = useNavigate();
@@ -52,6 +73,11 @@ export default function SellerProfile() {
   const [totalPages, setTotalPages] = useState(1);
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [togglingId, setTogglingId] = useState(null);
+  const [sellerReviews, setSellerReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewTotalItems, setReviewTotalItems] = useState(0);
+  const [reviewTotalPages, setReviewTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchWishlist = async () => {
@@ -205,6 +231,45 @@ export default function SellerProfile() {
     };
   }, [seller?.sellerId, productStatus, productPage, showToast]);
 
+  useEffect(() => {
+    const resolvedSellerId = seller?.sellerId;
+    if (!resolvedSellerId || activeTab !== 'reviews') return undefined;
+
+    let cancelled = false;
+
+    const loadSellerReviews = async () => {
+      setReviewsLoading(true);
+      try {
+        const data = await reviewService.getPublicSellerReviews(resolvedSellerId, {
+          Page: reviewPage,
+          PageSize: 5,
+          SortBy: 'newest',
+        });
+
+        if (!cancelled) {
+          setSellerReviews(data?.items || []);
+          setReviewTotalItems(Number(data?.totalItems || 0));
+          setReviewTotalPages(Math.max(1, Number(data?.totalPages || 1)));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSellerReviews([]);
+          setReviewTotalItems(0);
+          setReviewTotalPages(1);
+          showToast(err?.response?.data || 'Failed to load seller reviews.', 'error');
+        }
+      } finally {
+        if (!cancelled) setReviewsLoading(false);
+      }
+    };
+
+    loadSellerReviews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, reviewPage, seller?.sellerId, showToast]);
+
   const handleFollowToggle = async () => {
     if (!seller || followLoading || !canFollowSeller) return;
 
@@ -299,7 +364,19 @@ export default function SellerProfile() {
 
   const renderBuyerShopContent = () => {
     if (activeTab === 'reviews') {
-      return <SellerRatingPanel seller={seller} ratingText={ratingText} reviewText={reviewText} />;
+      return (
+        <SellerRatingPanel
+          seller={seller}
+          ratingText={ratingText}
+          reviewText={reviewText}
+          reviews={sellerReviews}
+          loadingReviews={reviewsLoading}
+          reviewPage={reviewPage}
+          setReviewPage={setReviewPage}
+          reviewTotalPages={reviewTotalPages}
+          reviewTotalItems={reviewTotalItems}
+        />
+      );
     }
 
     if (activeTab === 'auction') {
@@ -321,7 +398,20 @@ export default function SellerProfile() {
     }
 
     if (activeTab === 'reviews') {
-      return <SellerRatingPanel seller={seller} ratingText={ratingText} reviewText={reviewText} compact />;
+      return (
+        <SellerRatingPanel
+          seller={seller}
+          ratingText={ratingText}
+          reviewText={reviewText}
+          compact
+          reviews={sellerReviews}
+          loadingReviews={reviewsLoading}
+          reviewPage={reviewPage}
+          setReviewPage={setReviewPage}
+          reviewTotalPages={reviewTotalPages}
+          reviewTotalItems={reviewTotalItems}
+        />
+      );
     }
 
     if (activeTab === 'contact') {
@@ -428,10 +518,6 @@ export default function SellerProfile() {
           </div>
 
           <div className="buyer-shop-kpis">
-            <div>
-              <strong>{visibleProductCount}</strong>
-              <span>Listings</span>
-            </div>
             <div>
               <strong>{seller.followersCount}</strong>
               <span>Followers</span>
@@ -688,32 +774,180 @@ function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle 
   );
 }
 
-function SellerRatingPanel({ seller, ratingText, reviewText, compact = false }) {
+function SellerRatingPanel({
+  seller,
+  ratingText,
+  reviewText,
+  compact = false,
+  reviews = [],
+  loadingReviews = false,
+  reviewPage = 1,
+  setReviewPage = () => {},
+  reviewTotalPages = 1,
+  reviewTotalItems = 0,
+}) {
+  const [selectedReview, setSelectedReview] = useState(null);
   const stats = seller.ratingStats?.length
     ? seller.ratingStats
     : [5, 4, 3, 2, 1].map((rating) => ({ rating, count: 0, percentage: 0 }));
+  const firstReview = reviewTotalItems === 0 ? 0 : (reviewPage - 1) * 5 + 1;
+  const lastReview = Math.min(reviewPage * 5, reviewTotalItems);
+  const openReviewPreview = (review) => setSelectedReview(review);
+  const closeReviewPreview = () => setSelectedReview(null);
 
   return (
-    <div className={`seller-rating-panel ${compact ? 'compact' : ''}`}>
-      <section className="seller-rating-overview">
-        <span className="material-symbols-outlined">star</span>
-        <h2>{ratingText}</h2>
-        <StarMeter value={seller.averageRating || 0} />
-        <p>{reviewText}</p>
+    <div className={`seller-public-reviews ${compact ? 'compact' : ''}`}>
+      <div className={`seller-rating-panel ${compact ? 'compact' : ''}`}>
+        <section className="seller-rating-overview">
+          <span className="material-symbols-outlined">star</span>
+          <h2>{ratingText}</h2>
+          <StarMeter value={seller.averageRating || 0} />
+          <p>{reviewText}</p>
+        </section>
+
+        <section className="seller-rating-bars">
+          {stats.map((stat) => (
+            <div className="seller-rating-row" key={stat.rating}>
+              <span>{stat.rating}</span>
+              <span className="material-symbols-outlined">star</span>
+              <div>
+                <i style={{ width: `${Math.min(100, Math.max(0, stat.percentage || 0))}%` }}></i>
+              </div>
+              <strong>{stat.count}</strong>
+            </div>
+          ))}
+        </section>
+      </div>
+
+      <section className="seller-public-review-list">
+        <div className="seller-public-review-head">
+          <h2>Buyer Reviews</h2>
+          <span>{firstReview}-{lastReview} of {reviewTotalItems}</span>
+        </div>
+
+        {loadingReviews ? (
+          <div className="seller-public-review-loading">
+            <span className="btn-spinner"></span>
+            <p>Loading reviews...</p>
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="seller-public-review-empty">
+            <span className="material-symbols-outlined">rate_review</span>
+            <h2>No reviews yet</h2>
+            <p>This seller has not received any completed-order reviews.</p>
+          </div>
+        ) : (
+          <>
+            <div className="seller-public-review-items">
+              {reviews.map((review) => (
+                <article
+                  className="seller-public-review-card"
+                  key={review.reviewId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openReviewPreview(review)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openReviewPreview(review);
+                    }
+                  }}
+                >
+                  <div className="seller-public-review-avatar">
+                    {getReviewInitials(review.reviewerName)}
+                  </div>
+                  <div>
+                    <div className="seller-public-review-top">
+                      <div>
+                        <strong>{review.reviewerName || 'Anonymous buyer'}</strong>
+                        <span>{formatReviewDate(review.createdAt)}</span>
+                      </div>
+                      <StarMeter value={review.rating || 0} />
+                    </div>
+                    <p>{review.comment || 'No written comment.'}</p>
+                    <div className="seller-public-review-product">
+                      <span className="seller-public-review-product-img">
+                        {review.productImageUrl ? (
+                          <img src={review.productImageUrl} alt={review.productName || 'Reviewed product'} loading="lazy" />
+                        ) : (
+                          <span className="material-symbols-outlined">inventory_2</span>
+                        )}
+                      </span>
+                      <span className="seller-public-review-product-name">{review.productName || 'Reviewed product'}</span>
+                      {review.orderCode ? <em>{review.orderCode}</em> : null}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {reviewTotalPages > 1 && (
+              <div className="seller-public-review-pagination">
+                <button
+                  type="button"
+                  disabled={reviewPage <= 1}
+                  onClick={() => setReviewPage((page) => Math.max(1, page - 1))}
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                </button>
+                {Array.from({ length: reviewTotalPages }).map((_, index) => (
+                  <button
+                    key={index + 1}
+                    type="button"
+                    className={reviewPage === index + 1 ? 'active' : ''}
+                    onClick={() => setReviewPage(index + 1)}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={reviewPage >= reviewTotalPages}
+                  onClick={() => setReviewPage((page) => Math.min(reviewTotalPages, page + 1))}
+                >
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </section>
 
-      <section className="seller-rating-bars">
-        {stats.map((stat) => (
-          <div className="seller-rating-row" key={stat.rating}>
-            <span>{stat.rating}</span>
-            <span className="material-symbols-outlined">star</span>
-            <div>
-              <i style={{ width: `${Math.min(100, Math.max(0, stat.percentage || 0))}%` }}></i>
+      {selectedReview && (
+        <div className="seller-public-review-modal-backdrop" role="presentation" onMouseDown={closeReviewPreview}>
+          <section
+            className="seller-public-review-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="seller-public-review-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button type="button" className="seller-public-review-modal-close" onClick={closeReviewPreview} aria-label="Close review preview">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+
+            <div className="seller-public-review-modal-media">
+              {selectedReview.productImageUrl ? (
+                <img src={selectedReview.productImageUrl} alt={selectedReview.productName || 'Reviewed product'} />
+              ) : (
+                <span className="material-symbols-outlined">inventory_2</span>
+              )}
             </div>
-            <strong>{stat.count}</strong>
-          </div>
-        ))}
-      </section>
+
+            <div className="seller-public-review-modal-body">
+              <span className="seller-public-review-modal-eyebrow">Reviewed Product</span>
+              <h2 id="seller-public-review-modal-title">{selectedReview.productName || 'Reviewed product'}</h2>
+              <div className="seller-public-review-modal-meta">
+                <strong>{selectedReview.reviewerName || 'Buyer'}</strong>
+                <span>{formatReviewDate(selectedReview.createdAt)}</span>
+                {selectedReview.orderCode ? <span>{selectedReview.orderCode}</span> : null}
+              </div>
+              <StarMeter value={selectedReview.rating || 0} />
+              <p>{selectedReview.comment || 'No written comment.'}</p>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

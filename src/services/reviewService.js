@@ -6,6 +6,8 @@ const post = (url, payload) => api.post(url, payload).then((response) => respons
 const reviewService = {
   getByOrder: (buyerId, orderId) => get(`/Review/buyer/${buyerId}/order/${orderId}`),
   create: (buyerId, payload) => post(`/Review/buyer/${buyerId}`, payload),
+  getPublicSellerReviews: (sellerId, params) => api.get(`/Review/seller/${sellerId}`, { params }).then((response) => response.data),
+  getPublicSellerSummary: (sellerId) => get(`/Review/seller/${sellerId}/summary`),
   getSellerReviews: (params) => api.get('/Review/seller', { params }).then((response) => response.data),
   getSellerSummary: (params) => api.get('/Review/seller/summary', { params }).then((response) => response.data),
   getAdminReviews: (params) => api.get('/Review/admin', { params }).then((response) => response.data),
