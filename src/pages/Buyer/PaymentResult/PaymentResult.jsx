@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext';
+import profileService from '../../../services/profileService';
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams();
@@ -9,6 +11,30 @@ export default function PaymentResult() {
   const amount = searchParams.get('amount') || '';
   const transactionNo = searchParams.get('transactionNo') || '';
   const auctionId = searchParams.get('auctionId') || '';
+  const { user, setUser } = useAuth();
+
+  useEffect(() => {
+    const refreshProfile = async () => {
+      if (success && user) {
+        try {
+          const freshProfile = await profileService.getMyProfile();
+          if (freshProfile) {
+            const mergedProfile = {
+              ...user,
+              ...freshProfile,
+              roles: freshProfile.roles || user?.roles || [],
+              isPasswordSet: freshProfile.isPasswordSet ?? user?.isPasswordSet,
+            };
+            setUser(mergedProfile);
+            localStorage.setItem('user', JSON.stringify(mergedProfile));
+          }
+        } catch (err) {
+          console.error('Failed to refresh profile on payment success:', err);
+        }
+      }
+    };
+    refreshProfile();
+  }, [success, user, setUser]);
 
   return (
     <div className="container animate-fade-in" style={{ padding: '60px 20px', minHeight: '60vh' }}>

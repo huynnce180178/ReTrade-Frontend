@@ -203,7 +203,7 @@ export default function ProductForm() {
   const currentCategoryAttributes = useMemo(() => {
     if (!formData.categoryId) return [];
     const cat = categories.find((c) => c.categoryId === formData.categoryId);
-    return cat?.attributes || [];
+    return (cat?.attributes || []).filter(a => !a.isDeleted);
   }, [formData.categoryId, categories]);
 
   const validateAttribute = (attr, val) => {

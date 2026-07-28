@@ -41,6 +41,7 @@ export default function Category() {
   const [description, setDescription] = useState('');
   const [parentId, setParentId] = useState('');
   const [attributes, setAttributes] = useState([]); // Array of { attributeId, name, dataType, isRequired }
+  const [deletedAttributes, setDeletedAttributes] = useState([]);
   const [draggedIndex, setDraggedIndex] = useState(null);
 
   const [selectedImageFile, setSelectedImageFile] = useState(null);
@@ -213,6 +214,7 @@ export default function Category() {
     setDescription('');
     setParentId('');
     setAttributes([]);
+    setDeletedAttributes([]);
     setSelectedImageFile(null);
     setImagePreview('');
     setIsModalOpen(true);
@@ -223,8 +225,12 @@ export default function Category() {
     setName(category.name || '');
     setDescription(category.description || '');
     setParentId(category.parentId || '');
+    
+    const allAttrs = category.attributes || [];
+    
     // Mapping existing attributes. Note: exclude attributes with IsDeleted === true
-    const activeAttrs = (category.attributes || [])
+    const activeAttrs = allAttrs
+      .filter(attr => !attr.isDeleted)
       .map(attr => ({
         attributeId: attr.attributeId,
         name: attr.name || '',
@@ -238,7 +244,26 @@ export default function Category() {
         isSearchable: attr.isSearchable || false
       }))
       .sort((a, b) => a.displayOrder - b.displayOrder);
+      
+    // Mapping deleted attributes to show in restoration panel
+    const inactiveAttrs = allAttrs
+      .filter(attr => attr.isDeleted)
+      .map(attr => ({
+        attributeId: attr.attributeId,
+        name: attr.name || '',
+        dataType: attr.dataType || 'String',
+        isRequired: attr.isRequired || false,
+        minValue: attr.minValue !== undefined && attr.minValue !== null ? attr.minValue : null,
+        maxValue: attr.maxValue !== undefined && attr.maxValue !== null ? attr.maxValue : null,
+        unit: attr.unit || '',
+        displayOrder: attr.displayOrder || 0,
+        isFilterable: attr.isFilterable || false,
+        isSearchable: attr.isSearchable || false
+      }))
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+
     setAttributes(activeAttrs);
+    setDeletedAttributes(inactiveAttrs);
     setSelectedImageFile(null);
     setImagePreview(category.imageUrl || '');
     setIsModalOpen(true);
@@ -268,6 +293,12 @@ export default function Category() {
   const handleRemoveAttributeRow = (index) => {
     const updated = attributes.filter((_, i) => i !== index);
     setAttributes(updated);
+  };
+
+  const handleRestoreAttribute = (index) => {
+    const attrToRestore = deletedAttributes[index];
+    setDeletedAttributes(prev => prev.filter((_, i) => i !== index));
+    setAttributes(prev => [...prev, attrToRestore]);
   };
 
   const handleDragStart = (e, index) => {
@@ -631,6 +662,7 @@ export default function Category() {
                         </thead>
                         <tbody>
                           {[...(selectedCategory.attributes || [])]
+                            .filter(attr => !attr.isDeleted)
                             .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
                             .map((attr) => (
                               <tr key={attr.attributeId}>
@@ -808,6 +840,7 @@ export default function Category() {
                               className="form-input attr-type-select" 
                               value={attr.dataType}
                               onChange={(e) => handleAttributeChange(idx, 'dataType', e.target.value)}
+                              disabled={!!attr.attributeId}
                             >
                               <option value="String">String</option>
                               <option value="Number">Number</option>
@@ -892,6 +925,27 @@ export default function Category() {
                     )}
                   </div>
                 </div>
+
+                {deletedAttributes.length > 0 && (
+                  <div className="form-group" style={{ marginTop: '20px' }}>
+                    <label className="form-label">Deleted Attributes (Click Restore to recover)</label>
+                    <div className="deleted-attributes-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {deletedAttributes.map((attr, idx) => (
+                        <div key={idx} className="attribute-card-item deleted-item" style={{ opacity: 0.7, border: '1px dashed #cbd5e1', padding: '10px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <strong style={{ textDecoration: 'line-through', marginRight: '8px' }}>{attr.name}</strong> 
+                            <span className="badge badge-success" style={{ background: 'rgba(11, 148, 133, 0.08)', color: 'var(--accent)', border: 'none', fontSize: '11px', padding: '2px 6px' }}>{attr.dataType}</span>
+                            {attr.unit && <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>({attr.unit})</span>}
+                          </div>
+                          <button type="button" className="btn btn-outline" onClick={() => handleRestoreAttribute(idx)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '12px', height: 'fit-content' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>restore</span>
+                            Restore
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="modal-footer">

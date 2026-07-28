@@ -36,6 +36,10 @@ export default function Home() {
   const [latestProducts, setLatestProducts] = useState([]);
   const [loadingLatest, setLoadingLatest] = useState(true);
 
+  // Priority products (recommended seller subscription products)
+  const [priorityProducts, setPriorityProducts] = useState([]);
+  const [loadingPriority, setLoadingPriority] = useState(true);
+
   // Categories
   const [categories, setCategories] = useState([]);
 
@@ -67,6 +71,23 @@ export default function Home() {
       // Silently fail
     } finally {
       setLoadingLatest(false);
+    }
+  }, []);
+
+  const fetchPriorityProducts = useCallback(async () => {
+    setLoadingPriority(true);
+    try {
+      const data = await productService.getAll({
+        IsPriorityOnly: true,
+        Status: 'Accepted',
+        Page: 1,
+        PageSize: 4,
+      });
+      setPriorityProducts(data.items || []);
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingPriority(false);
     }
   }, []);
 
@@ -126,7 +147,8 @@ export default function Home() {
 
   useEffect(() => {
     fetchLatestProducts();
-  }, [fetchLatestProducts]);
+    fetchPriorityProducts();
+  }, [fetchLatestProducts, fetchPriorityProducts]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -175,6 +197,15 @@ export default function Home() {
     } finally {
       setTogglingId(null);
     }
+  };
+
+  const handlePremiumMouseMove = (e) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    card.style.setProperty('--x', `${x}px`);
+    card.style.setProperty('--y', `${y}px`);
   };
 
   return (
@@ -236,6 +267,82 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Priority/Premium Recommended Listings */}
+      {priorityProducts.length > 0 && (
+        <section className="priority-recommendations-section">
+          <div className="container">
+            <div className="priority-header-row">
+              <div className="section-title-wrap">
+                <span className="premium-glow-badge">
+                  <span className="material-symbols-outlined star-spin">stars</span>
+                  PREMIUM LISTINGS
+                </span>
+                <h2 className="section-title">Sponsored Spotlight</h2>
+                <p className="section-subtitle">Specially featured items from our verified premium sellers</p>
+              </div>
+            </div>
+
+            <div className="priority-grid">
+              {priorityProducts.map(product => (
+                <div key={product.productId} className="premium-card" onMouseMove={handlePremiumMouseMove}>
+                  <div className="premium-card-glow"></div>
+                  <div className="premium-image-wrapper">
+                    <span className="premium-badge-tag">
+                      <span className="material-symbols-outlined">workspace_premium</span>
+                      VIP
+                    </span>
+                    {product.mainImageUrl ? (
+                      <img src={product.mainImageUrl} alt={product.name} className="premium-img" />
+                    ) : (
+                      <div className="premium-image-placeholder">
+                        <span className="material-symbols-outlined">image</span>
+                      </div>
+                    )}
+                    <div className="premium-card-actions">
+                      <button
+                        className={`premium-action-btn ${wishlistIds.has(product.productId) ? 'active' : ''}`}
+                        onClick={() => handleToggleWishlist(product)}
+                        disabled={togglingId === product.productId}
+                        title="Add to Wishlist"
+                      >
+                        {togglingId === product.productId ? (
+                          <span className="premium-spinner"></span>
+                        ) : (
+                          <span className="material-symbols-outlined">favorite</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="premium-card-body">
+                    <div className="premium-seller-row">
+                      <span className="premium-seller-name">
+                        <span className="material-symbols-outlined">storefront</span>
+                        {product.sellerName || 'Verified Seller'}
+                      </span>
+                      <span className="premium-condition-tag">{product.condition || 'Used'}</span>
+                    </div>
+                    <Link to={`/product/${product.productId}`} className="premium-product-name">
+                      {product.name}
+                    </Link>
+                    <div className="premium-card-footer">
+                      <div className="premium-price-wrap">
+                        <span className="price-label">Buy Now</span>
+                        <span className="premium-price">{formatPrice(product.price)}</span>
+                      </div>
+                      <Link to={`/product/${product.productId}`} className="premium-view-btn">
+                        Details
+                        <span className="material-symbols-outlined">arrow_forward</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Horizontal Category List */}
       {categories.length > 0 && (
