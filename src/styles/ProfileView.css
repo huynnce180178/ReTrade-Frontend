@@ -770,7 +770,7 @@
 
 .buyer-shop-kpis {
   display: grid;
-  grid-template-columns: repeat(4, 92px);
+  grid-template-columns: repeat(3, 92px);
   gap: 10px;
 }
 

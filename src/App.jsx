@@ -49,6 +49,7 @@ import OrderStatusUpdate from './pages/Seller/OrderStatusUpdate/OrderStatusUpdat
 import SalesStatistics from './pages/Seller/SalesStatistics/SalesStatistics';
 import MyAuctions from './pages/Seller/MyAuctions/MyAuctions';
 import OfferList from './pages/Seller/OfferList/OfferList';
+import ReviewList from './pages/Seller/ReviewList/ReviewList';
 import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 import Listings from './pages/Admin/Listings/Listings';
 import AuctionControl from './pages/Admin/Auctions/AuctionControl';
@@ -109,6 +110,7 @@ function App() {
                   <Route path="orders/:orderId/status" element={<OrderStatusUpdate />} />
                   <Route path="orders/:orderId" element={<OrderDetail />} />
                   <Route path="offers" element={<OfferList />} />
+                  <Route path="reviews" element={<ReviewList />} />
                 </Route>
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
