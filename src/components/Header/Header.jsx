@@ -210,6 +210,7 @@ export default function Header() {
   const getPackageVisual = (serviceId) => {
     switch (serviceId) {
       case 'SERVICE_UPGRADE_SELLER':
+      case 'sub_20260701_100001':
         return {
           cardClass: 'sub-card featured-card',
           iconWrapClass: 'sub-icon-wrap member-bg',
@@ -229,6 +230,7 @@ export default function Header() {
           note: ''
         };
       case 'SERVICE_PRIORITY_LISTING':
+      case 'sub_20260701_100003':
         return {
           cardClass: 'sub-card dark-card',
           iconWrapClass: 'sub-icon-wrap featured-bg',
@@ -605,7 +607,7 @@ export default function Header() {
 
                   return (
                     <div key={pkg.serviceId} className={visual.cardClass}>
-                      {pkg.serviceId === 'SERVICE_UPGRADE_SELLER' && <div className="popular-badge">POPULAR</div>}
+                      {(pkg.serviceId === 'SERVICE_UPGRADE_SELLER' || pkg.serviceId === 'sub_20260701_100001') && <div className="popular-badge">POPULAR</div>}
                       <div className="sub-card-header">
                         <div className={visual.iconWrapClass}>
                           <span className="material-symbols-outlined">{visual.icon}</span>
