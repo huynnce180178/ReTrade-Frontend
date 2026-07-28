@@ -5,6 +5,8 @@ import { useToast } from '../../../context/ToastContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import './OrderManagement.css';
+import ReportModal from '../../../components/ReportModal/ReportModal';
+import reportService from '../../../services/reportService';
 
 const pageSize = 5;
 const SHIPPING_PROVIDER = 'GHN';
@@ -72,6 +74,8 @@ export default function OrderManagement() {
   const [filterForm, setFilterForm] = useState(initialFilterForm);
   const [appliedFilters, setAppliedFilters] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
@@ -297,6 +301,12 @@ export default function OrderManagement() {
   };
 
   const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
+  const submitBuyerReport = async (payload) => {
+    if (!reportTarget?.orderId) return;
+    try { setReportSubmitting(true); await reportService.reportBuyer(reportTarget.orderId, payload); showToast('Report submitted successfully.', 'success'); setReportTarget(null); }
+    catch (error) { showToast(error?.response?.data || 'Failed to submit report.', 'error'); }
+    finally { setReportSubmitting(false); }
+  };
 
   if (authLoading) {
     return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading orders...</p></div>;
@@ -469,6 +479,7 @@ export default function OrderManagement() {
                           ) : (
                             <span className="om-action-spacer" aria-hidden="true" />
                           )}
+                          {order.status === 'Completed' && <button type="button" className="om-detail-btn" disabled={isUpdating} onClick={() => setReportTarget(order)}>Report Buyer</button>}
                         </div>
                       </td>
                     </tr>
@@ -506,6 +517,7 @@ export default function OrderManagement() {
           </nav>
         </footer>
       </section>
+      <ReportModal isOpen={Boolean(reportTarget)} title="Report Buyer" targetLabel={`Report the buyer for order #${reportTarget?.orderCode || reportTarget?.orderId || ''}.`} submitting={reportSubmitting} onClose={() => !reportSubmitting && setReportTarget(null)} onSubmit={submitBuyerReport} />
     </div>
   );
 }

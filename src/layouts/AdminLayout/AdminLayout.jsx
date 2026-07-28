@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import '../../layouts/AdminLayout/AdminLayout.css';
+import './AdminReportNav.css';
 
 export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
@@ -240,6 +241,20 @@ export default function AdminLayout() {
                 <span className="material-symbols-outlined admin-menu-item-icon">payments</span>
                 Manage Refunds
               </NavLink>
+
+              <NavLink 
+                to="/admin/reports" 
+                className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
+              >
+                <span className="material-symbols-outlined admin-menu-item-icon">flag</span>
+                Report Management
+              </NavLink>
+              <div className="admin-report-submenu">
+                <NavLink to="/admin/reports/flagged-users" className={({ isActive }) => isActive ? 'active' : ''}>
+                  <span className="material-symbols-outlined">flag</span>
+                  Flagged Users
+                </NavLink>
+              </div>
 
               <NavLink 
                 to="/admin/promos" 

@@ -142,6 +142,10 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">workspace_premium</span>
           My Subscriptions
         </Link>
+        <Link to="/report-history" className={`menu-item ${isActive('/report-history')}`}>
+          <span className="material-symbols-outlined">flag</span>
+          Report History
+        </Link>
 
         {isAdmin && (
           <>

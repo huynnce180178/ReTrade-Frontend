@@ -31,6 +31,7 @@ import Wishlist from './pages/Buyer/Wishlist/Wishlist';
 import Checkout from './pages/Buyer/Checkout/Checkout';
 import Chat from './pages/Buyer/Chat/Chat';
 import AssistantChat from './pages/Buyer/AssistantChat/AssistantChat';
+import ReportHistory from './pages/Buyer/ReportHistory/ReportHistory';
 
 import Support from './pages/Buyer/Support/Support';
 import Category from './pages/Buyer/Category/Category';
@@ -54,6 +55,8 @@ import UserAccounts from './pages/Admin/UserAccounts/UserAccounts';
 import Listings from './pages/Admin/Listings/Listings';
 import AuctionControl from './pages/Admin/Auctions/AuctionControl';
 import ManageRefunds from './pages/Admin/Refunds/ManageRefunds';
+import ReportManagement from './pages/Admin/Reports/ReportManagement';
+import FlaggedUsers from './pages/Admin/Reports/FlaggedUsers';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -127,6 +130,7 @@ function App() {
                 <Route path="bid-history" element={<BidHistory />} />
                 <Route path="refund-history" element={<RefundHistory />} />
                 <Route path="offer-history" element={<OfferHistory />} />
+                <Route path="report-history" element={<ReportHistory />} />
                 <Route path="payment/vnpay-return" element={<PaymentResult />} />
                 <Route path="category" element={<CategoryList />} />
                 <Route path="category/:categoryId" element={<CategoryProductList />} />
@@ -141,6 +145,8 @@ function App() {
                 <Route path="listings" element={<Listings />} />
                 <Route path="auctions" element={<AuctionControl />} />
                 <Route path="refunds" element={<ManageRefunds />} />
+                <Route path="reports" element={<ReportManagement />} />
+                <Route path="reports/flagged-users" element={<FlaggedUsers />} />
                 <Route path="*" element={
                   <div className="admin-placeholder-page">
                     <span className="material-symbols-outlined admin-placeholder-icon">construction</span>

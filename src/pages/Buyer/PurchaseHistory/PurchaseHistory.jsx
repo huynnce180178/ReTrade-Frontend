@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import ReviewModal from '../../../components/ReviewModal/ReviewModal';
+import ReportModal from '../../../components/ReportModal/ReportModal';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import purchaseService from '../../../services/purchaseService';
 import reviewService from '../../../services/reviewService';
 import paymentService from '../../../services/paymentService';
+import reportService from '../../../services/reportService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import '../../../styles/MyAccount.css';
 import './PurchaseHistory.css';
@@ -69,6 +71,8 @@ export default function PurchaseHistory() {
   const [returnTarget, setReturnTarget] = useState(null);
   const [returnReason, setReturnReason] = useState('');
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   const buyerId = user?.userId;
 
@@ -375,6 +379,13 @@ export default function PurchaseHistory() {
     }
   };
 
+  const handleSubmitSellerReport = async (payload) => {
+    if (!reportTarget?.orderId) return;
+    try { setReportSubmitting(true); await reportService.reportSeller(reportTarget.orderId, payload); showToast('Report submitted successfully.', 'success'); setReportTarget(null); }
+    catch (error) { showToast(error?.response?.data || 'Failed to submit report.', 'error'); }
+    finally { setReportSubmitting(false); }
+  };
+
   if (authLoading) {
     return (
       <div className="profile-loading-wrapper">
@@ -457,6 +468,7 @@ export default function PurchaseHistory() {
                       onWriteReview={() => handleOpenReview(purchase)}
                       onRequestReturn={() => handleOpenReturn(purchase)}
                       onPayAgain={() => handlePayAgain(purchase)}
+                      onReportSeller={() => setReportTarget(purchase)}
                     />
                   ))
                 )}
@@ -553,6 +565,7 @@ export default function PurchaseHistory() {
             }}
             onSubmit={handleSubmitReview}
           />
+          <ReportModal isOpen={Boolean(reportTarget)} title="Report Seller" targetLabel={`Report the seller for order #${reportTarget?.orderCode || reportTarget?.orderId || ''}.`} submitting={reportSubmitting} onClose={() => !reportSubmitting && setReportTarget(null)} onSubmit={handleSubmitSellerReport} />
 
           {returnModalOpen && (
             <ReturnRequestModal
@@ -570,7 +583,7 @@ export default function PurchaseHistory() {
   );
 }
 
-function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain }) {
+function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain, onReportSeller }) {
   const meta = statusMeta[purchase.status] || { label: purchase.status || 'Unknown', className: 'default' };
   const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
   const canComplete = purchase.status === 'Delivered';
@@ -657,6 +670,7 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
             Request Return
           </button>
         )}
+        {purchase.status === 'Completed' && <button type="button" className="purchase-detail-btn" disabled={updating} onClick={onReportSeller}>Report Seller</button>}
         <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-detail-btn">
           Details
         </Link>
