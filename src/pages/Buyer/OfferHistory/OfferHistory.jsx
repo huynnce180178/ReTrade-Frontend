@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import offerService from '../../../services/offerService';
 import addressService from '../../../services/addressService';
 import checkoutService from '../../../services/checkoutService';
@@ -230,6 +231,7 @@ function OfferCheckoutModal({ offer, onClose, onSuccess }) {
    ============================================= */
 export default function OfferHistory() {
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -278,8 +280,8 @@ export default function OfferHistory() {
                     <span className="material-symbols-outlined">history</span>
                   </div>
                   <div>
-                    <h1 className="ma-headline">Offer History</h1>
-                    <p className="ma-subtitle">Track your offers and negotiate purchases</p>
+                    <h1 className="ma-headline">{language === 'vi' ? 'Lịch Sử Trả Giá' : 'Offer History'}</h1>
+                    <p className="ma-subtitle">{language === 'vi' ? 'Theo dõi các đề xuất giá và thương lượng mua hàng của bạn' : 'Track your offers and negotiate purchases'}</p>
                   </div>
                 </div>
               </div>
@@ -288,12 +290,12 @@ export default function OfferHistory() {
                 {loading ? (
                   <div className="offer-history-loading">
                     <span className="offer-spinner-lg" />
-                    <span>Loading offers...</span>
+                    <span>{language === 'vi' ? 'Đang tải danh sách trả giá...' : 'Loading offers...'}</span>
                   </div>
                 ) : offers.length === 0 ? (
                   <div className="offer-history-empty">
                     <span className="material-symbols-outlined" style={{ fontSize: '48px', opacity: 0.25 }}>inbox</span>
-                    <p>You haven't made any offers yet.</p>
+                    <p>{language === 'vi' ? 'Bạn chưa tạo đề xuất trả giá nào.' : "You haven't made any offers yet."}</p>
                   </div>
                 ) : (
                   <div className="offer-history-list">

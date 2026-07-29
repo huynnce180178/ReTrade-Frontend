@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import './AccountSidebar.css';
 
 export default function AccountSidebar() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const [avatarError, setAvatarError] = useState(false);
 
@@ -96,63 +98,63 @@ export default function AccountSidebar() {
       <hr className="profile-divider" />
 
       <nav className="profile-sidebar-menu">
-        <p className="sidebar-group-title">Account</p>
+        <p className="sidebar-group-title">{t('nav.my_account')}</p>
         <Link to="/profile" className={`menu-item ${isActive('/profile')}`}>
           <span className="material-symbols-outlined">account_circle</span>
-          Profile
+          {t('nav.profile')}
         </Link>
         <Link to="/change-password" className={`menu-item ${isActive('/change-password')}`}>
           <span className="material-symbols-outlined">shield_lock</span>
-          Change Password
+          {t('nav.change_password')}
         </Link>
         <Link to="/address-book" className={`menu-item ${isActive('/address-book')}`}>
           <span className="material-symbols-outlined">location_on</span>
-          Address Book
+          {t('nav.address_book')}
         </Link>
 
         {isSeller && (
           <Link to="/seller-dashboard" className={`menu-item ${isActive('/seller-dashboard')}`}>
             <span className="material-symbols-outlined">storefront</span>
-            Seller Dashboard
+            {t('nav.seller_center')}
           </Link>
         )}
 
-        <p className="sidebar-group-title mt-4">Activity</p>
+        <p className="sidebar-group-title mt-4">{t('history.purchase_title')}</p>
         <Link to="/purchase-history" className={`menu-item ${isActiveSection('/purchase-history')}`}>
           <span className="material-symbols-outlined">receipt_long</span>
-          Purchase History
+          {t('nav.purchase_history')}
         </Link>
         <Link to="/bid-history" className={`menu-item ${isActive('/bid-history')}`}>
           <span className="material-symbols-outlined">gavel</span>
-          Bid History
+          {t('nav.bid_history')}
         </Link>
         <Link to="/refund-history" className={`menu-item ${isActive('/refund-history')}`}>
           <span className="material-symbols-outlined">account_balance_wallet</span>
-          Refund History
+          {t('nav.refund_history')}
         </Link>
         <Link to="/offer-history" className={`menu-item ${isActive('/offer-history')}`}>
           <span className="material-symbols-outlined">local_offer</span>
-          Offer History
+          {t('nav.offer_history')}
         </Link>
         <Link to="/vouchers" className={`menu-item ${isActive('/vouchers')}`}>
           <span className="material-symbols-outlined">local_activity</span>
-          My Voucher
+          {t('nav.my_vouchers')}
         </Link>
         <Link to="/subscriptions" className={`menu-item ${isActive('/subscriptions')}`}>
           <span className="material-symbols-outlined">workspace_premium</span>
-          My Subscriptions
+          {t('nav.my_subscriptions')}
         </Link>
         <Link to="/report-history" className={`menu-item ${isActive('/report-history')}`}>
           <span className="material-symbols-outlined">flag</span>
-          Report History
+          {t('nav.report_history')}
         </Link>
 
         {isAdmin && (
           <>
-            <p className="sidebar-group-title mt-4">Management</p>
+            <p className="sidebar-group-title mt-4">{t('nav.admin_center')}</p>
             <Link to="/category" className={`menu-item ${isActive('/category')}`}>
               <span className="material-symbols-outlined">category</span>
-              Categories
+              {t('nav.category')}
             </Link>
           </>
         )}

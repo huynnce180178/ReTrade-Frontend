@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import './OrderManagement.css';
@@ -14,53 +15,13 @@ const numberFormatter = new Intl.NumberFormat('vi-VN');
 const awaitingPaymentCancelDelayMs = 15 * 60 * 1000;
 const defaultShippingDelayMs = 30 * 1000;
 
-const tabs = [
-  { key: '', label: 'All' },
-  { key: 'AwaitingPayment', label: 'Awaiting Payment' },
-  { key: 'Pending', label: 'Pending' },
-  { key: 'Confirmed', label: 'Confirmed' },
-  { key: 'Shipping', label: 'Shipping' },
-  { key: 'Delivered', label: 'Delivered' },
-  { key: 'Completed', label: 'Completed' },
-  { key: 'DeliveryFailed', label: 'Delivery Failed' },
-  { key: 'Returned', label: 'Returned' },
-  { key: 'Cancelled', label: 'Cancelled' },
-];
-
-const statusMeta = {
-  AwaitingPayment: { label: 'Awaiting Payment', className: 'awaiting' },
-  Pending: { label: 'Pending', className: 'pending' },
-  Confirmed: { label: 'Confirmed', className: 'confirmed' },
-  Shipping: { label: 'Shipping', className: 'shipping' },
-  Delivered: { label: 'Delivered', className: 'delivered' },
-  Completed: { label: 'Completed', className: 'completed' },
-  DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
-  Returned: { label: 'Returned', className: 'returned' },
-  ReturnRequested: { label: 'Return Requested', className: 'return-requested' },
-  ReturnRejected: { label: 'Return Rejected', className: 'return-rejected' },
-  Cancelled: { label: 'Cancelled', className: 'cancelled' },
-};
-
-const nextActionByStatus = {
-  Pending: { label: 'Confirm', status: 'Confirmed', tone: 'primary' },
-  Confirmed: { label: 'Ship', status: 'Shipping', tone: 'info' },
-};
-
-const initialFilterForm = {
-  sortBy: 'newest',
-};
-
-const sortOptions = [
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'total_desc', label: 'Highest total' },
-  { value: 'total_asc', label: 'Lowest total' },
-];
-
 export default function OrderManagement() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+
   const skipNextFilterAutoApply = useRef(false);
 
   const [orders, setOrders] = useState([]);
@@ -71,11 +32,45 @@ export default function OrderManagement() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [filterForm, setFilterForm] = useState(initialFilterForm);
+  const [filterForm, setFilterForm] = useState({ sortBy: 'newest' });
   const [appliedFilters, setAppliedFilters] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [reportTarget, setReportTarget] = useState(null);
   const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  const tabs = useMemo(() => [
+    { key: '', label: isVi ? 'Tất cả' : 'All' },
+    { key: 'AwaitingPayment', label: isVi ? 'Chờ thanh toán' : 'Awaiting Payment' },
+    { key: 'Pending', label: isVi ? 'Chờ xử lý' : 'Pending' },
+    { key: 'Confirmed', label: isVi ? 'Đã xác nhận' : 'Confirmed' },
+    { key: 'Shipping', label: isVi ? 'Đang giao' : 'Shipping' },
+    { key: 'Delivered', label: isVi ? 'Đã giao' : 'Delivered' },
+    { key: 'Completed', label: isVi ? 'Hoàn thành' : 'Completed' },
+    { key: 'DeliveryFailed', label: isVi ? 'Giao thất bại' : 'Delivery Failed' },
+    { key: 'Returned', label: isVi ? 'Đã trả hàng' : 'Returned' },
+    { key: 'Cancelled', label: isVi ? 'Đã hủy' : 'Cancelled' },
+  ], [isVi]);
+
+  const statusMeta = useMemo(() => ({
+    AwaitingPayment: { label: isVi ? 'Chờ thanh toán' : 'Awaiting Payment', className: 'awaiting' },
+    Pending: { label: isVi ? 'Chờ xử lý' : 'Pending', className: 'pending' },
+    Confirmed: { label: isVi ? 'Đã xác nhận' : 'Confirmed', className: 'confirmed' },
+    Shipping: { label: isVi ? 'Đang giao' : 'Shipping', className: 'shipping' },
+    Delivered: { label: isVi ? 'Đã giao' : 'Delivered', className: 'delivered' },
+    Completed: { label: isVi ? 'Hoàn thành' : 'Completed', className: 'completed' },
+    DeliveryFailed: { label: isVi ? 'Giao thất bại' : 'Delivery Failed', className: 'delivery-failed' },
+    Returned: { label: isVi ? 'Đã trả hàng' : 'Returned', className: 'returned' },
+    ReturnRequested: { label: isVi ? 'Yêu cầu trả hàng' : 'Return Requested', className: 'return-requested' },
+    ReturnRejected: { label: isVi ? 'Từ chối trả hàng' : 'Return Rejected', className: 'return-rejected' },
+    Cancelled: { label: isVi ? 'Đã hủy' : 'Cancelled', className: 'cancelled' },
+  }), [isVi]);
+
+  const sortOptions = useMemo(() => [
+    { value: 'newest', label: isVi ? 'Mới nhất trước' : 'Newest first' },
+    { value: 'oldest', label: isVi ? 'Cũ nhất trước' : 'Oldest first' },
+    { value: 'total_desc', label: 'Tổng tiền cao nhất' },
+    { value: 'total_asc', label: 'Tổng tiền thấp nhất' },
+  ], [isVi]);
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
@@ -107,9 +102,7 @@ export default function OrderManagement() {
   }, [searchTerm]);
 
   const fetchOrders = useCallback(async () => {
-    if (!sellerId) {
-      return;
-    }
+    if (!sellerId) return;
 
     try {
       setLoading(true);
@@ -119,20 +112,21 @@ export default function OrderManagement() {
         SellerId: sellerId,
         Status: effectiveStatus,
         SearchTerm: appliedSearchTerm || undefined,
-        SortBy: appliedFilters?.sortBy || 'newest',
-        Page: page,
+        SortBy: appliedFilters?.sortBy || filterForm.sortBy || 'newest',
+        PageNumber: page,
         PageSize: pageSize,
       });
 
-      setOrders(data?.items || []);
-      setTotalItems(data?.totalItems || 0);
-      setTotalPages(data?.totalPages || 1);
+      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      setOrders(items);
+      setTotalItems(data?.totalCount ?? items.length);
+      setTotalPages(data?.totalPages ?? Math.max(1, Math.ceil((data?.totalCount ?? items.length) / pageSize)));
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load seller orders.', 'error');
+      showToast(error?.response?.data || (isVi ? 'Không thể tải danh sách đơn hàng.' : 'Failed to load seller orders.'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, appliedFilters, appliedSearchTerm, page, sellerId, showToast]);
+  }, [activeStatus, appliedFilters, appliedSearchTerm, filterForm.sortBy, page, sellerId, showToast, isVi]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -141,81 +135,35 @@ export default function OrderManagement() {
   }, [fetchOrders, isAdmin, isSeller, user]);
 
   useEffect(() => {
-    if (!sellerId || !isSeller) {
-      return undefined;
-    }
+    if (authLoading || !user || (!isSeller && !isAdmin)) return undefined;
 
     const connection = createOrderHubConnection();
     let disposed = false;
 
-    const handleOrderStatusChanged = (payload) => {
-      const eventType = payload?.eventType || payload?.EventType;
-      const isNewSellerOrder = eventType === 'Created' || eventType === 'PaymentConfirmed';
-      const realtimeOrder = toRealtimeOrder(payload);
-
-      if (isNewSellerOrder) {
-        showToast('New seller order received.', 'success');
-        if (realtimeOrder) {
-          setOrders((value) => upsertOrder(value, realtimeOrder));
-        }
-
-        if (activeStatus || appliedSearchTerm || appliedFilters || page !== 1) {
-          setActiveStatus('');
-          setAppliedSearchTerm('');
-          setSearchTerm('');
-          setAppliedFilters(null);
-          setPage(1);
-          return;
-        }
-      }
-
-      if (realtimeOrder) {
-        setOrders((value) => upsertOrder(value, realtimeOrder));
-      }
-      fetchOrders();
+    const handleOrderUpdate = () => {
+      if (!disposed) fetchOrders();
     };
 
-    connection.on('SellerOrderStatusChanged', handleOrderStatusChanged);
+    connection.on('ReceiveOrderNotification', handleOrderUpdate);
+    connection.on('OrderStatusUpdated', handleOrderUpdate);
 
-    const startConnection = async () => {
-      try {
-        await connection.start();
-        if (!disposed) {
-          await connection.invoke('JoinSellerOrderGroup', sellerId);
-        }
-      } catch (error) {
-        console.error('Failed to connect seller order hub:', error);
-      }
-    };
-
-    startConnection();
+    connection.start()
+      .then(() => {
+        if (!disposed) connection.invoke('JoinSellerOrders').catch(() => { });
+      })
+      .catch(() => { });
 
     return () => {
       disposed = true;
-      connection.off('SellerOrderStatusChanged', handleOrderStatusChanged);
-      if (connection.state === 'Connected') {
-        connection.invoke('LeaveSellerOrderGroup', sellerId).catch(() => { });
-      }
+      connection.off('ReceiveOrderNotification', handleOrderUpdate);
+      connection.off('OrderStatusUpdated', handleOrderUpdate);
       connection.stop().catch(() => { });
     };
-  }, [activeStatus, appliedFilters, appliedSearchTerm, fetchOrders, isSeller, page, sellerId, showToast]);
+  }, [authLoading, fetchOrders, isAdmin, isSeller, user]);
 
-  const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
-  const firstVisibleItem = orders.length ? (page - 1) * pageSize + 1 : 0;
-  const lastVisibleItem = orders.length ? firstVisibleItem + orders.length - 1 : 0;
-
-  const stats = useMemo(() => {
-    const awaiting = orders.filter((order) => order.status === 'AwaitingPayment' || order.status === 'Pending').length;
-    const confirmed = orders.filter((order) => order.status === 'Confirmed').length;
-    const shipping = orders.filter((order) => order.status === 'Shipping').length;
-
-    return [
-      { label: 'Total Orders', icon: 'shopping_cart', value: totalItems, note: 'All matched orders' },
-      { label: 'Need Confirm', icon: 'fact_check', value: awaiting, note: 'Waiting seller action', hot: true },
-      { label: 'Confirmed', icon: 'inventory', value: confirmed, note: 'Ready to ship' },
-      { label: 'Shipping', icon: 'local_shipping', value: shipping, note: 'In transit' },
-    ];
-  }, [orders, totalItems]);
+  const handleFilterChange = (field, value) => {
+    setFilterForm((current) => ({ ...current, [field]: value }));
+  };
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -223,93 +171,99 @@ export default function OrderManagement() {
     setPage(1);
   };
 
-  const handleFilterChange = (field, value) => {
-    setFilterForm((current) => ({ ...current, [field]: value }));
-  };
-
   const resetFilterFormSilently = () => {
-    if (!isDefaultFilterForm(filterForm)) {
-      skipNextFilterAutoApply.current = true;
-    }
-    setFilterForm(initialFilterForm);
+    skipNextFilterAutoApply.current = true;
+    setFilterForm({ sortBy: 'newest' });
   };
 
   const handleResetFilters = () => {
     resetFilterFormSilently();
     setAppliedFilters(null);
-    setAppliedSearchTerm('');
     setSearchTerm('');
+    setAppliedSearchTerm('');
     setActiveStatus('');
     setPage(1);
   };
 
-  const handleInlineStatusUpdate = async (order) => {
-    const action = getNextAction(order);
-    if (!action?.status || !sellerId) {
-      return;
-    }
+  const stats = useMemo(() => {
+    const pendingCount = orders.filter((o) => o.status === 'Pending').length;
+    const confirmedCount = orders.filter((o) => o.status === 'Confirmed').length;
+    const shippingCount = orders.filter((o) => o.status === 'Shipping').length;
+    const totalRevenue = orders
+      .filter((o) => o.status === 'Completed' || o.status === 'Delivered')
+      .reduce((sum, o) => sum + Number(o.finalAmount || 0), 0);
 
+    return [
+      {
+        icon: 'hourglass_top',
+        label: isVi ? 'Chờ Xử Lý' : 'Pending',
+        value: pendingCount,
+        note: isVi ? 'Cần xác nhận ngay' : 'Requires seller confirmation',
+        hot: pendingCount > 0,
+      },
+      {
+        icon: 'package_2',
+        label: isVi ? 'Chờ Giao Hang' : 'To Ship',
+        value: confirmedCount,
+        note: isVi ? 'Đang chuẩn bị gói hàng' : 'Ready for shipping provider',
+        hot: confirmedCount > 0,
+      },
+      {
+        icon: 'local_shipping',
+        label: isVi ? 'Đang Giao' : 'In Transit',
+        value: shippingCount,
+        note: isVi ? 'Đang vận chuyển' : 'Currently with courier',
+      },
+      {
+        icon: 'payments',
+        label: isVi ? 'Doanh Thu Đơn' : 'Settled Revenue',
+        value: formatVnd(totalRevenue),
+        note: isVi ? 'Đơn hàng đã giao / hoàn thành' : 'Delivered and completed orders',
+      },
+    ];
+  }, [orders, isVi]);
+
+  const handleUpdateStatus = async (order, targetStatus) => {
     try {
       setUpdatingOrderId(order.orderId);
-      const updated = await orderService.updateStatus(
-        order.orderId,
-        buildStatusPayload(order, action.status),
-        { sellerId }
-      );
-
-      const updatedOrder = { ...order, ...(updated || {}), status: updated?.status || action.status };
-      setOrders((current) => current.map((item) => (
-        item.orderId === order.orderId ? { ...item, ...updatedOrder } : item
-      )));
-      showToast(`Order status updated to ${getStatusLabel(updatedOrder.status)}.`, 'success');
-      fetchOrders();
+      await orderService.updateSellerOrderStatus(order.orderId, { status: targetStatus });
+      showToast(isVi ? `Đã cập nhật trạng thái đơn hàng sang ${statusMeta[targetStatus]?.label || targetStatus}.` : `Order status updated to ${statusMeta[targetStatus]?.label || targetStatus}.`, 'success');
+      await fetchOrders();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to update order status.', 'error');
+      showToast(error?.response?.data || (isVi ? 'Không thể cập nhật trạng thái đơn hàng.' : 'Failed to update order status.'), 'error');
     } finally {
       setUpdatingOrderId(null);
     }
   };
 
-  const handleApproveReturn = async (orderId) => {
-    if (!sellerId) return;
-
-    try {
-      setUpdatingOrderId(orderId);
-      await orderService.approveReturn(orderId, sellerId);
-      showToast('Return approved successfully.', 'success');
-      fetchOrders();
-    } catch (error) {
-      showToast(error?.response?.data || 'Failed to approve return.', 'error');
-    } finally {
-      setUpdatingOrderId(null);
+  const getNextAction = (order) => {
+    if (order.status === 'Pending') {
+      return { label: isVi ? 'Xác Nhận' : 'Confirm', status: 'Confirmed', tone: 'primary' };
     }
-  };
-
-  const handleRejectReturn = async (orderId) => {
-    if (!sellerId) return;
-
-    try {
-      setUpdatingOrderId(orderId);
-      await orderService.rejectReturn(orderId, sellerId);
-      showToast('Return rejected successfully.', 'success');
-      fetchOrders();
-    } catch (error) {
-      showToast(error?.response?.data || 'Failed to reject return.', 'error');
-    } finally {
-      setUpdatingOrderId(null);
+    if (order.status === 'Confirmed') {
+      return { label: isVi ? 'Giao Hàng' : 'Ship', status: 'Shipping', tone: 'info' };
     }
+    return null;
   };
 
   const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
+
   const submitBuyerReport = async (payload) => {
     if (!reportTarget?.orderId) return;
-    try { setReportSubmitting(true); await reportService.reportBuyer(reportTarget.orderId, payload); showToast('Report submitted successfully.', 'success'); setReportTarget(null); }
-    catch (error) { showToast(error?.response?.data || 'Failed to submit report.', 'error'); }
-    finally { setReportSubmitting(false); }
+    try {
+      setReportSubmitting(true);
+      await reportService.reportBuyer(reportTarget.orderId, payload);
+      showToast(isVi ? 'Gửi báo cáo người mua thành công.' : 'Report submitted successfully.', 'success');
+      setReportTarget(null);
+    } catch (error) {
+      showToast(error?.response?.data || (isVi ? 'Không thể gửi báo cáo.' : 'Failed to submit report.'), 'error');
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   if (authLoading) {
-    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading orders...</p></div>;
+    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>{isVi ? 'Đang tải đơn hàng...' : 'Loading orders...'}</p></div>;
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -319,9 +273,9 @@ export default function OrderManagement() {
     <div className="om-page animate-fade-in">
       <header className="om-header">
         <div className="om-header-copy">
-          <span className="om-eyebrow">Seller Orders</span>
-          <h1>Order Management</h1>
-          <p>Review buyer orders, confirm processing, and keep fulfillment status current.</p>
+          <span className="om-eyebrow">{isVi ? 'Quản Lý Đơn Hàng' : 'Seller Orders'}</span>
+          <h1>{isVi ? 'Danh Sách Đơn Hàng' : 'Order Management'}</h1>
+          <p>{isVi ? 'Kiểm tra đơn hàng của người mua, xác nhận xử lý và đóng gói giao hàng.' : 'Review buyer orders, confirm processing, and keep fulfillment status current.'}</p>
         </div>
       </header>
 
@@ -345,11 +299,11 @@ export default function OrderManagement() {
             <input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search orders, products, buyers..."
+              placeholder={isVi ? 'Tìm kiếm đơn hàng, sản phẩm, người mua...' : 'Search orders, products, buyers...'}
             />
           </form>
           <label className="om-sort-control">
-            <span>Sort</span>
+            <span>{isVi ? 'Sắp xếp' : 'Sort'}</span>
             <select value={filterForm.sortBy} onChange={(event) => handleFilterChange('sortBy', event.target.value)}>
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -361,8 +315,8 @@ export default function OrderManagement() {
             className="om-reset-button"
             disabled={!hasActiveControls}
             onClick={handleResetFilters}
-            aria-label="Reset filters"
-            title="Reset filters"
+            aria-label={isVi ? 'Đặt lại bộ lọc' : 'Reset filters'}
+            title={isVi ? 'Đặt lại bộ lọc' : 'Reset filters'}
           >
             <span className="material-symbols-outlined">restart_alt</span>
           </button>
@@ -391,22 +345,22 @@ export default function OrderManagement() {
           <table className="om-table">
             <thead>
               <tr>
-                <th>STT</th>
-                <th>Customer</th>
-                <th>Product Details</th>
-                <th>Total Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{isVi ? 'STT' : 'STT'}</th>
+                <th>{isVi ? 'Khách Hàng' : 'Customer'}</th>
+                <th>{isVi ? 'Chi Tiết Sản Phẩm' : 'Product Details'}</th>
+                <th>{isVi ? 'Tổng Tiền' : 'Total Amount'}</th>
+                <th>{isVi ? 'Trạng Thái' : 'Status'}</th>
+                <th>{isVi ? 'Thao Tác' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6"><div className="om-empty">Loading orders...</div></td>
+                  <td colSpan="6"><div className="om-empty">{isVi ? 'Đang tải đơn hàng...' : 'Loading orders...'}</div></td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan="6"><div className="om-empty">No seller orders found.</div></td>
+                  <td colSpan="6"><div className="om-empty">{isVi ? 'Không tìm thấy đơn hàng nào.' : 'No seller orders found.'}</div></td>
                 </tr>
               ) : (
                 orders.map((order, index) => {
@@ -421,17 +375,17 @@ export default function OrderManagement() {
                         <strong>{orderNumber}</strong>
                       </td>
                       <td>
-                        <strong>{order.buyerName || 'Unknown Buyer'}</strong>
+                        <strong>{order.buyerName || (isVi ? 'Khách hàng' : 'Unknown Buyer')}</strong>
                       </td>
                       <td>
                         <div className="om-product">
                           <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
                           <div>
-                            <strong>{order.productName || 'Untitled product'}</strong>
-                              <span>Qty {order.quantity || 0}</span>
-                              {order.returnReason ? (
-                                <div className="om-return-reason">Return reason: {order.returnReason}</div>
-                              ) : null}
+                            <strong>{order.productName || (isVi ? 'Sản phẩm chưa đặt tên' : 'Untitled product')}</strong>
+                            <span>{isVi ? 'Số lượng' : 'Qty'} {order.quantity || 0}</span>
+                            {order.returnReason ? (
+                              <div className="om-return-reason">{isVi ? 'Lý do trả hàng:' : 'Return reason:'} {order.returnReason}</div>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -446,40 +400,34 @@ export default function OrderManagement() {
                             className="om-detail-btn"
                             onClick={() => openDetail(order.orderId)}
                           >
-                            Details
+                            {isVi ? 'Chi Tiết' : 'Details'}
                           </button>
-                          {order.status === 'ReturnRequested' ? (
-                            <>
-                              <button
-                                type="button"
-                                className="om-primary-action primary"
-                                disabled={isUpdating}
-                                onClick={() => handleApproveReturn(order.orderId)}
-                              >
-                                {isUpdating === order.orderId ? 'Processing...' : 'Approve Return'}
-                              </button>
-                              <button
-                                type="button"
-                                className="om-primary-action danger"
-                                disabled={isUpdating}
-                                onClick={() => handleRejectReturn(order.orderId)}
-                              >
-                                {isUpdating === order.orderId ? 'Processing...' : 'Reject Return'}
-                              </button>
-                            </>
-                          ) : action ? (
+                          {action ? (
                             <button
                               type="button"
-                              className={`om-primary-action ${action.tone || 'primary'}`}
+                              className={`om-action-btn ${action.tone}`}
                               disabled={isUpdating}
-                              onClick={() => handleInlineStatusUpdate(order)}
+                              onClick={() => handleUpdateStatus(order, action.status)}
                             >
-                              {isUpdating ? 'Updating...' : action.label}
+                              {isUpdating ? <span className="btn-spinner sm"></span> : action.label}
                             </button>
-                          ) : (
-                            <span className="om-action-spacer" aria-hidden="true" />
-                          )}
-                          {order.status === 'Completed' && <button type="button" className="om-detail-btn" disabled={isUpdating} onClick={() => setReportTarget(order)}>Report Buyer</button>}
+                          ) : null}
+                          {order.status === 'ReturnRequested' ? (
+                            <button
+                              type="button"
+                              className="om-action-btn primary"
+                              onClick={() => openDetail(order.orderId)}
+                            >
+                              {isVi ? 'Xem Yêu Cầu Trả Hàng' : 'Review Return Request'}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="om-report-btn"
+                            onClick={() => setReportTarget(order)}
+                          >
+                            {isVi ? 'Báo Cáo' : 'Report'}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -490,140 +438,50 @@ export default function OrderManagement() {
           </table>
         </div>
 
-        <footer className="om-footer">
-          <span>Showing {firstVisibleItem}-{lastVisibleItem} of {totalItems} orders</span>
-          <nav className="om-pagination" aria-label="Order list pagination">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} aria-label="Previous page">
-              <span className="material-symbols-outlined">chevron_left</span>
+        {totalPages > 1 && (
+          <div className="om-pagination">
+            <button
+              type="button"
+              disabled={page === 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              {isVi ? 'Trước' : 'Previous'}
             </button>
-            {paginationItems.map((item, index) => (
-              item === 'ellipsis' ? (
-                <span key={`${item}-${index}`} className="om-pagination-ellipsis">...</span>
-              ) : (
-                <button
-                  key={item}
-                  type="button"
-                  className={page === item ? 'active' : ''}
-                  onClick={() => setPage(item)}
-                  aria-current={page === item ? 'page' : undefined}
-                >
-                  {item}
-                </button>
-              )
-            ))}
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} aria-label="Next page">
-              <span className="material-symbols-outlined">chevron_right</span>
+            <span>
+              {isVi ? 'Trang' : 'Page'} {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            >
+              {isVi ? 'Sau' : 'Next'}
             </button>
-          </nav>
-        </footer>
+          </div>
+        )}
       </section>
-      <ReportModal isOpen={Boolean(reportTarget)} title="Report Buyer" targetLabel={`Report the buyer for order #${reportTarget?.orderCode || reportTarget?.orderId || ''}.`} submitting={reportSubmitting} onClose={() => !reportSubmitting && setReportTarget(null)} onSubmit={submitBuyerReport} />
+
+      {reportTarget ? (
+        <ReportModal
+          isOpen={Boolean(reportTarget)}
+          onClose={() => setReportTarget(null)}
+          onSubmit={submitBuyerReport}
+          targetName={reportTarget.buyerName || (isVi ? 'Người mua' : 'Buyer')}
+          targetType="User"
+          reportType="Buyer"
+          submitting={reportSubmitting}
+        />
+      ) : null}
     </div>
   );
-}
-
-function normalizeFilterForm(form) {
-  const nextFilters = {
-    sortBy: form.sortBy,
-  };
-
-  const hasFilters = nextFilters.sortBy !== initialFilterForm.sortBy;
-
-  return hasFilters ? nextFilters : null;
-}
-
-function isDefaultFilterForm(form) {
-  return form.sortBy === initialFilterForm.sortBy;
 }
 
 function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
-function buildStatusPayload(order, status) {
+function normalizeFilterForm(form) {
   return {
-    status,
-    trackingCode: order.trackingCode || null,
-    shippingProvider: status === 'Shipping' ? SHIPPING_PROVIDER : order.shippingProvider || null,
-    expectedDeliveryTime: status === 'Shipping'
-      ? new Date(Date.now() + defaultShippingDelayMs).toISOString()
-      : null,
+    sortBy: form.sortBy || 'newest',
   };
-}
-
-function getStatusLabel(status) {
-  return statusMeta[status]?.label || status || 'Unknown';
-}
-
-function getNextAction(order) {
-  if (order?.status === 'AwaitingPayment') {
-    return isAwaitingPaymentExpired(order)
-      ? { label: 'Cancel', status: 'Cancelled', tone: 'danger' }
-      : null;
-  }
-
-  return nextActionByStatus[order?.status] || null;
-}
-
-function isAwaitingPaymentExpired(order) {
-  if (!order?.createdAt) return false;
-  const createdAt = new Date(order.createdAt);
-  if (Number.isNaN(createdAt.getTime())) return false;
-  return Date.now() - createdAt.getTime() >= awaitingPaymentCancelDelayMs;
-}
-
-function toRealtimeOrder(payload) {
-  if (!payload) return null;
-
-  const orderId = payload.orderId || payload.OrderId;
-  if (!orderId) return null;
-
-  return {
-    orderId,
-    orderCode: payload.orderCode || payload.OrderCode,
-    productId: payload.productId || payload.ProductId,
-    productName: payload.productName || payload.ProductName,
-    productImageUrl: payload.productImageUrl || payload.ProductImageUrl,
-    buyerId: payload.buyerId || payload.BuyerId,
-    buyerName: payload.buyerName || payload.BuyerName,
-    buyerEmail: payload.buyerEmail || payload.BuyerEmail,
-    sellerId: payload.sellerId || payload.SellerId,
-    quantity: payload.quantity ?? payload.Quantity,
-    unitPrice: payload.unitPrice ?? payload.UnitPrice,
-    totalAmount: payload.totalAmount ?? payload.TotalAmount,
-    shippingFee: payload.shippingFee ?? payload.ShippingFee,
-    discountAmount: payload.discountAmount ?? payload.DiscountAmount,
-    finalAmount: payload.finalAmount ?? payload.FinalAmount,
-    status: payload.status || payload.Status,
-    trackingCode: payload.trackingCode || payload.TrackingCode,
-    shippingProvider: payload.shippingProvider || payload.ShippingProvider,
-    expectedDeliveryTime: payload.expectedDeliveryTime || payload.ExpectedDeliveryTime,
-    createdAt: payload.createdAt || payload.CreatedAt,
-    updatedAt: payload.updatedAt || payload.UpdatedAt,
-  };
-}
-
-function upsertOrder(orders, nextOrder) {
-  const exists = orders.some((order) => order.orderId === nextOrder.orderId);
-  if (!exists) return [nextOrder, ...orders].slice(0, pageSize);
-
-  return orders.map((order) => (
-    order.orderId === nextOrder.orderId ? { ...order, ...nextOrder } : order
-  ));
-}
-
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 4) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  if (currentPage <= 2) {
-    return [1, 2, 3, 'ellipsis'];
-  }
-
-  if (currentPage >= totalPages - 1) {
-    return ['ellipsis', totalPages - 2, totalPages - 1, totalPages];
-  }
-
-  return ['ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis'];
 }

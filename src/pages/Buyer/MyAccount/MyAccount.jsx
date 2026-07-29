@@ -5,7 +5,9 @@ import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import '../../../styles/MyAccount.css';
 import accountService from '../../../services/accountService';
 import profileService from '../../../services/profileService';
+import vietnamAddressService from '../../../services/vietnamAddressService';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import { forceLogout } from '../../../utils/authUtils';
 
 export default function MyAccount() {
@@ -13,7 +15,8 @@ export default function MyAccount() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
-  const fileInputRef = React.useRef();
+  const { t, language } = useLanguage();
+  const fileInputRef = useRef();
 
   const [username, setUsername] = useState(user?.username || '');
   const [firstName, setFirstName] = useState(user?.firstName || '');
@@ -32,9 +35,56 @@ export default function MyAccount() {
   const [deactivateLoading, setDeactivateLoading] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
 
+  const [fullAddressNames, setFullAddressNames] = useState({
+    province: '',
+    district: '',
+    ward: '',
+  });
+
   useEffect(() => {
     setAvatarError(false);
   }, [user?.avatarUrl]);
+
+  // Convert IDs into Human-readable Province, District, Ward names
+  useEffect(() => {
+    const fetchAddressNames = async () => {
+      if (!provinceId && !districtId && !wardCode) {
+        setFullAddressNames({ province: '', district: '', ward: '' });
+        return;
+      }
+      try {
+        let pName = '';
+        let dName = '';
+        let wName = '';
+
+        const provinces = await vietnamAddressService.getProvinces();
+        const p = provinces.find((x) => String(x.code) === String(provinceId));
+        if (p) pName = p.name;
+
+        if (provinceId) {
+          const districts = await vietnamAddressService.getDistricts(provinceId);
+          const d = districts.find((x) => String(x.code) === String(districtId));
+          if (d) dName = d.name;
+        }
+
+        if (districtId) {
+          const wards = await vietnamAddressService.getWards(districtId);
+          const w = wards.find((x) => String(x.code) === String(wardCode));
+          if (w) wName = w.name;
+        }
+
+        setFullAddressNames({
+          province: pName,
+          district: dName,
+          ward: wName,
+        });
+      } catch (err) {
+        console.error('Failed to fetch address names', err);
+      }
+    };
+
+    fetchAddressNames();
+  }, [provinceId, districtId, wardCode]);
 
   const isValidAvatarUrl = (url) => {
     if (!url || typeof url !== 'string') return false;
@@ -90,20 +140,20 @@ export default function MyAccount() {
         setReceiverName(address?.receiverName || `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim());
         setReceiverPhone(address?.receiverPhone || profile?.phone || '');
       } catch (err) {
-        showToast(err?.response?.data || 'Failed to load profile details.', 'error');
+        showToast(err?.response?.data || (language === 'vi' ? 'Không thể tải chi tiết hồ sơ.' : 'Failed to load profile details.'), 'error');
       } finally {
         setProfileLoading(false);
       }
     };
 
     loadProfileDetail();
-  }, [user, showToast]);
+  }, [user, showToast, language]);
 
   if (loading) {
     return (
       <div className="profile-loading-wrapper">
         <span className="btn-spinner"></span>
-        <p>Loading account details...</p>
+        <p>{language === 'vi' ? 'Đang tải thông tin tài khoản...' : 'Loading account details...'}</p>
       </div>
     );
   }
@@ -112,11 +162,11 @@ export default function MyAccount() {
       <div className="profile-unauth-page animate-fade-in">
         <div className="unauth-card glass-panel text-center">
           <span className="unauth-icon">🔒</span>
-          <h2>Access Denied</h2>
-          <p>Please log in to view and manage your account details.</p>
+          <h2>{language === 'vi' ? 'Truy cập bị từ chối' : 'Access Denied'}</h2>
+          <p>{language === 'vi' ? 'Vui lòng đăng nhập để xem và quản lý tài khoản của bạn.' : 'Please log in to view and manage your account details.'}</p>
           <div className="unauth-actions">
-            <Link to="/login" className="btn btn-primary">Sign In</Link>
-            <Link to="/" className="btn btn-secondary">Go to Home</Link>
+            <Link to="/login" className="btn btn-primary">{language === 'vi' ? 'Đăng Nhập' : 'Sign In'}</Link>
+            <Link to="/" className="btn btn-secondary">{language === 'vi' ? 'Trang Chủ' : 'Go to Home'}</Link>
           </div>
         </div>
       </div>
@@ -127,83 +177,55 @@ export default function MyAccount() {
     if (user.firstName && user.lastName) {
       return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
     }
-    return user.username.slice(0, 2).toUpperCase();
+    return user.username ? user.username.slice(0, 2).toUpperCase() : 'U';
   };
 
+  const handleChooseImage = () => {
+    fileInputRef.current?.click();
+  };
 
-
-
-    const handleChooseImage = () => {
-      fileInputRef.current?.click();
-    };
-
-    const handleFileChange = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        showToast('Uploading image...', 'info');
-        const res = await accountService.uploadAvatar(file);
-        if (res?.avatarUrl) {
-          setUser((u) => {
-            const updated = { ...u, avatarUrl: res.avatarUrl };
-            localStorage.setItem('user', JSON.stringify(updated));
-            return updated;
-          });
-          showToast('Profile image updated.', 'success');
-        } else {
-          showToast('Upload succeeded but no url returned.', 'warning');
-        }
-      } catch (err) {
-        showToast(err?.response?.data || 'Failed to upload image.', 'error');
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      showToast(language === 'vi' ? 'Đang tải ảnh lên...' : 'Uploading image...', 'info');
+      const res = await accountService.uploadAvatar(file);
+      if (res?.avatarUrl) {
+        setUser((u) => {
+          const updated = { ...u, avatarUrl: res.avatarUrl };
+          localStorage.setItem('user', JSON.stringify(updated));
+          return updated;
+        });
+        showToast(language === 'vi' ? 'Đã cập nhật ảnh đại diện.' : 'Profile image updated.', 'success');
+      } else {
+        showToast(language === 'vi' ? 'Tải ảnh thành công nhưng không nhận được link.' : 'Upload succeeded but no url returned.', 'warning');
       }
-    };
-
-  const getDisplayName = () => {
-    if (user.firstName || user.lastName) {
-      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    } catch (err) {
+      showToast(err?.response?.data || (language === 'vi' ? 'Không thể tải ảnh lên.' : 'Failed to upload image.'), 'error');
     }
-    return user.username;
   };
-
-
 
   const handleSaveChanges = async (e) => {
     e.preventDefault();
     try {
-      showToast('Saving changes...', 'info');
-      const addressPayload = street || receiverName || receiverPhone || provinceId || districtId || wardCode
-        ? {
-            addressId: defaultAddress?.addressId,
-            receiverName: receiverName || `${firstName} ${lastName}`.trim(),
-            receiverPhone: receiverPhone || phone,
-            street,
-            provinceId: provinceId === '' ? null : Number(provinceId),
-            districtId: districtId === '' ? null : Number(districtId),
-            wardCode,
-            isDefault: true,
-            status: defaultAddress?.status || 'Active',
-          }
-        : null;
-
+      showToast(language === 'vi' ? 'Đang lưu thay đổi...' : 'Saving changes...', 'info');
       const updatedProfile = await profileService.updateMyProfile({
         username,
         firstName,
         lastName,
         email,
         phone,
-        address: addressPayload,
       });
       if (updatedProfile) {
-        setDefaultAddress(updatedProfile.defaultAddress || null);
         setUser((u) => {
           const updated = { ...u, ...updatedProfile };
           localStorage.setItem('user', JSON.stringify(updated));
           return updated;
         });
-        showToast('Profile updated successfully.', 'success');
+        showToast(language === 'vi' ? 'Đã cập nhật thông tin cá nhân thành công!' : 'Profile updated successfully.', 'success');
       }
     } catch (err) {
-      showToast(err?.response?.data || 'Failed to update profile.', 'error');
+      showToast(err?.response?.data || (language === 'vi' ? 'Không thể cập nhật hồ sơ.' : 'Failed to update profile.'), 'error');
     }
   };
 
@@ -214,30 +236,24 @@ export default function MyAccount() {
       setLastName(user.lastName || '');
       setEmail(user.email || '');
       setPhone(user.phone || '');
-      setStreet(defaultAddress?.street || '');
-      setProvinceId(defaultAddress?.provinceId ?? '');
-      setDistrictId(defaultAddress?.districtId ?? '');
-      setWardCode(defaultAddress?.wardCode || '');
-      setReceiverName(defaultAddress?.receiverName || '');
-      setReceiverPhone(defaultAddress?.receiverPhone || '');
     }
   };
 
   const handleDeactivateAccount = async () => {
     const isAdmin = user?.roles?.some((r) => String(r).toLowerCase() === 'admin') || user?.primaryRole?.toLowerCase() === 'admin';
     if (isAdmin) {
-      showToast('Administrators cannot deactivate their own accounts.', 'error');
+      showToast(language === 'vi' ? 'Quản trị viên không thể tự vô hiệu hóa tài khoản.' : 'Administrators cannot deactivate their own accounts.', 'error');
       setShowDeactivateModal(false);
       return;
     }
     try {
       setDeactivateLoading(true);
       await accountService.deactivateMe();
-      showToast('Your account has been deactivated.', 'success');
+      showToast(language === 'vi' ? 'Tài khoản của bạn đã bị vô hiệu hóa.' : 'Your account has been deactivated.', 'success');
       setShowDeactivateModal(false);
       forceLogout();
     } catch (err) {
-      showToast(err?.response?.data || 'Failed to deactivate account.', 'error');
+      showToast(err?.response?.data || (language === 'vi' ? 'Không thể vô hiệu hóa tài khoản.' : 'Failed to deactivate account.'), 'error');
     } finally {
       setDeactivateLoading(false);
     }
@@ -261,76 +277,96 @@ export default function MyAccount() {
                     <span className="material-symbols-outlined">person_search</span>
                   </div>
                   <div>
-                    <h1 className="ma-headline">Personal Information</h1>
-                    <p className="ma-subtitle">Manage your account details and profile settings</p>
+                    <h1 className="ma-headline">{language === 'vi' ? 'Thông Tin Cá Nhân' : 'Personal Information'}</h1>
+                    <p className="ma-subtitle">{language === 'vi' ? 'Xem thông tin tài khoản và địa chỉ mặc định của bạn' : 'Manage your account details and profile settings'}</p>
                   </div>
                 </div>
               </div>
 
               {/* Personal Information Form Card */}
               <div className="ma-card ma-info-card">
-                <h4 className="ma-card-title">Basic Details</h4>
-                {profileLoading && <p className="ma-inline-note">Loading latest profile data...</p>}
+                <h4 className="ma-card-title">{language === 'vi' ? 'Thông Tin Cơ Bản' : 'Basic Details'}</h4>
+                {profileLoading && <p className="ma-inline-note">{language === 'vi' ? 'Đang tải dữ liệu hồ sơ...' : 'Loading latest profile data...'}</p>}
                 <form className="ma-form" onSubmit={handleSaveChanges}>
                   <div className="ma-form-grid">
                     <div className="ma-form-group">
-                      <label className="ma-label">Username</label>
+                      <label className="ma-label">{language === 'vi' ? 'Tên đăng nhập' : 'Username'}</label>
                       <input type="text" className="ma-input" value={username} onChange={(e) => setUsername(e.target.value)} required />
                     </div>
                     <div className="ma-form-group">
-                      <label className="ma-label">Email Address</label>
+                      <label className="ma-label">{language === 'vi' ? 'Địa chỉ Email' : 'Email Address'}</label>
                       <input type="email" className="ma-input" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     </div>
                     <div className="ma-form-group">
-                      <label className="ma-label">First Name</label>
+                      <label className="ma-label">{language === 'vi' ? 'Họ' : 'First Name'}</label>
                       <input type="text" className="ma-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
                     </div>
                     <div className="ma-form-group">
-                      <label className="ma-label">Last Name</label>
+                      <label className="ma-label">{language === 'vi' ? 'Tên' : 'Last Name'}</label>
                       <input type="text" className="ma-input" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
                     </div>
                     <div className="ma-form-group">
-                      <label className="ma-label">Phone Number</label>
+                      <label className="ma-label">{language === 'vi' ? 'Số điện thoại' : 'Phone Number'}</label>
                       <input type="tel" className="ma-input" value={phone} onChange={(e) => setPhone(e.target.value)} />
                     </div>
                   </div>
 
-                  <div className="ma-section-divider">
-                    <h4 className="ma-card-title">Default Address</h4>
-                    <p className="ma-subtitle-small">This address is created when missing and updated when already available.</p>
+                  <div className="ma-form-actions" style={{ marginTop: '20px', marginBottom: '28px' }}>
+                    <button type="submit" className="ma-btn-primary">{language === 'vi' ? 'Lưu Thay Đổi' : 'Save Changes'}</button>
+                    <button type="button" className="ma-btn-secondary" onClick={handleCancel}>{language === 'vi' ? 'Hủy' : 'Cancel'}</button>
                   </div>
 
-                  <div className="ma-form-grid">
-                    <div className="ma-form-group">
-                      <label className="ma-label">Receiver Name</label>
-                      <input type="text" className="ma-input" value={receiverName} onChange={(e) => setReceiverName(e.target.value)} />
+                  {/* Read-only Default Address Card */}
+                  <div className="ma-section-divider" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', marginBottom: '16px' }}>
+                    <div>
+                      <h4 className="ma-card-title" style={{ margin: 0 }}>{language === 'vi' ? 'Địa Chỉ Mặc Định' : 'Default Address'}</h4>
+                      <p className="ma-subtitle-small" style={{ margin: '4px 0 0' }}>{language === 'vi' ? 'Địa chỉ này dùng làm địa chỉ mặc định cho các đơn hàng của bạn.' : 'This address is used as default delivery location for your orders.'}</p>
                     </div>
-                    <div className="ma-form-group">
-                      <label className="ma-label">Receiver Phone</label>
-                      <input type="tel" className="ma-input" value={receiverPhone} onChange={(e) => setReceiverPhone(e.target.value)} />
-                    </div>
-                    <div className="ma-form-group ma-form-group-wide">
-                      <label className="ma-label">Street Address</label>
-                      <input type="text" className="ma-input" value={street} onChange={(e) => setStreet(e.target.value)} placeholder="House number, street, building" />
-                    </div>
-                    <div className="ma-form-group">
-                      <label className="ma-label">Province ID</label>
-                      <input type="number" className="ma-input" value={provinceId} onChange={(e) => setProvinceId(e.target.value)} />
-                    </div>
-                    <div className="ma-form-group">
-                      <label className="ma-label">District ID</label>
-                      <input type="number" className="ma-input" value={districtId} onChange={(e) => setDistrictId(e.target.value)} />
-                    </div>
-                    <div className="ma-form-group">
-                      <label className="ma-label">Ward Code</label>
-                      <input type="text" className="ma-input" value={wardCode} onChange={(e) => setWardCode(e.target.value)} />
-                    </div>
+                    <Link
+                      to="/address-book"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        color: 'var(--color-secondary, #006a4e)',
+                        textDecoration: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        background: 'rgba(0, 106, 78, 0.08)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>menu_book</span>
+                      {language === 'vi' ? 'Sổ địa chỉ ➔' : 'Address Book ➔'}
+                    </Link>
                   </div>
 
-                  <div className="ma-form-actions">
-                    <button type="submit" className="ma-btn-primary">Save Changes</button>
-                    <button type="button" className="ma-btn-secondary" onClick={handleCancel}>Cancel</button>
-                  </div>
+                  {defaultAddress ? (
+                    <div style={{ background: '#f8faf9', padding: '16px 20px', borderRadius: '12px', border: '1px solid rgba(2, 36, 27, 0.08)', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', fontWeight: '700', color: '#02241b', flexWrap: 'wrap' }}>
+                        <span className="material-symbols-outlined" style={{ color: '#006a4e' }}>person</span>
+                        <span>{receiverName || `${firstName} ${lastName}`.trim() || user.username}</span>
+                        <span className="material-symbols-outlined" style={{ color: '#006a4e', marginLeft: '12px' }}>call</span>
+                        <span style={{ fontWeight: 600, color: '#2d3748' }}>{receiverPhone || phone || 'N/A'}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '14px', color: '#4a5568', lineHeight: 1.5 }}>
+                        <span className="material-symbols-outlined" style={{ color: '#006a4e', marginTop: '2px', flexShrink: 0 }}>home_pin</span>
+                        <span style={{ fontWeight: 500 }}>
+                          {street || ''}{street ? ', ' : ''}
+                          {fullAddressNames.ward ? `${fullAddressNames.ward}, ` : (wardCode ? `Ward ${wardCode}, ` : '')}
+                          {fullAddressNames.district ? `${fullAddressNames.district}, ` : (districtId ? `District ${districtId}, ` : '')}
+                          {fullAddressNames.province ? fullAddressNames.province : (provinceId ? `Province ${provinceId}` : '')}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ background: '#f8faf9', padding: '16px 20px', borderRadius: '12px', border: '1px dashed rgba(2, 36, 27, 0.15)', textAlign: 'center', color: '#718096', marginBottom: '20px' }}>
+                      <p>{language === 'vi' ? 'Chưa thiết lập địa chỉ mặc định. Bạn có thể thêm trong Sổ địa chỉ.' : 'No default address set. You can add one in your Address Book.'}</p>
+                    </div>
+                  )}
                 </form>
               </div>
 
@@ -341,7 +377,7 @@ export default function MyAccount() {
               
               {/* Profile Photo Card */}
               <div className="ma-card">
-                <h4 className="ma-card-title" style={{ marginBottom: '24px' }}>Profile Photo</h4>
+                <h4 className="ma-card-title" style={{ marginBottom: '24px' }}>{language === 'vi' ? 'Ảnh Đại Diện' : 'Profile Photo'}</h4>
                 <div className="ma-profile-photo-section" style={{ flexDirection: 'column', gap: '24px', alignItems: 'flex-start', marginBottom: 0 }}>
                   <div className="ma-photo-wrapper">
                     {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
@@ -356,8 +392,8 @@ export default function MyAccount() {
                     )}
                   </div>
                     <div className="ma-photo-text">
-                    <p className="ma-subtitle-small">Accepted formats: JPG, PNG (Max 5MB)</p>
-                    <button type="button" className="ma-link-btn" onClick={handleChooseImage}>Update Image</button>
+                    <p className="ma-subtitle-small">{language === 'vi' ? 'Định dạng hỗ trợ: JPG, PNG (Tối đa 5MB)' : 'Accepted formats: JPG, PNG (Max 5MB)'}</p>
+                    <button type="button" className="ma-link-btn" onClick={handleChooseImage}>{language === 'vi' ? 'Cập Nhật Ảnh' : 'Update Image'}</button>
                     <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
                   </div>
                 </div>
@@ -367,10 +403,10 @@ export default function MyAccount() {
               <div className="ma-privacy-card" style={{ flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span className="material-symbols-outlined ma-privacy-icon fill-1">verified_user</span>
-                  <h4 className="ma-privacy-title" style={{ margin: 0 }}>Privacy & Security</h4>
+                  <h4 className="ma-privacy-title" style={{ margin: 0 }}>{language === 'vi' ? 'Bảo Mật & Riêng Tư' : 'Privacy & Security'}</h4>
                 </div>
                 <p className="ma-privacy-text" style={{ fontSize: '14px' }}>
-                  RETRADE uses end-to-end encryption to protect your personal information. We never share your sensitive data with third parties without your explicit consent.
+                  {language === 'vi' ? 'RETRADE sử dụng mã hóa bảo vệ thông tin cá nhân của bạn. Chúng tôi không bao giờ chia sẻ dữ liệu nhạy cảm cho bên thứ ba khi chưa có sự đồng ý của bạn.' : 'RETRADE uses end-to-end encryption to protect your personal information. We never share your sensitive data with third parties without your explicit consent.'}
                 </p>
               </div>
 
@@ -378,13 +414,13 @@ export default function MyAccount() {
                 <div className="ma-danger-card" style={{ flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span className="material-symbols-outlined ma-danger-icon">cancel</span>
-                    <h4 className="ma-danger-title" style={{ margin: 0 }}>Deactivate Account</h4>
+                    <h4 className="ma-danger-title" style={{ margin: 0 }}>{language === 'vi' ? 'Vô Hiệu Hóa Tài Khoản' : 'Deactivate Account'}</h4>
                   </div>
                   <p className="ma-danger-text" style={{ fontSize: '14px' }}>
-                    If you no longer want to use ReTrade, you can deactivate your account. You will be logged out immediately and receive a confirmation email.
+                    {language === 'vi' ? 'Nếu không còn nhu cầu sử dụng ReTrade, bạn có thể vô hiệu hóa tài khoản. Bạn sẽ bị đăng xuất ngay lập tức.' : 'If you no longer want to use ReTrade, you can deactivate your account. You will be logged out immediately and receive a confirmation email.'}
                   </p>
                   <button type="button" className="ma-danger-btn" onClick={() => setShowDeactivateModal(true)}>
-                    Deactivate Account
+                    {language === 'vi' ? 'Vô Hiệu Hóa Tài Khoản' : 'Deactivate Account'}
                   </button>
                 </div>
               )}
@@ -399,8 +435,8 @@ export default function MyAccount() {
           <div className="ma-deactivate-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ma-deactivate-header">
               <div>
-                <p className="ma-deactivate-kicker">Inactive User</p>
-                <h3>Deactivate your account?</h3>
+                <p className="ma-deactivate-kicker">{language === 'vi' ? 'Tài Khoản Không Hoạt Động' : 'Inactive User'}</p>
+                <h3>{language === 'vi' ? 'Vô hiệu hóa tài khoản của bạn?' : 'Deactivate your account?'}</h3>
               </div>
               <button type="button" className="ma-deactivate-close" onClick={() => setShowDeactivateModal(false)} disabled={deactivateLoading}>
                 <span className="material-symbols-outlined">close</span>
@@ -409,19 +445,19 @@ export default function MyAccount() {
 
             <div className="ma-deactivate-body">
               <p>
-                Your account will be set to <strong>Inactive</strong>, you will be logged out immediately, and you will receive a confirmation email.
+                {language === 'vi' ? 'Tài khoản của bạn sẽ bị chuyển sang trạng thái Không hoạt động và đăng xuất ngay lập tức.' : 'Your account will be set to Inactive, you will be logged out immediately, and you will receive a confirmation email.'}
               </p>
               <div className="ma-deactivate-note">
-                You can ask support by replying to the email if you have any questions.
+                {language === 'vi' ? 'Liên hệ hỗ trợ nếu bạn cần sự trợ giúp.' : 'You can ask support by replying to the email if you have any questions.'}
               </div>
             </div>
 
             <div className="ma-deactivate-footer">
               <button type="button" className="ma-btn-secondary" onClick={() => setShowDeactivateModal(false)} disabled={deactivateLoading}>
-                Cancel
+                {language === 'vi' ? 'Hủy' : 'Cancel'}
               </button>
               <button type="button" className="ma-danger-btn" onClick={handleDeactivateAccount} disabled={deactivateLoading}>
-                {deactivateLoading ? 'Processing...' : 'Deactivate'}
+                {deactivateLoading ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...') : (language === 'vi' ? 'Xác Nhận Vô Hiệu Hóa' : 'Deactivate')}
               </button>
             </div>
           </div>
@@ -430,4 +466,3 @@ export default function MyAccount() {
     </div>
   );
 }
-

@@ -359,15 +359,31 @@
 }
 
 @keyframes float1 {
-  0% { transform: translateY(0px) rotate(-3deg); }
-  50% { transform: translateY(-12px) rotate(-3deg); }
-  100% { transform: translateY(0px) rotate(-3deg); }
+  0% {
+    transform: translateY(0px) rotate(-3deg);
+  }
+
+  50% {
+    transform: translateY(-12px) rotate(-3deg);
+  }
+
+  100% {
+    transform: translateY(0px) rotate(-3deg);
+  }
 }
 
 @keyframes float2 {
-  0% { transform: translateY(0px) rotate(2deg); }
-  50% { transform: translateY(-10px) rotate(2deg); }
-  100% { transform: translateY(0px) rotate(2deg); }
+  0% {
+    transform: translateY(0px) rotate(2deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+
+  100% {
+    transform: translateY(0px) rotate(2deg);
+  }
 }
 
 /* Stats Section */
@@ -619,7 +635,8 @@
   gap: 16px;
   overflow-x: auto;
   padding-bottom: 12px;
-  scrollbar-width: none; /* Hide scrollbar for cleaner look */
+  scrollbar-width: none;
+  /* Hide scrollbar for cleaner look */
 }
 
 .home-categories-list::-webkit-scrollbar {
@@ -689,7 +706,7 @@
   flex-wrap: wrap;
 }
 
-.home-section-header > div {
+.home-section-header>div {
   flex: 1;
   min-width: 200px;
 }
@@ -764,12 +781,19 @@
 }
 
 @keyframes wl-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .home-products-empty {
@@ -941,9 +965,17 @@
 }
 
 @keyframes heart-pop {
-  0% { transform: scale(0.7); }
-  50% { transform: scale(1.25); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0.7);
+  }
+
+  50% {
+    transform: scale(1.25);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 .home-wl-spinner {
@@ -1050,9 +1082,20 @@
 }
 
 @keyframes premium-pulse {
-  0% { box-shadow: 0 0 10px rgba(234, 179, 8, 0.1); transform: scale(1); }
-  50% { box-shadow: 0 0 25px rgba(234, 179, 8, 0.25); transform: scale(1.03); }
-  100% { box-shadow: 0 0 10px rgba(234, 179, 8, 0.1); transform: scale(1); }
+  0% {
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.1);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(234, 179, 8, 0.25);
+    transform: scale(1.03);
+  }
+
+  100% {
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.1);
+    transform: scale(1);
+  }
 }
 
 .star-spin {
@@ -1061,8 +1104,13 @@
 }
 
 @keyframes rotation {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .priority-recommendations-section .section-title {
@@ -1346,5 +1394,72 @@
 }
 
 @keyframes premium-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Home Product Carousel Slider Navigation */
+.home-product-slider-container {
+  position: relative;
+  width: 100%;
+}
+
+.home-product-scroll {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 12px 6px;
+}
+
+.home-product-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.home-scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-scroll-btn:hover {
+  background: var(--primary, #0f7b5f);
+  color: #ffffff;
+  border-color: var(--primary, #0f7b5f);
+  box-shadow: 0 6px 18px rgba(15, 123, 95, 0.35);
+  transform: translateY(-50%) scale(1.12);
+}
+
+.home-scroll-btn.left {
+  left: -22px;
+}
+
+.home-scroll-btn.right {
+  right: -22px;
+}
+
+@media (max-width: 768px) {
+  .home-scroll-btn.left {
+    left: 4px;
+  }
+
+  .home-scroll-btn.right {
+    right: 4px;
+  }
 }

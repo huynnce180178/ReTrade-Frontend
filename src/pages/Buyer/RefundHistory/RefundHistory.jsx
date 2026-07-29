@@ -3,12 +3,13 @@ import { Navigate } from 'react-router-dom';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import userRefundService from '../../../services/userRefundService';
 import '../../../styles/MyAccount.css';
 import './RefundHistory.css';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
+const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
   month: 'short',
   year: 'numeric',
@@ -66,6 +67,8 @@ const filterTabs = [
 export default function RefundHistory() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
   const [refunds, setRefunds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -96,20 +99,16 @@ export default function RefundHistory() {
         } else {
           throw new Error('Invalid response');
         }
-      } catch (err) {
-        console.error('Failed to fetch banks list, falling back to static list.', err);
+      } catch (e) {
         setBanksList([
           { code: 'VCB', shortName: 'Vietcombank' },
           { code: 'TCB', shortName: 'Techcombank' },
-          { code: 'CTG', shortName: 'VietinBank' },
-          { code: 'BID', shortName: 'BIDV' },
-          { code: 'VBA', shortName: 'Agribank' },
-          { code: 'MB', shortName: 'MB Bank' },
+          { code: 'MB', shortName: 'MBBank' },
           { code: 'ACB', shortName: 'ACB' },
           { code: 'VPB', shortName: 'VPBank' },
-          { code: 'STB', shortName: 'Sacombank' },
+          { code: 'BIDV', shortName: 'BIDV' },
+          { code: 'CTG', shortName: 'VietinBank' },
           { code: 'TPB', shortName: 'TPBank' },
-          { code: 'VIB', shortName: 'VIB' },
         ]);
       }
     };
@@ -123,7 +122,7 @@ export default function RefundHistory() {
       const data = await userRefundService.getMyRefunds();
       setRefunds(Array.isArray(data) ? data : []);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load refund history.', 'error');
+      showToast(error?.response?.data || (isVi ? 'Không thể tải lịch sử hoàn tiền.' : 'Failed to load refund history.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -135,47 +134,76 @@ export default function RefundHistory() {
     }
   }, [user]);
 
-  // Reset page when search or tab changes
+  // Scroll to top when page changes
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {}
+  }, [page]);
+
+  // Reset page when filter or search term changes
   useEffect(() => {
     setPage(1);
   }, [activeTab, searchTerm]);
 
-  // Client-side search and filter
+  // Filter refunds
   const filteredRefunds = useMemo(() => {
-    const keyword = searchTerm.trim().toLowerCase();
-    return refunds.filter((r) => {
-      const matchesKeyword = !keyword || (r.note && r.note.toLowerCase().includes(keyword));
-      const matchesTab = activeTab === 'all' || r.status === activeTab;
-      return matchesKeyword && matchesTab;
+    return refunds.filter((refund) => {
+      const matchesSearch =
+        !searchTerm.trim() ||
+        (refund.note || '').toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+        (refund.bankName || '').toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+        (refund.bankAccountNumber || '').includes(searchTerm.trim());
+
+      if (!matchesSearch) return false;
+
+      if (activeTab === 'all') return true;
+      return refund.status === activeTab;
     });
   }, [refunds, activeTab, searchTerm]);
 
-  // Pagination bounds
   const totalItems = filteredRefunds.length;
+
   const paginatedRefunds = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredRefunds.slice(start, start + pageSize);
-  }, [filteredRefunds, page]);
+  }, [filteredRefunds, page, pageSize]);
 
-  // Calculations for stats
+  // Summaries
   const summaries = useMemo(() => {
-    const totalCount = refunds.length;
-    const totalAmount = refunds.reduce((sum, r) => sum + Number(r.amount || 0), 0);
-    const notReadyCount = refunds.filter(r => r.status === 'NotReady').length;
-    const pendingCount = refunds.filter(r => r.status === 'Pending').length;
-    const completedCount = refunds.filter(r => r.status === 'Completed').length;
-    return { totalCount, totalAmount, notReadyCount, pendingCount, completedCount };
+    let totalAmount = 0;
+    let notReadyCount = 0;
+    let pendingCount = 0;
+    let completedCount = 0;
+
+    refunds.forEach((r) => {
+      if (r.status === 'Completed') {
+        totalAmount += Number(r.amount || 0);
+        completedCount += 1;
+      } else if (r.status === 'NotReady') {
+        notReadyCount += 1;
+      } else if (r.status === 'Pending') {
+        pendingCount += 1;
+      }
+    });
+
+    return {
+      totalCount: refunds.length,
+      notReadyCount,
+      pendingCount,
+      completedCount,
+      totalAmount,
+    };
   }, [refunds]);
 
-  // Tab counters (without keyword filter)
+  // Tab counts
   const tabCounts = useMemo(() => {
     return refunds.reduce(
       (acc, r) => {
         acc.all += 1;
-        if (r.status === 'NotReady') acc.NotReady += 1;
-        if (r.status === 'Pending') acc.Pending += 1;
-        if (r.status === 'Processed') acc.Processed += 1;
-        if (r.status === 'Completed') acc.Completed += 1;
+        if (r.status && acc[r.status] !== undefined) {
+          acc[r.status] += 1;
+        }
         return acc;
       },
       { all: 0, NotReady: 0, Pending: 0, Processed: 0, Completed: 0 }
@@ -202,9 +230,9 @@ export default function RefundHistory() {
     const { name, value } = e.target;
     if (name === 'bankAccountHolder') {
       const sanitized = sanitizeAccountHolderName(value);
-      setBankForm(prev => ({ ...prev, [name]: sanitized }));
+      setBankForm((prev) => ({ ...prev, [name]: sanitized }));
     } else {
-      setBankForm(prev => ({ ...prev, [name]: value }));
+      setBankForm((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -213,24 +241,24 @@ export default function RefundHistory() {
     e.preventDefault();
     if (!editingRefund) return;
     if (!bankForm.bankName.trim() || !bankForm.bankAccountNumber.trim() || !bankForm.bankAccountHolder.trim()) {
-      showToast('Please fill in all bank account details.', 'warning');
+      showToast(isVi ? 'Vui lòng điền đầy đủ thông tin tài khoản ngân hàng.' : 'Please fill in all bank account details.', 'warning');
       return;
     }
 
     const holderRegex = /^[A-Z ]+$/;
     if (!holderRegex.test(bankForm.bankAccountHolder)) {
-      showToast('Account holder name must contain only uppercase non-accented letters.', 'warning');
+      showToast(isVi ? 'Tên chủ tài khoản phải chỉ chứa chữ cái tiếng Việt không dấu in hoa.' : 'Account holder name must contain only uppercase non-accented letters.', 'warning');
       return;
     }
 
     try {
       setModalLoading(true);
       await userRefundService.updateBankDetails(editingRefund.refundRequestId, bankForm);
-      showToast('Bank account details updated successfully.', 'success');
+      showToast(isVi ? 'Cập nhật tài khoản ngân hàng nhận tiền thành công!' : 'Bank account details updated successfully.', 'success');
       setEditingRefund(null);
       await loadRefunds();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to update bank details.', 'error');
+      showToast(error?.response?.data || (isVi ? 'Không thể cập nhật tài khoản ngân hàng.' : 'Failed to update bank details.'), 'error');
     } finally {
       setModalLoading(false);
     }
@@ -242,11 +270,11 @@ export default function RefundHistory() {
     try {
       setConfirmLoading(true);
       await userRefundService.confirmReceived(confirmingRefund.refundRequestId);
-      showToast('Confirmed receipt successfully!', 'success');
+      showToast(isVi ? 'Đã xác nhận nhận tiền cọc thành công!' : 'Refund marked as received & completed.', 'success');
       setConfirmingRefund(null);
       await loadRefunds();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to confirm receipt.', 'error');
+      showToast(error?.response?.data || (isVi ? 'Không thể xác nhận nhận tiền.' : 'Failed to confirm receipt.'), 'error');
     } finally {
       setConfirmLoading(false);
     }
@@ -256,7 +284,7 @@ export default function RefundHistory() {
     return (
       <div className="profile-loading-wrapper">
         <span className="btn-spinner"></span>
-        <p>Loading refund history...</p>
+        <p>{isVi ? 'Đang tải lịch sử hoàn tiền...' : 'Loading refund history...'}</p>
       </div>
     );
   }
@@ -267,218 +295,235 @@ export default function RefundHistory() {
     <>
       <div className="profile-page-wrapper container animate-fade-in">
         <div className="profile-grid">
-        <AccountSidebar />
+          <AccountSidebar />
 
-        <main className="ma-main">
-          <div className="refund-layout">
-            <section className="refund-main-col">
-              <div className="ma-card refund-hero-card">
-                <div className="ma-header-info">
-                  <div className="ma-header-icon">
-                    <span className="material-symbols-outlined">payments</span>
-                  </div>
-                  <div>
-                    <h1 className="ma-headline">Refund History</h1>
-                    <p className="ma-subtitle">Track your deposit refund requests and update payout accounts.</p>
+          <main className="ma-main">
+            <div className="refund-layout">
+              <section className="refund-main-col">
+                <div className="ma-card refund-hero-card">
+                  <div className="ma-header-info">
+                    <div className="ma-header-icon">
+                      <span className="material-symbols-outlined">payments</span>
+                    </div>
+                    <div>
+                      <h1 className="ma-headline">{isVi ? 'Lịch Sử Hoàn Tiền' : 'Refund History'}</h1>
+                      <p className="ma-subtitle">{isVi ? 'Theo dõi các yêu cầu hoàn tiền đặt cọc và cập nhật tài khoản nhận tiền.' : 'Track your deposit refund requests and update payout accounts.'}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <section className="refund-filter-card">
-                <div className="refund-tabs">
-                  {filterTabs.map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      className={activeTab === tab.key ? 'active' : ''}
-                      onClick={() => setActiveTab(tab.key)}
-                    >
-                      {tab.label}
-                      <span>{tabCounts[tab.key] || 0}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <label className="refund-search">
-                  <span className="material-symbols-outlined">search</span>
-                  <input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by description..."
-                  />
-                </label>
-              </section>
-
-              <section className="refund-list">
-                {loading ? (
-                  <div className="refund-empty-state">
-                    <span className="btn-spinner"></span>
-                    <p>Loading data...</p>
+                <section className="refund-filter-card">
+                  <div className="refund-tabs">
+                    {filterTabs.map((tab) => {
+                      const tabMapVi = {
+                        all: 'Tất cả',
+                        NotReady: 'Chưa đủ điều kiện',
+                        Pending: 'Chờ chuyển khoản',
+                        Processed: 'Đang hoàn tiền',
+                        Completed: 'Đã nhận tiền',
+                      };
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          className={activeTab === tab.key ? 'active' : ''}
+                          onClick={() => setActiveTab(tab.key)}
+                        >
+                          {isVi ? (tabMapVi[tab.key] || tab.label) : tab.label}
+                          <span>{tabCounts[tab.key] || 0}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                ) : paginatedRefunds.length === 0 ? (
-                  <div className="refund-empty-state">
-                    <span className="material-symbols-outlined">payments</span>
-                    <h3>No refund requests found</h3>
-                    <p>Adjust your filters or try a different search keyword.</p>
-                  </div>
-                ) : (
-                  paginatedRefunds.map((refund) => (
-                    <article key={refund.refundRequestId} className="refund-card">
-                      <header className="refund-card-header">
-                        <div className="refund-card-header-left">
-                          <strong className="refund-card-order-code">REF #{refund.refundRequestId.split('_').pop().toUpperCase()}</strong>
-                          <span className="refund-card-date">{formatDate(refund.requestedAt)}</span>
-                        </div>
-                        <em className={`refund-status ${refund.status ? refund.status.toLowerCase() : ''}`}>
-                          {refund.status === 'NotReady' ? 'Not Ready' : refund.status === 'Pending' ? 'Pending' : refund.status === 'Processed' ? 'Processing' : 'Completed'}
-                        </em>
-                      </header>
 
-                      <div className="refund-card-body">
-                        <div className="refund-bank-display-box">
-                          <span className="material-symbols-outlined">account_balance</span>
-                          <div className="refund-bank-display-details">
-                            {refund.bankName ? (
-                              <>
-                                <strong>{refund.bankName}</strong>
-                                <span>Account Number: {refund.bankAccountNumber} ({refund.bankAccountHolder})</span>
-                              </>
-                            ) : (
-                              <em style={{ color: '#ea580c', fontWeight: 700 }}>
-                                Bank account for refund not updated yet
-                              </em>
-                            )}
+                  <label className="refund-search">
+                    <span className="material-symbols-outlined">search</span>
+                    <input
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder={isVi ? 'Tìm theo mô tả...' : 'Search by description...'}
+                    />
+                  </label>
+                </section>
+
+                <section className="refund-list">
+                  {loading ? (
+                    <div className="refund-empty-state">
+                      <span className="btn-spinner"></span>
+                      <p>{isVi ? 'Đang tải dữ liệu hoàn tiền...' : 'Loading data...'}</p>
+                    </div>
+                  ) : paginatedRefunds.length === 0 ? (
+                    <div className="refund-empty-state">
+                      <span className="material-symbols-outlined">payments</span>
+                      <h3>{isVi ? 'Không tìm thấy yêu cầu hoàn tiền nào' : 'No refund requests found'}</h3>
+                      <p>{isVi ? 'Điều chỉnh bộ lọc hoặc thử từ khóa tìm kiếm khác.' : 'Adjust your filters or try a different search keyword.'}</p>
+                    </div>
+                  ) : (
+                    paginatedRefunds.map((refund) => (
+                      <article key={refund.refundRequestId} className="refund-card">
+                        <header className="refund-card-header">
+                          <div className="refund-card-header-left">
+                            <strong className="refund-card-order-code">{isVi ? 'Mã hoàn tiền #' : 'REF #'}{refund.refundRequestId.split('_').pop().toUpperCase()}</strong>
+                            <span className="refund-card-date">{formatDate(refund.requestedAt)}</span>
+                          </div>
+                          <em className={`refund-status ${refund.status ? refund.status.toLowerCase() : ''}`}>
+                            {refund.status === 'NotReady'
+                              ? (isVi ? 'Chưa đủ điều kiện' : 'Not Ready')
+                              : refund.status === 'Pending'
+                              ? (isVi ? 'Chờ xử lý' : 'Pending')
+                              : refund.status === 'Processed'
+                              ? (isVi ? 'Đang hoàn tiền' : 'Processing')
+                              : (isVi ? 'Đã hoàn thành' : 'Completed')}
+                          </em>
+                        </header>
+
+                        <div className="refund-card-body">
+                          <div className="refund-bank-display-box">
+                            <span className="material-symbols-outlined">account_balance</span>
+                            <div className="refund-bank-display-details">
+                              {refund.bankName ? (
+                                <>
+                                  <strong>{refund.bankName}</strong>
+                                  <span>{isVi ? 'Số tài khoản:' : 'Account Number:'} {refund.bankAccountNumber} ({refund.bankAccountHolder})</span>
+                                </>
+                              ) : (
+                                <em style={{ color: '#ea580c', fontWeight: 700 }}>
+                                  {isVi ? 'Chưa cập nhật tài khoản ngân hàng nhận tiền hoàn' : 'Bank account for refund not updated yet'}
+                                </em>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="refund-detail-row">
+                            <div className="refund-info-group">
+                              <span className="refund-info-label">{isVi ? 'Mô tả' : 'Description'}</span>
+                              <span className="refund-info-value" style={{ fontWeight: 500 }}>{refund.note || '-'}</span>
+                            </div>
+                            <div className="refund-info-group" style={{ alignItems: 'flex-end' }}>
+                              <span className="refund-info-label">{isVi ? 'Số tiền hoàn' : 'Refund Amount'}</span>
+                              <strong className="refund-info-value amount">{formatVnd(refund.amount)}</strong>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="refund-detail-row">
-                          <div className="refund-info-group">
-                            <span className="refund-info-label">Description</span>
-                            <span className="refund-info-value" style={{ fontWeight: 500 }}>{refund.note || '-'}</span>
-                          </div>
-                          <div className="refund-info-group" style={{ alignItems: 'flex-end' }}>
-                            <span className="refund-info-label">Refund Amount</span>
-                            <strong className="refund-info-value amount">{formatVnd(refund.amount)}</strong>
-                          </div>
-                        </div>
-                      </div>
+                        <footer className="refund-card-actions">
+                          {refund.status === 'NotReady' && (
+                            <button
+                              type="button"
+                              className="refund-primary-btn animate-pulse"
+                              onClick={() => handleOpenEdit(refund)}
+                              style={{ background: 'var(--secondary)' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '4px' }}>account_balance</span>
+                              {isVi ? 'Thêm tài khoản nhận tiền' : 'Add Payout Bank Account'}
+                            </button>
+                          )}
+                          {refund.status === 'Pending' && (
+                            <button
+                              type="button"
+                              className="refund-detail-btn"
+                              onClick={() => handleOpenEdit(refund)}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '4px' }}>edit</span>
+                              {isVi ? 'Sửa tài khoản nhận tiền' : 'Edit Payout Account'}
+                            </button>
+                          )}
+                          {refund.status === 'Processed' && (
+                            <button
+                              type="button"
+                              className="refund-primary-btn"
+                              onClick={() => setConfirmingRefund(refund)}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '4px' }}>check_circle</span>
+                              {isVi ? 'Xác nhận đã nhận tiền' : 'Confirm Received Money'}
+                            </button>
+                          )}
+                          {refund.status === 'Completed' && (
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 700, paddingRight: '12px' }}>
+                              {isVi ? 'Yêu cầu đã hoàn thành' : 'Request Completed'}
+                            </span>
+                          )}
+                        </footer>
+                      </article>
+                    ))
+                  )}
+                </section>
 
-                      <footer className="refund-card-actions">
-                        {refund.status === 'NotReady' && (
-                          <button
-                            type="button"
-                            className="refund-primary-btn animate-pulse"
-                            onClick={() => handleOpenEdit(refund)}
-                            style={{ background: 'var(--secondary)' }}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '4px' }}>account_balance</span>
-                            Add Payout Bank Account
-                          </button>
-                        )}
-                        {refund.status === 'Pending' && (
-                          <button
-                            type="button"
-                            className="refund-detail-btn"
-                            onClick={() => handleOpenEdit(refund)}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '4px' }}>edit</span>
-                            Edit Payout Account
-                          </button>
-                        )}
-                        {refund.status === 'Processed' && (
-                          <button
-                            type="button"
-                            className="refund-primary-btn"
-                            onClick={() => setConfirmingRefund(refund)}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '4px' }}>check_circle</span>
-                            Confirm Received Money
-                          </button>
-                        )}
-                        {refund.status === 'Completed' && (
-                          <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 700, paddingRight: '12px' }}>
-                            Request Completed
-                          </span>
-                        )}
-                      </footer>
-                    </article>
-                  ))
+                {totalItems > 0 && (
+                  <footer className="refund-list-footer">
+                    <div>
+                      <span>
+                        {isVi 
+                          ? `Hiển thị ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalItems)} trong ${totalItems}`
+                          : `Showing ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalItems)} of ${totalItems}`}
+                      </span>
+                    </div>
+                    <div className="refund-pagination">
+                      <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                        {isVi ? 'Trước' : 'Previous'}
+                      </button>
+                      <span className="page-indicator">{isVi ? 'Trang' : 'Page'} {page}</span>
+                      <button type="button" disabled={page * pageSize >= totalItems} onClick={() => setPage((p) => p + 1)}>
+                        {isVi ? 'Tiếp' : 'Next'}
+                      </button>
+                    </div>
+                  </footer>
                 )}
               </section>
 
-              {totalItems > 0 && (
-                <footer className="refund-list-footer">
-                  <div>
-                    <span>
-                      Showing {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalItems)} of {totalItems}
-                    </span>
-                  </div>
-                  <div className="refund-pagination">
-                    <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                      Previous
-                    </button>
-                    <span className="page-indicator">Page {page}</span>
-                    <button type="button" disabled={page * pageSize >= totalItems} onClick={() => setPage((p) => p + 1)}>
-                      Next
-                    </button>
-                  </div>
-                </footer>
-              )}
-            </section>
+              <aside className="refund-side-col">
+                <div className="refund-side-sticky glass-panel">
+                  <section className="refund-summary-card">
+                    <h2>{isVi ? 'Tổng Quan Hoàn Tiền' : 'Refund Summary'}</h2>
+                    <div className="refund-total-spent">
+                      <span>{isVi ? 'Tổng Tiền Cọc Đã Hoàn' : 'Total Deposit Refunded'}</span>
+                      <strong>{formatVnd(summaries.totalAmount)}</strong>
+                    </div>
+                    <div className="refund-summary-grid">
+                      <div>
+                        <span>{isVi ? 'Tổng số yêu cầu' : 'Total Requests'}</span>
+                        <strong>{summaries.totalCount}</strong>
+                      </div>
+                      <div>
+                        <span>{isVi ? 'Chưa đủ điều kiện' : 'Not Ready'}</span>
+                        <strong>{summaries.notReadyCount}</strong>
+                      </div>
+                      <div>
+                        <span>{isVi ? 'Chờ xử lý' : 'Pending'}</span>
+                        <strong>{summaries.pendingCount}</strong>
+                      </div>
+                      <div>
+                        <span>{isVi ? 'Đã hoàn thành' : 'Completed'}</span>
+                        <strong>{summaries.completedCount}</strong>
+                      </div>
+                    </div>
+                  </section>
 
-            <aside className="refund-side-col">
-              <div className="refund-side-sticky glass-panel">
-                <section className="refund-summary-card">
-                  <h2>Refund Summary</h2>
-                  <div className="refund-total-spent">
-                    <span>Total Deposit Refunded</span>
-                    <strong>{formatVnd(summaries.totalAmount)}</strong>
-                  </div>
-                  <div className="refund-summary-grid">
-                    <div>
-                      <span>Total Requests</span>
-                      <strong>{summaries.totalCount}</strong>
-                    </div>
-                    <div>
-                      <span>Not Ready</span>
-                      <strong>{summaries.notReadyCount}</strong>
-                    </div>
-                    <div>
-                      <span>Pending</span>
-                      <strong>{summaries.pendingCount}</strong>
-                    </div>
-                    <div>
-                      <span>Completed</span>
-                      <strong>{summaries.completedCount}</strong>
-                    </div>
-                  </div>
-                </section>
+                  <section className="refund-insights-card">
+                    <h2>{isVi ? 'Tỷ Lệ Trạng Thái' : 'Status Ratio'}</h2>
+                    <InsightBar label={isVi ? `Đã hoàn thành (${tabCounts.Completed})` : `Completed (${tabCounts.Completed})`} value={getPercent(tabCounts.Completed, summaries.totalCount)} />
+                    <InsightBar label={isVi ? `Đang hoàn tiền (${tabCounts.Processed})` : `Processing (${tabCounts.Processed})`} value={getPercent(tabCounts.Processed, summaries.totalCount)} />
+                    <InsightBar label={isVi ? `Chờ xử lý (${tabCounts.Pending})` : `Pending (${tabCounts.Pending})`} value={getPercent(tabCounts.Pending, summaries.totalCount)} />
+                    <InsightBar label={isVi ? `Chưa đủ điều kiện (${tabCounts.NotReady})` : `Not Ready (${tabCounts.NotReady})`} value={getPercent(tabCounts.NotReady, summaries.totalCount)} muted />
 
-                <section className="refund-insights-card">
-                  <h2>Status Ratio</h2>
-                  <InsightBar label={`Completed (${tabCounts.Completed})`} value={getPercent(tabCounts.Completed, summaries.totalCount)} />
-                  <InsightBar label={`Processing (${tabCounts.Processed})`} value={getPercent(tabCounts.Processed, summaries.totalCount)} />
-                  <InsightBar label={`Pending (${tabCounts.Pending})`} value={getPercent(tabCounts.Pending, summaries.totalCount)} />
-                  <InsightBar label={`Not Ready (${tabCounts.NotReady})`} value={getPercent(tabCounts.NotReady, summaries.totalCount)} muted />
-
-                  <div className="refund-insight-note">
-                    <span className="material-symbols-outlined">info</span>
-                    <p>Please make sure your bank account information is accurate so that the admin can transfer your deposit refund.</p>
-                  </div>
-                </section>
-              </div>
-            </aside>
-          </div>
-        </main>
+                    <div className="refund-insight-note">
+                      <span className="material-symbols-outlined">info</span>
+                      <p>{isVi ? 'Vui lòng đảm bảo thông tin tài khoản ngân hàng chính xác để Quản trị viên chuyển khoản tiền cọc hoàn lại.' : 'Please make sure your bank account information is accurate so that the admin can transfer your deposit refund.'}</p>
+                    </div>
+                  </section>
+                </div>
+              </aside>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
 
       {/* Edit bank details modal */}
       {editingRefund && (
         <div className="refund-edit-modal-overlay" onClick={handleCloseEdit}>
           <form className="refund-edit-modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSaveBankDetails}>
             <header className="refund-edit-modal-header">
-              <h3>Payout Account Details</h3>
+              <h3>{isVi ? 'Thông Tin Tài Khoản Nhận Tiền' : 'Payout Account Details'}</h3>
               <button type="button" className="refund-edit-modal-close" onClick={handleCloseEdit} disabled={modalLoading}>
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -486,7 +531,7 @@ export default function RefundHistory() {
 
             <div className="refund-edit-modal-body">
               <div className="refund-form-group">
-                <label htmlFor="bankName">Bank Name</label>
+                <label htmlFor="bankName">{isVi ? 'Tên Ngân Hàng' : 'Bank Name'}</label>
                 <select
                   id="bankName"
                   name="bankName"
@@ -495,7 +540,7 @@ export default function RefundHistory() {
                   required
                   disabled={modalLoading}
                 >
-                  <option value="" disabled>Select your bank...</option>
+                  <option value="" disabled>{isVi ? 'Chọn ngân hàng của bạn...' : 'Select your bank...'}</option>
                   {banksList.map((bank) => (
                     <option key={bank.code} value={bank.shortName || bank.short_name || bank.code}>
                       {bank.shortName || bank.short_name || bank.code} ({bank.code})
@@ -505,26 +550,26 @@ export default function RefundHistory() {
               </div>
 
               <div className="refund-form-group" style={{ marginTop: '16px' }}>
-                <label htmlFor="bankAccountNumber">Account Number</label>
+                <label htmlFor="bankAccountNumber">{isVi ? 'Số Tài Khoản' : 'Account Number'}</label>
                 <input
                   id="bankAccountNumber"
                   name="bankAccountNumber"
                   value={bankForm.bankAccountNumber}
                   onChange={handleBankFormChange}
-                  placeholder="Enter bank account number..."
+                  placeholder={isVi ? 'Nhập số tài khoản ngân hàng...' : 'Enter bank account number...'}
                   required
                   disabled={modalLoading}
                 />
               </div>
 
               <div className="refund-form-group" style={{ marginTop: '16px' }}>
-                <label htmlFor="bankAccountHolder">Account Holder Name</label>
+                <label htmlFor="bankAccountHolder">{isVi ? 'Tên Chủ Tài Khoản' : 'Account Holder Name'}</label>
                 <input
                   id="bankAccountHolder"
                   name="bankAccountHolder"
                   value={bankForm.bankAccountHolder}
                   onChange={handleBankFormChange}
-                  placeholder="ENTER ACCOUNT HOLDER NAME..."
+                  placeholder={isVi ? 'NHẬP TÊN CHỦ TÀI KHOẢN (VIẾT HOA KHÔNG DẤU)...' : 'ENTER ACCOUNT HOLDER NAME...'}
                   required
                   disabled={modalLoading}
                 />
@@ -539,7 +584,7 @@ export default function RefundHistory() {
                 onClick={handleCloseEdit}
                 disabled={modalLoading}
               >
-                Cancel
+                {isVi ? 'Hủy' : 'Cancel'}
               </button>
               <button
                 type="submit"
@@ -547,7 +592,7 @@ export default function RefundHistory() {
                 style={{ padding: '8px 18px' }}
                 disabled={modalLoading}
               >
-                {modalLoading ? <span className="btn-spinner"></span> : 'Save'}
+                {modalLoading ? <span className="btn-spinner"></span> : (isVi ? 'Lưu' : 'Save')}
               </button>
             </footer>
           </form>
@@ -559,7 +604,7 @@ export default function RefundHistory() {
         <div className="refund-edit-modal-overlay" onClick={() => setConfirmingRefund(null)}>
           <div className="refund-edit-modal" onClick={(e) => e.stopPropagation()}>
             <header className="refund-edit-modal-header">
-              <h3>Confirm Payment Received</h3>
+              <h3>{isVi ? 'Xác Nhận Đã Nhận Tiền' : 'Confirm Payment Received'}</h3>
               <button type="button" className="refund-edit-modal-close" onClick={() => setConfirmingRefund(null)} disabled={confirmLoading}>
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -567,11 +612,12 @@ export default function RefundHistory() {
 
             <div className="refund-edit-modal-body">
               <p>
-                Do you confirm that you have received this deposit refund amount via bank transfer from the Admin?
-                This action will mark the request as **Completed** and cannot be undone.
+                {isVi 
+                  ? 'Bạn có xác nhận đã nhận được số tiền cọc hoàn lại này qua chuyển khoản từ Quản trị viên không? Hành động này sẽ đánh dấu yêu cầu là **Đã hoàn thành** và không thể hoàn tác.'
+                  : 'Do you confirm that you have received this deposit refund amount via bank transfer from the Admin? This action will mark the request as Completed and cannot be undone.'}
               </p>
               <div className="admin-refund-modal-target" style={{ margin: 0, padding: '14px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Refund Amount Received</span>
+                <span style={{ fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>{isVi ? 'Số Tiền Hoàn Đã Nhận' : 'Refund Amount Received'}</span>
                 <strong style={{ fontSize: '18px', color: 'var(--primary)' }}>{formatVnd(confirmingRefund.amount)}</strong>
               </div>
             </div>
@@ -584,7 +630,7 @@ export default function RefundHistory() {
                 onClick={() => setConfirmingRefund(null)}
                 disabled={confirmLoading}
               >
-                Cancel
+                {isVi ? 'Hủy' : 'Cancel'}
               </button>
               <button
                 type="button"
@@ -593,7 +639,7 @@ export default function RefundHistory() {
                 onClick={handleConfirmReceived}
                 disabled={confirmLoading}
               >
-                {confirmLoading ? <span className="btn-spinner"></span> : 'Confirm (Received)'}
+                {confirmLoading ? <span className="btn-spinner"></span> : (isVi ? 'Xác nhận (Đã nhận tiền)' : 'Confirm (Received)')}
               </button>
             </footer>
           </div>

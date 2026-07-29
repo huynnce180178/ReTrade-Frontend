@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import chatService from '../../../services/chatService';
 import { createChatHubConnection } from '../../../services/chatRealtimeService';
 import productService from '../../../services/productService';
@@ -14,30 +15,22 @@ function getDisplayName(participant) {
   return participant?.displayName || participant?.email || 'ReTrade User';
 }
 
-function formatTime(value) {
+function formatTime(value, language) {
   if (!value) return '';
-  return new Date(value).toLocaleTimeString('vi-VN', {
+  return new Date(value).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
 }
 
-function formatRoomTime(value) {
+function formatRoomTime(value, language) {
   if (!value) return '';
   const date = new Date(value);
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
 
-  if (sameDay) return formatTime(value);
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-}
-
-function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(value);
+  if (sameDay) return formatTime(value, language);
+  return date.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', { day: '2-digit', month: '2-digit' });
 }
 
 function initials(name) {
@@ -53,17 +46,17 @@ function getRoomTitle(room) {
   return room.productName || getDisplayName(room.otherParticipant) || 'Product conversation';
 }
 
-function getRoomSubtitle(room) {
+function getRoomSubtitle(room, language) {
   if (!room) return '';
-  if (room.roomType === 'Business') return 'Business';
+  if (room.roomType === 'Business') return language === 'vi' ? 'Hệ thống' : 'Business';
   return getDisplayName(room.otherParticipant);
 }
 
-function getMessagePreview(message) {
-  if (!message) return 'No messages yet';
-  if (message.isRecalled || message.messageType === 'Recall') return 'Tin nhan da bi thu hoi';
-  if (message.messageType === 'Image') return 'Image';
-  return message.message || 'No messages yet';
+function getMessagePreview(message, language) {
+  if (!message) return language === 'vi' ? 'Chưa có tin nhắn nào' : 'No messages yet';
+  if (message.isRecalled || message.messageType === 'Recall') return language === 'vi' ? 'Tin nhắn đã bị thu hồi' : 'Message recalled';
+  if (message.messageType === 'Image') return language === 'vi' ? '[Hình ảnh]' : 'Image';
+  return message.message || (language === 'vi' ? 'Chưa có tin nhắn nào' : 'No messages yet');
 }
 
 function shouldShowProductIntro(message, room) {
@@ -75,6 +68,7 @@ export default function Chat({ basePath = '/chat' }) {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, language, formatCurrency } = useLanguage();
   const [rooms, setRooms] = useState([]);
   const [messages, setMessages] = useState([]);
   const [roomsLoading, setRoomsLoading] = useState(true);
@@ -140,12 +134,12 @@ export default function Chat({ basePath = '/chat' }) {
         navigate(`${basePath}/${list[0].roomId}`, { replace: true });
       }
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Failed to load conversations.';
+      const msg = error.response?.data || error.message || (language === 'vi' ? 'Lỗi tải danh sách trò chuyện.' : 'Failed to load conversations.');
       showToast(String(msg), 'error');
     } finally {
       setRoomsLoading(false);
     }
-  }, [basePath, navigate, roomId, showToast, user]);
+  }, [basePath, navigate, roomId, showToast, user, language]);
 
   const loadMessages = useCallback(async (targetRoomId, targetPage = 1, appendOlder = false) => {
     if (!targetRoomId) return;
@@ -175,13 +169,13 @@ export default function Chat({ basePath = '/chat' }) {
         ));
       }
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Failed to load messages.';
+      const msg = error.response?.data || error.message || (language === 'vi' ? 'Lỗi tải tin nhắn.' : 'Failed to load messages.');
       showToast(String(msg), 'error');
     } finally {
       setMessagesLoading(false);
       setOlderLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, language]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -344,7 +338,7 @@ export default function Chat({ basePath = '/chat' }) {
         room.roomId === roomId ? { ...room, lastMessage: message, updatedAt: message.createdAt } : room
       ));
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Failed to send message.';
+      const msg = error.response?.data || error.message || (language === 'vi' ? 'Không thể gửi tin nhắn.' : 'Failed to send message.');
       showToast(String(msg), 'error');
     } finally {
       setSending(false);
@@ -357,7 +351,7 @@ export default function Chat({ basePath = '/chat' }) {
     if (!roomId || !file || uploadingImage) return;
 
     if (!file.type.startsWith('image/')) {
-      showToast('Please choose an image file.', 'warning');
+      showToast(language === 'vi' ? 'Vui lòng chọn một tệp hình ảnh.' : 'Please choose an image file.', 'warning');
       return;
     }
 
@@ -365,7 +359,7 @@ export default function Chat({ basePath = '/chat' }) {
     try {
       const result = await chatService.uploadImage(file);
       if (!result?.imageUrl) {
-        throw new Error('Image upload failed.');
+        throw new Error(language === 'vi' ? 'Tải ảnh thất bại.' : 'Image upload failed.');
       }
 
       const message = await chatService.sendMessage(roomId, result.imageUrl, 'Image');
@@ -376,7 +370,7 @@ export default function Chat({ basePath = '/chat' }) {
         room.roomId === roomId ? { ...room, lastMessage: message, updatedAt: message.createdAt } : room
       ));
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Failed to send image.';
+      const msg = error.response?.data || error.message || (language === 'vi' ? 'Không thể gửi ảnh.' : 'Failed to send image.');
       showToast(String(msg), 'error');
     } finally {
       setUploadingImage(false);
@@ -395,7 +389,7 @@ export default function Chat({ basePath = '/chat' }) {
           : room
       ));
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Failed to delete message.';
+      const msg = error.response?.data || error.message || (language === 'vi' ? 'Không thể xóa tin nhắn.' : 'Failed to delete message.');
       showToast(String(msg), 'error');
     }
   };
@@ -414,7 +408,7 @@ export default function Chat({ basePath = '/chat' }) {
           : room
       ));
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Messages can only be recalled within 3 minutes.';
+      const msg = error.response?.data || error.message || (language === 'vi' ? 'Chỉ có thể thu hồi tin nhắn trong vòng 3 phút.' : 'Messages can only be recalled within 3 minutes.');
       showToast(String(msg), 'error');
     }
   };
@@ -432,27 +426,27 @@ export default function Chat({ basePath = '/chat' }) {
       <aside className="chat-sidebar">
         <div className="chat-sidebar-header">
           <div>
-            <span className="chat-kicker">Messages</span>
-            <h1>Conversations</h1>
+            <span className="chat-kicker">{t('nav.chat')}</span>
+            <h1>{language === 'vi' ? 'Trò chuyện' : 'Conversations'}</h1>
           </div>
-          <button type="button" className="chat-refresh-btn" onClick={loadRooms} title="Refresh">
+          <button type="button" className="chat-refresh-btn" onClick={loadRooms} title={language === 'vi' ? 'Làm mới' : 'Refresh'}>
             <span className="material-symbols-outlined">refresh</span>
           </button>
         </div>
 
         <div className="chat-room-list">
           {roomsLoading ? (
-            <div className="chat-state">Loading conversations...</div>
+            <div className="chat-state">{language === 'vi' ? 'Đang tải trò chuyện...' : 'Loading conversations...'}</div>
           ) : rooms.length === 0 ? (
             <div className="chat-empty-list">
               <span className="material-symbols-outlined">forum</span>
-              <strong>No conversations yet</strong>
-              <p>Start from a product page by contacting the seller.</p>
+              <strong>{language === 'vi' ? 'Chưa có cuộc trò chuyện nào' : 'No conversations yet'}</strong>
+              <p>{language === 'vi' ? 'Bắt đầu từ trang sản phẩm bằng cách liên hệ với người bán.' : 'Start from a product page by contacting the seller.'}</p>
             </div>
           ) : (
             rooms.map((room) => {
               const title = getRoomTitle(room);
-              const subtitle = getRoomSubtitle(room);
+              const subtitle = getRoomSubtitle(room, language);
               const active = room.roomId === roomId;
               return (
                 <button
@@ -467,12 +461,12 @@ export default function Chat({ basePath = '/chat' }) {
                   <div className="chat-room-main">
                     <div className="chat-room-topline">
                       <span>{title}</span>
-                      <time>{formatRoomTime(room.lastMessage?.createdAt || room.updatedAt)}</time>
+                      <time>{formatRoomTime(room.lastMessage?.createdAt || room.updatedAt, language)}</time>
                     </div>
                     <div className={`chat-room-product ${room.roomType === 'Business' ? 'business' : ''}`}>
                       {subtitle}
                     </div>
-                    <div className="chat-room-preview">{getMessagePreview(room.lastMessage)}</div>
+                    <div className="chat-room-preview">{getMessagePreview(room.lastMessage, language)}</div>
                   </div>
                   {room.unreadCount > 0 && <span className="chat-unread-badge">{room.unreadCount}</span>}
                 </button>
@@ -486,8 +480,8 @@ export default function Chat({ basePath = '/chat' }) {
         {!roomId ? (
           <div className="chat-no-room">
             <span className="material-symbols-outlined">mark_unread_chat_alt</span>
-            <h2>Select a conversation</h2>
-            <p>Your real-time messages will appear here.</p>
+            <h2>{language === 'vi' ? 'Chọn một cuộc trò chuyện' : 'Select a conversation'}</h2>
+            <p>{language === 'vi' ? 'Tin nhắn thời gian thực của bạn sẽ xuất hiện ở đây.' : 'Your real-time messages will appear here.'}</p>
           </div>
         ) : (
           <>
@@ -501,28 +495,28 @@ export default function Chat({ basePath = '/chat' }) {
               </div>
               <div>
                 <h2>{getRoomTitle(activeRoom)}</h2>
-                <p>{activeRoom?.roomType === 'Business' ? 'Business chat' : `Chat with ${getDisplayName(activeRoom?.otherParticipant)}`}</p>
+                <p>{activeRoom?.roomType === 'Business' ? (language === 'vi' ? 'Hệ thống ReTrade' : 'Business chat') : (language === 'vi' ? `Trò chuyện với ${getDisplayName(activeRoom?.otherParticipant)}` : `Chat with ${getDisplayName(activeRoom?.otherParticipant)}`)}</p>
               </div>
               <div className={`chat-live-pill ${connectionReady ? 'online' : ''}`}>
                 <span />
-                {connectionReady ? 'Live' : 'Connecting'}
+                {connectionReady ? (language === 'vi' ? 'Trực tuyến' : 'Live') : (language === 'vi' ? 'Đang kết nối' : 'Connecting')}
               </div>
             </header>
 
             <div className="chat-messages" ref={messagesRef}>
               {hasMore && messages.length > 0 && (
                 <button type="button" className="chat-load-more" onClick={handleLoadOlder} disabled={olderLoading}>
-                  {olderLoading ? 'Loading...' : 'Load older messages'}
+                  {olderLoading ? (language === 'vi' ? 'Đang tải...' : 'Loading...') : (language === 'vi' ? 'Tải thêm tin nhắn cũ' : 'Load older messages')}
                 </button>
               )}
 
               {messagesLoading ? (
-                <div className="chat-state">Loading messages...</div>
+                <div className="chat-state">{language === 'vi' ? 'Đang tải tin nhắn...' : 'Loading messages...'}</div>
               ) : messages.length === 0 ? (
                 <div className="chat-empty-thread">
                   <span className="material-symbols-outlined">chat_bubble</span>
-                  <strong>Start the conversation</strong>
-                  <p>Send a message about delivery, condition, negotiation, or support.</p>
+                  <strong>{language === 'vi' ? 'Bắt đầu cuộc trò chuyện' : 'Start the conversation'}</strong>
+                  <p>{language === 'vi' ? 'Gửi tin nhắn về giao hàng, tình trạng, thương lượng hoặc hỗ trợ.' : 'Send a message about delivery, condition, negotiation, or support.'}</p>
                 </div>
               ) : (
                 messages.map((message) => {
@@ -546,7 +540,7 @@ export default function Chat({ basePath = '/chat' }) {
                               )}
                             </div>
                             <div className="chat-product-intro-info">
-                              <span>San pham dang quan tam</span>
+                              <span>{language === 'vi' ? 'Sản phẩm đang quan tâm' : 'Interested product'}</span>
                               <strong>{activeRoom.productName}</strong>
                               {productPrice !== null && productPrice !== undefined && (
                                 <b>{formatCurrency(productPrice)}</b>
@@ -555,7 +549,7 @@ export default function Chat({ basePath = '/chat' }) {
                           </div>
                         )}
                         {message.isRecalled || message.messageType === 'Recall' ? (
-                          <p className="chat-message-recalled">Tin nhắn đã bị thu hồi</p>
+                          <p className="chat-message-recalled">{language === 'vi' ? 'Tin nhắn đã bị thu hồi' : 'Message recalled'}</p>
                         ) : message.messageType === 'Image' ? (
                           <a href={message.message} target="_blank" rel="noreferrer" className="chat-image-link">
                             <img src={message.message} alt="Chat attachment" className="chat-message-image" />
@@ -564,7 +558,7 @@ export default function Chat({ basePath = '/chat' }) {
                           <p>{message.message}</p>
                         )}
                         <div className="chat-message-meta">
-                          <time>{formatTime(message.createdAt)}</time>
+                          <time>{formatTime(message.createdAt, language)}</time>
                           {mine && (
                             <span className="material-symbols-outlined">
                               {message.isRead ? 'done_all' : 'done'}
@@ -574,11 +568,11 @@ export default function Chat({ basePath = '/chat' }) {
                         <div className="chat-message-actions">
                           {mine && message.canRecall && !message.isRecalled && (
                             <button type="button" onClick={() => handleRecallMessage(message)}>
-                              Thu hồi
+                              {language === 'vi' ? 'Thu hồi' : 'Recall'}
                             </button>
                           )}
                           <button type="button" onClick={() => handleDeleteMessage(message)}>
-                            Xóa
+                            {language === 'vi' ? 'Xóa' : 'Delete'}
                           </button>
                         </div>
                       </div>
@@ -602,7 +596,7 @@ export default function Chat({ basePath = '/chat' }) {
                 className="chat-attach-btn"
                 disabled={!roomId || uploadingImage}
                 onClick={() => imageInputRef.current?.click()}
-                title="Send image"
+                title={language === 'vi' ? 'Gửi hình ảnh' : 'Send image'}
               >
                 <span className="material-symbols-outlined">{uploadingImage ? 'hourglass_empty' : 'image'}</span>
               </button>
@@ -612,7 +606,7 @@ export default function Chat({ basePath = '/chat' }) {
                     key={reaction}
                     type="button"
                     onClick={() => handleQuickReaction(reaction)}
-                    title="Add reaction"
+                    title={language === 'vi' ? 'Thêm cảm xúc' : 'Add reaction'}
                   >
                     {reaction}
                   </button>
@@ -621,7 +615,7 @@ export default function Chat({ basePath = '/chat' }) {
               <textarea
                 value={messageText}
                 onChange={(event) => setMessageText(event.target.value)}
-                placeholder="Write a message..."
+                placeholder={language === 'vi' ? 'Nhập tin nhắn...' : 'Write a message...'}
                 maxLength={2000}
                 rows={1}
                 onKeyDown={(event) => {

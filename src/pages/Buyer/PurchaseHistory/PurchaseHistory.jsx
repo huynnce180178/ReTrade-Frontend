@@ -5,6 +5,7 @@ import ReviewModal from '../../../components/ReviewModal/ReviewModal';
 import ReportModal from '../../../components/ReportModal/ReportModal';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import purchaseService from '../../../services/purchaseService';
 import reviewService from '../../../services/reviewService';
 import paymentService from '../../../services/paymentService';
@@ -53,6 +54,7 @@ const statusMeta = {
 export default function PurchaseHistory() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { language, formatCurrency } = useLanguage();
 
   const [purchases, setPurchases] = useState([]);
   const [allPurchases, setAllPurchases] = useState([]);
@@ -411,28 +413,45 @@ export default function PurchaseHistory() {
                     <span className="material-symbols-outlined">shopping_bag</span>
                   </div>
                   <div>
-                    <h1 className="ma-headline">Purchase History</h1>
-                    <p className="ma-subtitle">Track and manage your orders, payments, and shipping progress.</p>
+                    <h1 className="ma-headline">{language === 'vi' ? 'Lịch Sử Mua Hàng' : 'Purchase History'}</h1>
+                    <p className="ma-subtitle">{language === 'vi' ? 'Theo dõi và quản lý các đơn hàng, thanh toán và tiến trình giao hàng của bạn.' : 'Track and manage your orders, payments, and shipping progress.'}</p>
                   </div>
                 </div>
               </div>
 
               <section className="purchase-filter-card">
                 <div className="purchase-tabs">
-                  {statusTabs.map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      className={activeStatus === tab.key ? 'active' : ''}
-                      onClick={() => {
-                        setActiveStatus(tab.key);
-                        setPage(1);
-                      }}
-                    >
-                      {tab.label}
-                      <span>{statusCounts[tab.key] || 0}</span>
-                    </button>
-                  ))}
+                  {statusTabs.map((tab) => {
+                    const tabMapVi = {
+                      all: 'Tất cả đơn',
+                      AwaitingPayment: 'Chờ thanh toán',
+                      Pending: 'Đang xử lý',
+                      Confirmed: 'Đã xác nhận',
+                      Shipping: 'Đang giao',
+                      Delivered: 'Đã giao',
+                      Completed: 'Hoàn thành',
+                      ReturnRequested: 'Yêu cầu trả',
+                      Returned: 'Đã trả hàng',
+                      ReturnRejected: 'Bị từ chối trả',
+                      DeliveryFailed: 'Giao thất bại',
+                      Cancelled: 'Đã hủy',
+                    };
+                    const labelText = language === 'vi' ? (tabMapVi[tab.key] || tab.label) : tab.label;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        className={activeStatus === tab.key ? 'active' : ''}
+                        onClick={() => {
+                          setActiveStatus(tab.key);
+                          setPage(1);
+                        }}
+                      >
+                        {labelText}
+                        <span>{statusCounts[tab.key] || 0}</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <label className="purchase-search">
@@ -440,7 +459,7 @@ export default function PurchaseHistory() {
                   <input
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search by order ID, product, or seller..."
+                    placeholder={language === 'vi' ? 'Tìm theo mã đơn hàng, sản phẩm hoặc người bán...' : 'Search by order ID, product, or seller...'}
                   />
                 </label>
               </section>
@@ -462,6 +481,7 @@ export default function PurchaseHistory() {
                     <PurchaseCard
                       key={purchase.orderId}
                       purchase={purchase}
+                      language={language}
                       updating={updatingId === purchase.orderId}
                       onCancel={() => updatePurchase(purchase, 'cancel')}
                       onComplete={() => updatePurchase(purchase, 'complete')}
@@ -496,41 +516,41 @@ export default function PurchaseHistory() {
             <aside className="purchase-side-col">
               <div className="purchase-side-sticky glass-panel">
                 <section className="purchase-summary-card">
-                <h2>Spending Summary</h2>
+                <h2>{language === 'vi' ? 'Tổng Quan Chi Tiêu' : 'Spending Summary'}</h2>
                 <div className="purchase-total-spent">
-                  <span>Total Spent (Lifetime)</span>
+                  <span>{language === 'vi' ? 'Tổng Chi Tiêu (Toàn thời gian)' : 'Total Spent (Lifetime)'}</span>
                   <strong>{formatVnd(summary.totalSpent)}</strong>
                 </div>
                 <div className="purchase-summary-grid">
                   <div>
-                    <span>Pending</span>
-                    <strong>{summary.pending} Orders</strong>
+                    <span>{language === 'vi' ? 'Chờ xử lý' : 'Pending'}</span>
+                    <strong>{summary.pending} {language === 'vi' ? 'Đơn' : 'Orders'}</strong>
                   </div>
                   <div>
-                    <span>Shipping</span>
-                    <strong>{summary.transit} Orders</strong>
+                    <span>{language === 'vi' ? 'Đang giao' : 'Shipping'}</span>
+                    <strong>{summary.transit} {language === 'vi' ? 'Đơn' : 'Orders'}</strong>
                   </div>
                   <div>
-                    <span>Delivered</span>
-                    <strong>{summary.delivered} Orders</strong>
+                    <span>{language === 'vi' ? 'Đã giao' : 'Delivered'}</span>
+                    <strong>{summary.delivered} {language === 'vi' ? 'Đơn' : 'Orders'}</strong>
                   </div>
                   <div>
-                    <span>Completed</span>
-                    <strong>{summary.completed} Orders</strong>
+                    <span>{language === 'vi' ? 'Hoàn thành' : 'Completed'}</span>
+                    <strong>{summary.completed} {language === 'vi' ? 'Đơn' : 'Orders'}</strong>
                   </div>
                   <div>
-                    <span>Returns</span>
-                    <strong>{summary.returns} Orders</strong>
+                    <span>{language === 'vi' ? 'Trả hàng' : 'Returns'}</span>
+                    <strong>{summary.returns} {language === 'vi' ? 'Đơn' : 'Orders'}</strong>
                   </div>
                 </div>
                 <div style={{ marginTop: 14, color: '#5c706b', fontSize: 13 }}>
-                  <span>Avg. Order Value: </span>
+                  <span>{language === 'vi' ? 'Giá trị đơn TB: ' : 'Avg. Order Value: '}</span>
                   <strong>{formatCompactVnd(summary.averageOrder)}</strong>
                 </div>
                 </section>
 
                 <section className="purchase-insights-card">
-                <h2>Purchase Insights</h2>
+                <h2>{language === 'vi' ? 'Thống Kê Mua Hàng' : 'Purchase Insights'}</h2>
                 {/* Use the same population as `summary` for percentages when available (overview),
                     otherwise fall back to server `total`. This prevents >100% values. */}
                 {(() => {
@@ -583,7 +603,7 @@ export default function PurchaseHistory() {
   );
 }
 
-function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain, onReportSeller }) {
+function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain, onReportSeller, language }) {
   const meta = statusMeta[purchase.status] || { label: purchase.status || 'Unknown', className: 'default' };
   const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
   const canComplete = purchase.status === 'Delivered';
@@ -596,7 +616,7 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
       <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-card-click-area">
         <header className="purchase-card-header">
           <div className="purchase-card-header-left">
-            <strong className="purchase-card-order-code">Order #{purchase.orderCode || purchase.orderId}</strong>
+            <strong className="purchase-card-order-code">{language === 'vi' ? 'Đơn hàng #' : 'Order #'}{purchase.orderCode || purchase.orderId}</strong>
             <span className="purchase-card-date">{formatDate(purchase.createdAt)}</span>
             <span className="purchase-card-seller">
               <span className="material-symbols-outlined">storefront</span>
@@ -615,7 +635,7 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
             />
             <div className="purchase-product-details">
               <h3 className="purchase-product-title">{purchase.productName || 'Untitled product'}</h3>
-              <span className="purchase-product-qty">Qty: x{purchase.quantity || 0}</span>
+              <span className="purchase-product-qty">{language === 'vi' ? 'SL: x' : 'Qty: x'}{purchase.quantity || 0}</span>
             </div>
             <div className="purchase-product-price-info">
               <span className="purchase-product-unit-price">
@@ -630,11 +650,11 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
                 local_shipping
               </span>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                {purchase.shippingProvider || 'Shipping pending'}
+                {purchase.shippingProvider || (language === 'vi' ? 'Chờ vận chuyển' : 'Shipping pending')}
               </span>
             </div>
             <div className="purchase-total-price-wrap">
-              <span className="purchase-total-label">Order Total: </span>
+              <span className="purchase-total-label">{language === 'vi' ? 'Tổng tiền: ' : 'Order Total: '}</span>
               <strong className="purchase-total-price">
                 {formatVnd(purchase.finalAmount || purchase.totalAmount || 0)}
               </strong>
@@ -652,31 +672,35 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
       <footer className="purchase-card-actions">
         {canCancel && (
           <button type="button" className="purchase-text-danger" disabled={updating} onClick={onCancel}>
-            {updating ? 'Updating...' : 'Cancel'}
+            {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Updating...') : (language === 'vi' ? 'Hủy đơn hàng' : 'Cancel')}
           </button>
         )}
         {canPay && (
           <button type="button" className="purchase-primary-btn" disabled={updating} onClick={onPayAgain}>
-            {updating ? 'Processing...' : 'Pay Again'}
+            {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...') : (language === 'vi' ? 'Thanh toán lại' : 'Pay Again')}
           </button>
         )}
         {canReview && (
           <button type="button" className="purchase-primary-btn" onClick={onWriteReview}>
-            Write Review
+            {language === 'vi' ? 'Đánh giá' : 'Write Review'}
           </button>
         )}
         {canRequestReturn && (
           <button type="button" className="purchase-detail-btn request-return" disabled={updating} onClick={onRequestReturn}>
-            Request Return
+            {language === 'vi' ? 'Yêu cầu trả hàng' : 'Request Return'}
           </button>
         )}
-        {purchase.status === 'Completed' && <button type="button" className="purchase-detail-btn" disabled={updating} onClick={onReportSeller}>Report Seller</button>}
+        {purchase.status === 'Completed' && (
+          <button type="button" className="purchase-detail-btn" disabled={updating} onClick={onReportSeller}>
+            {language === 'vi' ? 'Báo cáo người bán' : 'Report Seller'}
+          </button>
+        )}
         <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-detail-btn">
-          Details
+          {language === 'vi' ? 'Chi tiết' : 'Details'}
         </Link>
         {canComplete && (
           <button type="button" className="purchase-primary-btn" disabled={updating} onClick={onComplete}>
-            {updating ? 'Updating...' : 'Mark Completed'}
+            {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Updating...') : (language === 'vi' ? 'Đã nhận hàng' : 'Mark Completed')}
           </button>
         )}
       </footer>

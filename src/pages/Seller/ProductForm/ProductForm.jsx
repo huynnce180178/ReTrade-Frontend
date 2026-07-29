@@ -4,11 +4,15 @@ import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 
+import { useLanguage } from '../../../context/LanguageContext';
+
 export default function ProductForm() {
   const { user } = useOutletContext();
   const navigate = useNavigate();
   const { productId } = useParams();
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
   const isEdit = Boolean(productId);
 
@@ -21,7 +25,7 @@ export default function ProductForm() {
   const [reqDescription, setReqDescription] = useState('');
   const [reqParentId, setReqParentId] = useState('');
   const [reqAttributes, setReqAttributes] = useState([]);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     categoryId: '',
@@ -35,7 +39,7 @@ export default function ProductForm() {
     heightCm: '',
     isForAuction: false,
   });
-  
+
   const [images, setImages] = useState([]);
   const [dynamicAttributes, setDynamicAttributes] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
@@ -140,7 +144,7 @@ export default function ProductForm() {
       showToast('Submitting category request...', 'info');
       const newCategory = await categoryService.create(payload);
       showToast('Category request submitted successfully! Waiting for Admin approval.', 'success');
-      
+
       setCategories(prev => [...prev, newCategory]);
       setFormData(prev => ({ ...prev, categoryId: newCategory.categoryId }));
 
@@ -163,7 +167,7 @@ export default function ProductForm() {
       if (!product) return;
 
       const isAuction = product.status === 'Waiting' || product.status === 'Ready' || product.status === 'AuctionRejected';
-      
+
       setFormData({
         name: product.name || '',
         categoryId: product.categoryId || '',
@@ -184,7 +188,7 @@ export default function ProductForm() {
       });
       setDynamicAttributes(attrs);
       setValidationErrors({});
-      
+
       const imgs = (product.images || []).map((i) => ({
         id: i.imageId,
         imageId: i.imageId,
@@ -258,7 +262,7 @@ export default function ProductForm() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (name === 'categoryId' && value === 'other_request') {
       setIsCategoryRequestModalOpen(true);
       setFormData((prev) => ({
@@ -337,7 +341,7 @@ export default function ProductForm() {
           isFirst = false;
         }
       }
-      
+
       if (uploadedImages.length > 0) {
         setImages((prev) => [...prev, ...uploadedImages]);
         showToast(`Uploaded ${uploadedImages.length} image(s) successfully.`, 'success');
@@ -372,7 +376,7 @@ export default function ProductForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.categoryId) {
       showToast('Please select a product category.', 'warning');
       return;
@@ -458,92 +462,92 @@ export default function ProductForm() {
       <div className="tab-product-form animate-fade-in">
         <header className="seller-dash-header">
           <div>
-            <h1>{!isEdit ? 'Post New Product' : 'Edit Product'}</h1>
-            <p>Provide detailed information and images for the best listing representation.</p>
+            <h1>{!isEdit ? (isVi ? 'Đăng Sản Phẩm Mới' : 'Post New Product') : (isVi ? 'Chỉnh Sửa Sản Phẩm' : 'Edit Product')}</h1>
+            <p>{isVi ? 'Cung cấp thông tin chi tiết và hình ảnh để tin đăng đạt chất lượng tốt nhất.' : 'Provide detailed information and images for the best listing representation.'}</p>
           </div>
           <button className="seller-action-btn-back" onClick={() => navigate('/seller-dashboard/products')}>
-            <span className="material-symbols-outlined">arrow_back</span>Back to List
+            <span className="material-symbols-outlined">arrow_back</span>{isVi ? 'Quay lại danh sách' : 'Back to List'}
           </button>
         </header>
 
         <form onSubmit={handleSubmit} className="product-form-layout">
           <div className="form-column-left">
             <div className="form-card">
-              <h2>General Information</h2>
+              <h2>{isVi ? 'Thông Tin Chung' : 'General Information'}</h2>
               <div className="form-group">
-                <label>Product Name *</label>
+                <label>{isVi ? 'Tên Sản Phẩm *' : 'Product Name *'}</label>
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
                   required
-                  placeholder="e.g. iPhone 15 Pro Max 256GB Gold"
+                  placeholder={isVi ? 'Ví dụ: iPhone 15 Pro Max 256GB Vàng' : 'e.g. iPhone 15 Pro Max 256GB Gold'}
                   className={validationErrors.name ? 'has-error' : ''}
                 />
                 {validationErrors.name && <span className="input-error-msg">{validationErrors.name}</span>}
               </div>
-              
+
               <div className="form-group-row">
                 <div className="form-group">
-                  <label>Product Category *</label>
-                   <select name="categoryId" value={formData.categoryId} onChange={handleInputChange} required className={validationErrors.categoryId ? 'has-error' : ''}>
-                    <option value="">-- Select Category --</option>
+                  <label>{isVi ? 'Danh Mục Sản Phẩm *' : 'Product Category *'}</label>
+                  <select name="categoryId" value={formData.categoryId} onChange={handleInputChange} required className={validationErrors.categoryId ? 'has-error' : ''}>
+                    <option value="">{isVi ? '-- Chọn Danh Mục --' : '-- Select Category --'}</option>
                     {categories.filter(c => c.status === 'Active' || c.status === 'Pending').map((c) => (
                       <option key={c.categoryId} value={c.categoryId}>
-                        {c.name} {c.status === 'Pending' ? '(Pending Approval)' : ''}
+                        {c.name} {c.status === 'Pending' ? (isVi ? '(Chờ duyệt)' : '(Pending Approval)') : ''}
                       </option>
                     ))}
-                    <option value="other_request" style={{ fontWeight: '600', color: 'var(--primary-color)' }}>+ Request New Category...</option>
+                    <option value="other_request" style={{ fontWeight: '600', color: 'var(--primary-color)' }}>{isVi ? '+ Yêu cầu danh mục mới...' : '+ Request New Category...'}</option>
                   </select>
                   {validationErrors.categoryId && <span className="input-error-msg">{validationErrors.categoryId}</span>}
                 </div>
-                
+
                 <div className="form-group">
-                  <label>Product Condition</label>
+                  <label>{isVi ? 'Tình Trạng Sản Phẩm' : 'Product Condition'}</label>
                   <select name="condition" value={formData.condition} onChange={handleInputChange}>
-                    <option value="New">New (Sealed)</option>
-                    <option value="LikeNew">Like New (99%)</option>
-                    <option value="Excellent">Excellent</option>
-                    <option value="Good">Good</option>
-                    <option value="Fair">Fair</option>
-                    <option value="Used">Used</option>
-                    <option value="Damaged">Damaged</option>
-                    <option value="ForParts">For Parts</option>
+                    <option value="New">{isVi ? 'Mới (Nguyên niêm phong)' : 'New (Sealed)'}</option>
+                    <option value="LikeNew">{isVi ? 'Như mới (99%)' : 'Like New (99%)'}</option>
+                    <option value="Excellent">{isVi ? 'Rất tốt' : 'Excellent'}</option>
+                    <option value="Good">{isVi ? 'Tốt' : 'Good'}</option>
+                    <option value="Fair">{isVi ? 'Khá' : 'Fair'}</option>
+                    <option value="Used">{isVi ? 'Đã qua sử dụng' : 'Used'}</option>
+                    <option value="Damaged">{isVi ? 'Có trầy xước / Hỏng nhẹ' : 'Damaged'}</option>
+                    <option value="ForParts">{isVi ? 'Bán xác / Linh kiện' : 'For Parts'}</option>
                   </select>
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Detailed Description</label>
-                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={6} placeholder="Detailed description of the product, minor defects if any, included accessories..." />
+                <label>{isVi ? 'Mô Tả Chi Tiết' : 'Detailed Description'}</label>
+                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={6} placeholder={isVi ? 'Mô tả chi tiết sản phẩm, các vết xước nhỏ nếu có, phụ kiện đi kèm...' : 'Detailed description of the product, minor defects if any, included accessories...'} />
               </div>
             </div>
 
             <div className="form-card">
-              <h2>Listing Format & Stock</h2>
-              
+              <h2>{isVi ? 'Hình Thức Đăng & Tồn Kho' : 'Listing Format & Stock'}</h2>
+
               {!isEdit ? (
                 <div className="form-toggle-group">
                   <label className="toggle-label">
                     <input type="checkbox" name="isForAuction" checked={formData.isForAuction} onChange={handleAuctionToggle} />
                     <span className="toggle-custom-box"></span>
-                    List as an Auction
+                    {isVi ? 'Đăng Dưới Dạng Đấu Giá' : 'List as an Auction'}
                   </label>
-                  <p className="toggle-help-text">Auction products will be approved to join a dedicated room.</p>
+                  <p className="toggle-help-text">{isVi ? 'Sản phẩm đấu giá sẽ được duyệt để tham gia phòng đấu giá riêng.' : 'Auction products will be approved to join a dedicated room.'}</p>
                 </div>
               ) : (
                 <div className="auction-static-info">
-                  <strong>Format: </strong>
+                  <strong>{isVi ? 'Hình thức: ' : 'Format: '}</strong>
                   <span className={`badge ${formData.isForAuction ? 'badge-auction' : 'badge-pending'}`}>
-                    {formData.isForAuction ? 'Auction' : 'Sale'}
+                    {formData.isForAuction ? (isVi ? 'Đấu giá' : 'Auction') : (isVi ? 'Bán thẳng' : 'Sale')}
                   </span>
                 </div>
               )}
 
               <div className="form-group-row">
                 <div className="form-group">
-                  <label>Price (VND) {!formData.isForAuction && '*'}</label>
+                  <label>{isVi ? 'Giá (VND)' : 'Price (VND)'} {!formData.isForAuction && '*'}</label>
                   <input
                     type="number"
                     name="price"
@@ -551,14 +555,14 @@ export default function ProductForm() {
                     onChange={handleInputChange}
                     disabled={formData.isForAuction}
                     required={!formData.isForAuction}
-                    placeholder={formData.isForAuction ? "Set in Auction" : "e.g. 15000000"}
+                    placeholder={formData.isForAuction ? (isVi ? 'Thiết lập khi Đấu Giá' : 'Set in Auction') : (isVi ? 'Ví dụ: 15000000' : 'e.g. 15000000')}
                     className={validationErrors.price ? 'has-error' : ''}
                   />
                   {validationErrors.price && <span className="input-error-msg">{validationErrors.price}</span>}
                 </div>
 
                 <div className="form-group">
-                  <label>Stock Quantity *</label>
+                  <label>{isVi ? 'Số Lượng Tồn Kho *' : 'Stock Quantity *'}</label>
                   <input
                     type="number"
                     name="stockQuantity"
@@ -575,17 +579,17 @@ export default function ProductForm() {
             </div>
 
             <div className="form-card">
-              <h2>Weight & Packaging Dimensions</h2>
-              <p className="form-section-subtitle">Used for automatic shipping fee calculation</p>
-              
+              <h2>{isVi ? 'Trọng Lượng & Kích Thước Đóng Gói' : 'Weight & Packaging Dimensions'}</h2>
+              <p className="form-section-subtitle">{isVi ? 'Dùng để tính phí vận chuyển tự động' : 'Used for automatic shipping fee calculation'}</p>
+
               <div className="form-group">
-                <label>Weight (Grams)</label>
+                <label>{isVi ? 'Trọng Lượng (Gram)' : 'Weight (Grams)'}</label>
                 <input
                   type="number"
                   name="weightGram"
                   value={formData.weightGram}
                   onChange={handleInputChange}
-                  placeholder="e.g. 200"
+                  placeholder={isVi ? 'Ví dụ: 200' : 'e.g. 200'}
                   className={validationErrors.weightGram ? 'has-error' : ''}
                 />
                 {validationErrors.weightGram && <span className="input-error-msg">{validationErrors.weightGram}</span>}
@@ -593,37 +597,37 @@ export default function ProductForm() {
 
               <div className="form-group-triple">
                 <div className="form-group">
-                  <label>Length (Cm)</label>
+                  <label>{isVi ? 'Chiều Dài (Cm)' : 'Length (Cm)'}</label>
                   <input
                     type="number"
                     name="lengthCm"
                     value={formData.lengthCm}
                     onChange={handleInputChange}
-                    placeholder="Length"
+                    placeholder={isVi ? 'Dài' : 'Length'}
                     className={validationErrors.lengthCm ? 'has-error' : ''}
                   />
                   {validationErrors.lengthCm && <span className="input-error-msg">{validationErrors.lengthCm}</span>}
                 </div>
                 <div className="form-group">
-                  <label>Width (Cm)</label>
+                  <label>{isVi ? 'Chiều Rộng (Cm)' : 'Width (Cm)'}</label>
                   <input
                     type="number"
                     name="widthCm"
                     value={formData.widthCm}
                     onChange={handleInputChange}
-                    placeholder="Width"
+                    placeholder={isVi ? 'Rộng' : 'Width'}
                     className={validationErrors.widthCm ? 'has-error' : ''}
                   />
                   {validationErrors.widthCm && <span className="input-error-msg">{validationErrors.widthCm}</span>}
                 </div>
                 <div className="form-group">
-                  <label>Height (Cm)</label>
+                  <label>{isVi ? 'Chiều Cao (Cm)' : 'Height (Cm)'}</label>
                   <input
                     type="number"
                     name="heightCm"
                     value={formData.heightCm}
                     onChange={handleInputChange}
-                    placeholder="Height"
+                    placeholder={isVi ? 'Cao' : 'Height'}
                     className={validationErrors.heightCm ? 'has-error' : ''}
                   />
                   {validationErrors.heightCm && <span className="input-error-msg">{validationErrors.heightCm}</span>}
@@ -633,7 +637,7 @@ export default function ProductForm() {
 
             {currentCategoryAttributes.length > 0 && (
               <div className="form-card">
-                <h2>Specifications (Category Attributes)</h2>
+                <h2>{isVi ? 'Thông Số Kỹ Thuật (Đặc Tính Danh Mục)' : 'Specifications (Category Attributes)'}</h2>
                 <div className="dynamic-attributes-grid">
                   {currentCategoryAttributes.map((attr) => (
                     <div className="form-group" key={attr.attributeId}>
@@ -645,7 +649,7 @@ export default function ProductForm() {
                         value={dynamicAttributes[attr.attributeId] || ''}
                         onChange={(e) => handleAttrChange(attr.attributeId, e.target.value)}
                         required={attr.isRequired}
-                        placeholder={attr.dataType === 'Number' ? 'Numbers only' : `Enter ${attr.name.toLowerCase()}`}
+                        placeholder={attr.dataType === 'Number' ? (isVi ? 'Chỉ nhập số' : 'Numbers only') : (isVi ? `Nhập ${attr.name.toLowerCase()}` : `Enter ${attr.name.toLowerCase()}`)}
                         className={validationErrors[attr.attributeId] ? 'has-error' : ''}
                       />
                       {validationErrors[attr.attributeId] && <span className="input-error-msg">{validationErrors[attr.attributeId]}</span>}
@@ -658,11 +662,11 @@ export default function ProductForm() {
 
           <div className="form-column-right">
             <div className="form-card">
-              <h2>Product Images *</h2>
+              <h2>{isVi ? 'Hình Ảnh Sản Phẩm *' : 'Product Images *'}</h2>
               <div className="image-upload-wrapper">
                 <label className="image-upload-btn">
                   <span className="material-symbols-outlined">cloud_upload</span>
-                  Upload Image
+                  {isVi ? 'Tải Ảnh Lên' : 'Upload Image'}
                   <input
                     type="file"
                     accept="image/*"
@@ -677,7 +681,7 @@ export default function ProductForm() {
                 {images.map((img, idx) => (
                   <div className={`uploaded-img-card ${img.isMain ? 'is-main-card' : ''}`} key={img.id}>
                     <img src={img.imageUrl} alt={img.altText} />
-                    
+
                     <div className="img-card-actions">
                       <label className="main-radio-label">
                         <input
@@ -686,7 +690,7 @@ export default function ProductForm() {
                           checked={!!img.isMain}
                           onChange={() => handleSetMainImage(img.id)}
                         />
-                        <span>Primary</span>
+                        <span>{isVi ? 'Ảnh chính' : 'Primary'}</span>
                       </label>
                       <button type="button" className="remove-img-btn" onClick={() => handleRemoveImage(img.id)}>
                         <span className="material-symbols-outlined">close</span>
@@ -700,11 +704,11 @@ export default function ProductForm() {
             <div className="form-submit-card">
               <button type="submit" className="btn-submit-product">
                 <span className="material-symbols-outlined">save</span>
-                {!isEdit ? 'Submit Product' : 'Save Changes'}
+                {!isEdit ? (isVi ? 'Đăng Sản Phẩm' : 'Submit Product') : (isVi ? 'Lưu Thay Đổi' : 'Save Changes')}
               </button>
-              
+
               <button type="button" className="btn-cancel-product" onClick={() => navigate('/seller-dashboard/products')}>
-                Cancel
+                {isVi ? 'Hủy Bỏ' : 'Cancel'}
               </button>
             </div>
           </div>
@@ -721,44 +725,44 @@ export default function ProductForm() {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            
+
             <form onSubmit={handleSaveCategoryRequest} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 <div className="form-group">
                   <label className="form-label">Category Name *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    value={reqName} 
-                    onChange={(e) => setReqName(e.target.value)} 
-                    required 
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={reqName}
+                    onChange={(e) => setReqName(e.target.value)}
+                    required
                     placeholder="e.g. Vintage Books"
                   />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Parent Category</label>
-                  <select 
-                    className="form-input" 
-                    value={reqParentId} 
+                  <select
+                    className="form-input"
+                    value={reqParentId}
                     onChange={(e) => setReqParentId(e.target.value)}
                   >
                     <option value="">None (Root Category)</option>
                     {categories.map(c => (
-                        <option key={c.categoryId} value={c.categoryId}>
-                          {c.name}
-                        </option>
-                      ))
+                      <option key={c.categoryId} value={c.categoryId}>
+                        {c.name}
+                      </option>
+                    ))
                     }
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Description</label>
-                  <textarea 
-                    className="form-input" 
-                    rows="3" 
-                    value={reqDescription} 
+                  <textarea
+                    className="form-input"
+                    rows="3"
+                    value={reqDescription}
                     onChange={(e) => setReqDescription(e.target.value)}
                     placeholder="Provide details about the category..."
                   />
@@ -782,16 +786,16 @@ export default function ProductForm() {
                       reqAttributes.map((attr, idx) => (
                         <div key={idx} className="attribute-card-item">
                           <div className="attribute-card-header">
-                            <input 
-                              type="text" 
-                              className="form-input attr-name-input" 
-                              placeholder="Attribute Name (e.g. Page Count)" 
+                            <input
+                              type="text"
+                              className="form-input attr-name-input"
+                              placeholder="Attribute Name (e.g. Page Count)"
                               value={attr.name}
                               onChange={(e) => handleReqAttributeChange(idx, 'name', e.target.value)}
                               required
                             />
-                            <select 
-                              className="form-input attr-type-select" 
+                            <select
+                              className="form-input attr-type-select"
                               value={attr.dataType}
                               onChange={(e) => handleReqAttributeChange(idx, 'dataType', e.target.value)}
                             >
@@ -804,68 +808,68 @@ export default function ProductForm() {
                               <span className="material-symbols-outlined">delete</span>
                             </button>
                           </div>
-                          
+
                           <div className="attribute-card-settings">
                             <div className="settings-field">
                               <label>Unit</label>
-                              <input 
-                                type="text" 
-                                className="form-input input-sm" 
-                                placeholder="e.g. pages, cm" 
+                              <input
+                                type="text"
+                                className="form-input input-sm"
+                                placeholder="e.g. pages, cm"
                                 value={attr.unit || ''}
                                 onChange={(e) => handleReqAttributeChange(idx, 'unit', e.target.value)}
                               />
                             </div>
-                            
+
                             {attr.dataType === 'Number' && (
                               <>
                                 <div className="settings-field">
                                   <label>Min Value</label>
-                                  <input 
-                                    type="number" 
+                                  <input
+                                    type="number"
                                     step="any"
-                                    className="form-input input-sm" 
-                                    placeholder="Min" 
+                                    className="form-input input-sm"
+                                    placeholder="Min"
                                     value={attr.minValue !== null && attr.minValue !== undefined ? attr.minValue : ''}
                                     onChange={(e) => handleReqAttributeChange(idx, 'minValue', e.target.value === '' ? null : e.target.value)}
                                   />
                                 </div>
                                 <div className="settings-field">
                                   <label>Max Value</label>
-                                  <input 
-                                    type="number" 
+                                  <input
+                                    type="number"
                                     step="any"
-                                    className="form-input input-sm" 
-                                    placeholder="Max" 
+                                    className="form-input input-sm"
+                                    placeholder="Max"
                                     value={attr.maxValue !== null && attr.maxValue !== undefined ? attr.maxValue : ''}
                                     onChange={(e) => handleReqAttributeChange(idx, 'maxValue', e.target.value === '' ? null : e.target.value)}
                                   />
                                 </div>
                               </>
                             )}
-                            
+
                             <div className="checkboxes-group">
                               <label className="checkbox-label">
-                                <input 
-                                  type="checkbox" 
+                                <input
+                                  type="checkbox"
                                   checked={attr.isRequired || false}
                                   onChange={(e) => handleReqAttributeChange(idx, 'isRequired', e.target.checked)}
                                 />
                                 <span>Required</span>
                               </label>
-                              
+
                               <label className="checkbox-label">
-                                <input 
-                                  type="checkbox" 
+                                <input
+                                  type="checkbox"
                                   checked={attr.isFilterable || false}
                                   onChange={(e) => handleReqAttributeChange(idx, 'isFilterable', e.target.checked)}
                                 />
                                 <span>Filterable</span>
                               </label>
-                              
+
                               <label className="checkbox-label">
-                                <input 
-                                  type="checkbox" 
+                                <input
+                                  type="checkbox"
                                   checked={attr.isSearchable || false}
                                   onChange={(e) => handleReqAttributeChange(idx, 'isSearchable', e.target.checked)}
                                 />

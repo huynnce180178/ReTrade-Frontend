@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import reportService from '../../services/reportService';
 import ReportStatusBadge from '../ReportStatusBadge/ReportStatusBadge';
 import TargetTypeBadge from '../TargetTypeBadge/TargetTypeBadge';
+import { useLanguage } from '../../context/LanguageContext';
 import './ReportHistory.css';
 
 const toList = (data) => Array.isArray(data) ? data : data?.items || data?.value || [];
 
 export default function ReportHistory() {
+  const { t, language } = useLanguage();
   const [tab, setTab] = useState('submitted');
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,40 +38,40 @@ export default function ReportHistory() {
     <section className="report-history-card ma-card">
       <div className="report-history-head">
         <div>
-          <h4 className="ma-card-title">Report History</h4>
-          <p className="ma-subtitle-small">Track reports you submitted and reports received on your account.</p>
+          <h4 className="ma-card-title">{language === 'vi' ? 'Lịch Sử Báo Cáo' : 'Report History'}</h4>
+          <p className="ma-subtitle-small">{language === 'vi' ? 'Theo dõi các báo cáo bạn đã gửi và các báo cáo liên quan đến tài khoản của bạn.' : 'Track reports you submitted and reports received on your account.'}</p>
         </div>
       </div>
       
       <div className="report-history-tabs">
         <button className={tab === 'submitted' ? 'active' : ''} onClick={() => setTab('submitted')}>
-          Reports Submitted
+          {language === 'vi' ? 'Báo cáo đã gửi' : 'Reports Submitted'}
         </button>
         <button className={tab === 'received' ? 'active' : ''} onClick={() => setTab('received')}>
-          Reports Received
+          {language === 'vi' ? 'Báo cáo nhận được' : 'Reports Received'}
         </button>
       </div>
 
       {loading ? (
         <div className="report-history-empty">
-          <span className="btn-spinner" /> Loading reports...
+          <span className="btn-spinner" /> {language === 'vi' ? 'Đang tải báo cáo...' : 'Loading reports...'}
         </div>
       ) : reports.length ? (
         <div className="report-history-table-wrapper">
           <table className="report-history-table">
             <thead>
               <tr>
-                <th>Reason</th>
-                <th>Created Date</th>
-                <th>Type</th>
-                <th>Status</th>
+                <th>{language === 'vi' ? 'Lý do' : 'Reason'}</th>
+                <th>{language === 'vi' ? 'Ngày tạo' : 'Created Date'}</th>
+                <th>{language === 'vi' ? 'Loại' : 'Type'}</th>
+                <th>{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
               </tr>
             </thead>
             <tbody>
               {reports.map((report) => (
                 <tr key={report.reportId || report.id}>
                   <td className="col-reason">
-                    <strong>{report.reason || 'Report'}</strong>
+                    <strong>{report.reason || (language === 'vi' ? 'Báo cáo' : 'Report')}</strong>
                     {report.description && (
                       <span className="col-desc-sub" title={report.description}>
                         {report.description}
@@ -93,7 +95,7 @@ export default function ReportHistory() {
       ) : (
         <div className="report-history-empty">
           <span className="material-symbols-outlined">flag</span>
-          No {tab} reports.
+          {language === 'vi' ? `Không có báo cáo ${tab === 'submitted' ? 'đã gửi' : 'nhận được'} nào.` : `No ${tab} reports.`}
         </div>
       )}
     </section>

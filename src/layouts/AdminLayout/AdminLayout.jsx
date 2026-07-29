@@ -2,11 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSwitcher from '../../components/LanguageSwitcher/LanguageSwitcher';
 import '../../layouts/AdminLayout/AdminLayout.css';
 import './AdminReportNav.css';
 
 export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
+  const { t } = useLanguage();
   const { unreadCount, notifications, markAsRead, markAllAsRead, deleteNotification } = useNotification();
   const navigate = useNavigate();
   const location = useLocation();
@@ -61,7 +64,7 @@ export default function AdminLayout() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: '16px' }}>
         <span className="btn-spinner"></span>
-        <p>Loading Admin Space...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -116,16 +119,16 @@ export default function AdminLayout() {
           <Link to="/" className="admin-logo-text">RETRADE</Link>
         </div>
 
-
-
         <div className="admin-header-right">
+          <LanguageSwitcher />
+
           <Link to="/" className="btn-view-live">
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>open_in_new</span>
-            View Live Site
+            {t('common.view_all')}
           </Link>
 
           <div className="notification-wrapper" ref={notifRef} style={{ position: 'relative' }}>
-            <button className="admin-icon-btn" onClick={() => setNotifOpen(!notifOpen)} style={{ position: 'relative' }}>
+            <button className="admin-icon-btn" onClick={() => setNotifOpen(!notifOpen)} style={{ position: 'relative' }} aria-label={t('nav.notifications')}>
               <span className="material-symbols-outlined">notifications</span>
               {unreadCount > 0 && <span className="notif-badge" style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#ef4444', color: 'white', fontSize: '10px', padding: '2px 5px', borderRadius: '10px', fontWeight: 'bold' }}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
@@ -133,14 +136,14 @@ export default function AdminLayout() {
             {notifOpen && (
               <div className="notif-dropdown animate-fade-in" style={{ position: 'absolute', top: '100%', right: '0', width: '320px', background: 'white', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb', zIndex: 1000, marginTop: '8px' }}>
                 <div className="notif-header" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Notifications</h4>
+                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{t('nav.notifications')}</h4>
                   {unreadCount > 0 && (
-                    <button className="text-btn" onClick={() => markAllAsRead()} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Mark all read</button>
+                    <button className="text-btn" onClick={() => markAllAsRead()} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{t('common.confirm')}</button>
                   )}
                 </div>
                 <div className="notif-list" style={{ maxHeight: '350px', overflowY: 'auto' }}>
                   {notifications.length === 0 ? (
-                    <div className="notif-empty" style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>No notifications yet</div>
+                    <div className="notif-empty" style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>{t('common.no_data')}</div>
                   ) : (
                     notifications.slice(0, 5).map(n => (
                       <div key={n.notificationId} className={`notif-item ${!n.isRead ? 'unread' : ''}`} onClick={() => handleNotificationClick(n)} style={{ padding: '16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: '12px', background: !n.isRead ? '#f0fdf4' : 'transparent', transition: 'background 0.2s' }}>
@@ -152,7 +155,7 @@ export default function AdminLayout() {
                         <button 
                           className="notif-delete-btn" 
                           onClick={(e) => { e.stopPropagation(); deleteNotification(n.notificationId); }}
-                          title="Delete"
+                          title={t('common.delete')}
                           style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', height: 'fit-content' }}
                         >
                           ×
@@ -164,10 +167,6 @@ export default function AdminLayout() {
               </div>
             )}
           </div>
-
-          <button className="admin-icon-btn">
-            <span className="material-symbols-outlined">settings</span>
-          </button>
 
           <div className="user-dropdown-wrapper" ref={dropdownRef} style={{ marginLeft: '8px' }}>
             <button className="user-profile-trigger" onClick={() => setDropdownOpen(!dropdownOpen)} style={{ padding: '4px 12px 4px 4px', border: '1px solid #e5e7eb', background: '#ffffff', borderRadius: '40px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
@@ -201,19 +200,19 @@ export default function AdminLayout() {
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                     <circle cx="12" cy="7" r="4"></circle>
                   </svg>
-                  Profile
+                  {t('nav.profile')}
                 </Link>
 
                 {isSeller && (
                   <Link to="/seller-dashboard" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
                     <span className="material-symbols-outlined item-symbol-icon" style={{ fontSize: '18px', marginRight: '8px' }}>storefront</span>
-                    Seller Dashboard
+                    {t('nav.seller_center')}
                   </Link>
                 )}
 
                 <Link to="/" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
                   <span className="material-symbols-outlined item-symbol-icon" style={{ fontSize: '18px', marginRight: '8px' }}>home</span>
-                  Back to Live Site
+                  {t('nav.home')}
                 </Link>
 
                 <button className="dropdown-item logout-item" onClick={handleLogoutClick}>
@@ -222,7 +221,7 @@ export default function AdminLayout() {
                     <polyline points="16 17 21 12 16 7"></polyline>
                     <line x1="21" y1="12" x2="9" y2="12"></line>
                   </svg>
-                  Logout
+                  {t('nav.logout')}
                 </button>
               </div>
             )}
@@ -241,7 +240,7 @@ export default function AdminLayout() {
               </div>
               <div className="admin-title-group">
                 <h3>RETRADE Admin</h3>
-                <p>Platform Controller</p>
+                <p>{t('nav.admin_center')}</p>
               </div>
             </div>
 
@@ -251,7 +250,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">grid_view</span>
-                Overview
+                {t('admin.dashboard_title')}
               </NavLink>
 
               <NavLink 
@@ -259,7 +258,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">monitoring</span>
-                Statistics
+                {t('seller.sales_stats')}
               </NavLink>
 
               <NavLink 
@@ -267,7 +266,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">group</span>
-                User Accounts
+                {t('admin.user_management')}
               </NavLink>
 
               <NavLink 
@@ -275,7 +274,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">category</span>
-                Category Management
+                {t('admin.category_management')}
               </NavLink>
 
               <NavLink 
@@ -283,7 +282,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">rule</span>
-                Product Management
+                {t('admin.listings_moderation')}
               </NavLink>
 
               <NavLink 
@@ -291,7 +290,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">gavel</span>
-                Auction Control
+                {t('admin.auction_control')}
               </NavLink>
 
               <NavLink 
@@ -299,7 +298,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">payments</span>
-                Manage Refunds
+                {t('admin.refund_management')}
               </NavLink>
 
               <NavLink 
@@ -307,12 +306,12 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">flag</span>
-                Report Management
+                {t('admin.report_management')}
               </NavLink>
               <div className="admin-report-submenu">
                 <NavLink to="/admin/reports/flagged-users" className={({ isActive }) => isActive ? 'active' : ''}>
                   <span className="material-symbols-outlined">flag</span>
-                  Flagged Users
+                  {t('history.report_history_title')}
                 </NavLink>
               </div>
             </nav>
@@ -321,17 +320,17 @@ export default function AdminLayout() {
           <div className="admin-sidebar-bottom">
             <div className="system-status-indicator">
               <span className="status-dot"></span>
-              <span>System Status: Optimal</span>
+              <span>{t('common.system')}: OK</span>
             </div>
 
             <Link to="/profile" className="admin-profile-link">
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>account_box</span>
-              Admin Profile
+              {t('nav.profile')}
             </Link>
 
             <button className="admin-logout-btn" onClick={handleLogoutClick}>
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
-              Logout
+              {t('nav.logout')}
             </button>
           </div>
         </aside>

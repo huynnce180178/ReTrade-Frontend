@@ -7,46 +7,44 @@ import subscriptionService from '../../services/subscriptionService';
 import userSearchService from '../../services/userSearchService';
 import chatService from '../../services/chatService';
 import { createChatHubConnection } from '../../services/chatRealtimeService';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSwitcher from '../LanguageSwitcher/LanguageSwitcher';
+import { formatNotificationContent } from '../../utils/notificationUtils';
 
 import './Header.css';
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { t, language, formatCurrency } = useLanguage();
   const { unreadCount, notifications, markAsRead, markAllAsRead, deleteNotification } = useNotification();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Search History
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchHistory, setSearchHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
-  const searchRef = useRef(null);
 
+  // Subscription Modal
   const [subscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [packages, setPackages] = useState([]);
   const [activePackages, setActivePackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
-  const [purchaseLoadingId, setPurchaseLoadingId] = useState('');
+  const [purchaseLoadingId, setPurchaseLoadingId] = useState(null);
+
+  // Unread chat messages count
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
-  const chatHubRef = useRef(null);
-  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
-  const messagesPath = isSeller ? '/seller-dashboard/messages' : '/chat';
+  const searchRef = useRef(null);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const header = document.querySelector('.site-header');
-      if (header) {
-        header.classList.toggle('scrolled', window.scrollY > 20);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
+  // Close dropdowns on outside click or Escape key
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -100,15 +98,14 @@ export default function Header() {
           setActivePackages(Array.isArray(myData) ? myData : []);
         }
       } catch (error) {
-        console.error('Failed to load service packages:', error);
-        showToast('Failed to load subscription packages.', 'error');
+        showToast(t('common.error_occurred'), 'error');
       } finally {
         setLoadingPackages(false);
       }
     };
 
     loadData();
-  }, [subscriptionModalOpen, user, packages.length, showToast]);
+  }, [subscriptionModalOpen, user, packages.length, showToast, t]);
 
   useEffect(() => {
     if (!user) {
@@ -116,90 +113,76 @@ export default function Header() {
       return undefined;
     }
 
-    let disposed = false;
-
-    const loadUnread = async () => {
+    const fetchInitialUnread = async () => {
       try {
-        const rooms = await chatService.getRooms();
-        if (!disposed) {
-          setChatUnreadCount((Array.isArray(rooms) ? rooms : []).reduce((sum, room) => sum + (room.unreadCount || 0), 0));
-        }
+        const total = await chatService.getUnreadCount();
+        setChatUnreadCount(total);
       } catch {
-        if (!disposed) setChatUnreadCount(0);
+        // Silently fail
       }
     };
 
-    loadUnread();
+    fetchInitialUnread();
 
     const connection = createChatHubConnection();
-    chatHubRef.current = connection;
+    let isSubscribed = true;
 
-    const handleNotification = () => {
-      if (location.pathname.startsWith(messagesPath)) {
-        loadUnread();
-        return;
+    connection.on('ReceiveMessage', (message) => {
+      if (!isSubscribed) return;
+      const uId = user.userId || user.id;
+      if (message && message.senderId !== uId) {
+        setChatUnreadCount((prev) => prev + 1);
       }
-      loadUnread();
-    };
-
-    connection.on('ChatNotification', handleNotification);
-    connection.onreconnected(() => {
-      connection.invoke('JoinUserNotifications').catch(() => {});
-      loadUnread();
     });
-    connection.start()
-      .then(() => connection.invoke('JoinUserNotifications'))
-      .catch(() => {});
+
+    connection.start().catch(() => { });
 
     return () => {
-      disposed = true;
-      connection.off('ChatNotification', handleNotification);
-      connection.stop().catch(() => {});
+      isSubscribed = false;
+      connection.stop().catch(() => { });
     };
-  }, [location.pathname, messagesPath, user]);
+  }, [user]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    userSearchService.saveSearchHistory(searchQuery.trim());
+    setSearchHistory(userSearchService.getSearchHistory());
+
+    setShowHistory(false);
+    navigate(`/product?search=${encodeURIComponent(searchQuery.trim())}`);
+  };
+
+  const handleSelectHistoryItem = (term) => {
+    setSearchQuery(term);
+    setShowHistory(false);
+    userSearchService.saveSearchHistory(term);
+    navigate(`/product?search=${encodeURIComponent(term)}`);
+  };
+
+  const handleRemoveHistoryItem = (e, term) => {
+    e.stopPropagation();
+    const updated = userSearchService.removeSearchHistory(term);
+    setSearchHistory(updated);
+  };
+
+  const handleClearAllHistory = (e) => {
+    e.stopPropagation();
+    userSearchService.clearSearchHistory();
+    setSearchHistory([]);
+  };
 
   const handleLogoutClick = () => {
     logout();
-    setDropdownOpen(false);
-    setMobileMenuOpen(false);
-    navigate('/');
-  };
-
-  const [avatarError, setAvatarError] = useState(false);
-
-  useEffect(() => {
-    setAvatarError(false);
-  }, [user?.avatarUrl]);
-
-  const isValidAvatarUrl = (url) => {
-    if (!url || typeof url !== 'string') return false;
-    const trimmed = url.trim();
-    if (
-      !trimmed ||
-      trimmed === 'Avatar' ||
-      trimmed === 'Profile' ||
-      trimmed === 'null' ||
-      trimmed === 'undefined' ||
-      trimmed === '[object Object]'
-    ) {
-      return false;
-    }
-    return (
-      trimmed.startsWith('http://') ||
-      trimmed.startsWith('https://') ||
-      trimmed.startsWith('data:') ||
-      trimmed.startsWith('blob:') ||
-      trimmed.startsWith('/')
-    );
+    showToast(t('toast.logout_success'), 'info');
+    navigate('/login');
   };
 
   const getInitials = () => {
     if (!user) return '';
     if (user.firstName && user.lastName) {
       return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
-    }
-    if (user.firstName) {
-      return user.firstName.slice(0, 2).toUpperCase();
     }
     if (user.username) {
       return user.username.slice(0, 2).toUpperCase();
@@ -215,13 +198,6 @@ export default function Header() {
     return user.username;
   };
 
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(value || 0);
-
   const getPackageVisual = (serviceId) => {
     switch (serviceId) {
       case 'SERVICE_UPGRADE_SELLER':
@@ -230,7 +206,7 @@ export default function Header() {
           cardClass: 'sub-card featured-card',
           iconWrapClass: 'sub-icon-wrap member-bg',
           icon: 'storefront',
-          tagline: 'Unlock your selling journey on ReTrade.',
+          tagline: t('subscriptions.tagline_seller'),
           buttonClass: 'sub-card-btn white-btn',
           note: ''
         };
@@ -240,7 +216,7 @@ export default function Header() {
           cardClass: 'sub-card featured-card',
           iconWrapClass: 'sub-icon-wrap member-bg',
           icon: 'workspace_premium',
-          tagline: 'Receive 30 exclusive discount & freeship vouchers for 30 days of shopping.',
+          tagline: t('subscriptions.tagline_voucher'),
           buttonClass: 'sub-card-btn primary-btn',
           note: ''
         };
@@ -250,7 +226,7 @@ export default function Header() {
           cardClass: 'sub-card dark-card',
           iconWrapClass: 'sub-icon-wrap featured-bg',
           icon: 'stars',
-          tagline: 'Increase visibility and priority on the interface.',
+          tagline: t('subscriptions.tagline_priority'),
           buttonClass: 'sub-card-btn green-btn',
           note: ''
         };
@@ -259,7 +235,7 @@ export default function Header() {
           cardClass: 'sub-card',
           iconWrapClass: 'sub-icon-wrap seller-bg',
           icon: 'workspace_premium',
-          tagline: 'Subscription package for your account.',
+          tagline: t('subscriptions.tagline_default'),
           buttonClass: 'sub-card-btn primary-btn',
           note: ''
         };
@@ -267,14 +243,14 @@ export default function Header() {
   };
 
   const getFeatureLines = (pkg) =>
-    (pkg.benefitsDescription || '')
+    (pkg?.benefitsDescription || '')
       .split(/[.;]/)
       .map((item) => item.trim())
       .filter(Boolean);
 
   const handlePurchasePackage = async (serviceId) => {
     if (!user) {
-      showToast('Please login to purchase a subscription package.', 'warning');
+      showToast(t('auth.login_title'), 'warning');
       setSubscriptionModalOpen(false);
       navigate('/login');
       return;
@@ -282,331 +258,283 @@ export default function Header() {
 
     setPurchaseLoadingId(serviceId);
     try {
-      const result = await subscriptionService.purchase(serviceId);
-      if (!result?.paymentUrl) {
-        throw new Error('Failed to create payment link.');
+      const response = await subscriptionService.purchase(serviceId);
+      const targetUrl = response?.paymentUrl || response?.url || (typeof response === 'string' ? response : null);
+      if (targetUrl && typeof targetUrl === 'string' && targetUrl.startsWith('http')) {
+        window.location.href = targetUrl;
+      } else {
+        showToast(language === 'vi' ? 'Không thể tạo liên kết thanh toán VNPAY.' : 'Failed to create VNPAY payment URL', 'error');
       }
-
-      window.location.href = result.paymentUrl;
-    } catch (error) {
-      console.error('Failed to create payment url:', error);
-      const message = error.response?.data?.message || error.response?.data || error.message || 'Failed to create VNPAY payment.';
-      showToast(String(message), 'error');
+    } catch (err) {
+      console.error('Package purchase error:', err);
+      const serverErr = err?.response?.data;
+      let msg = '';
+      if (typeof serverErr === 'string') {
+        msg = serverErr;
+      } else if (serverErr?.message) {
+        msg = serverErr.message;
+      } else if (serverErr?.title) {
+        msg = serverErr.title;
+      } else {
+        msg = err?.message || t('common.error_occurred');
+      }
+      showToast(msg, 'error');
     } finally {
-      setPurchaseLoadingId('');
+      setPurchaseLoadingId(null);
     }
   };
 
-  const saveSearchToHistory = (keyword) => {
-    if (!keyword) return;
-    const history = JSON.parse(localStorage.getItem('retrade_search_history') || '[]');
-    const newHistory = [keyword, ...history.filter(item => item !== keyword)].slice(0, 6);
-    localStorage.setItem('retrade_search_history', JSON.stringify(newHistory));
-    setSearchHistory(newHistory);
-  };
-
-  const handleSearchSubmit = async (e) => {
-    e.preventDefault();
-    if (!searchTerm.trim()) return;
-
-    saveSearchToHistory(searchTerm.trim());
-
-    if (user) {
-      try {
-        await userSearchService.addSearch(searchTerm.trim());
-      } catch {
-        // Ignore
-      }
-    }
-    
-    setShowHistory(false);
-    navigate(`/product?search=${encodeURIComponent(searchTerm.trim())}`);
-  };
-
-  const handleHistoryClick = (keyword) => {
-    setSearchTerm(keyword);
-    saveSearchToHistory(keyword);
-    setShowHistory(false);
-    navigate(`/product?search=${encodeURIComponent(keyword)}`);
-  };
-
-  const handleDeleteHistory = async (e, keyword) => {
-    e.stopPropagation();
-    const newHistory = searchHistory.filter(item => item !== keyword);
-    localStorage.setItem('retrade_search_history', JSON.stringify(newHistory));
-    setSearchHistory(newHistory);
-  };
-
-  const handleClearAllHistory = async (e) => {
-    e.stopPropagation();
-    localStorage.removeItem('retrade_search_history');
-    setSearchHistory([]);
-    if (user) {
-      try {
-        await userSearchService.clearAll();
-      } catch {
-        // Ignore
-      }
-    }
-  };
-
-  const timeAgo = (dateStr) => {
-    if (!dateStr) return '';
-    const now = new Date();
-    // Assuming backend returns UTC without Z, append Z if needed, or simply parse
-    const then = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
-    const diff = Math.floor((now - then) / 1000);
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)} mins ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-    return `${Math.floor(diff / 86400)} days ago`;
-  };
-
-  const handleNotificationClick = (n) => {
-    if (!n.isRead) {
-      markAsRead(n.notificationId);
-    }
-    setNotifOpen(false);
-    // Navigation logic based on referenceId/type could go here. For now, navigate to notifications page
-    // navigate(`/notifications`);
-  };
+  const messagesPath = user?.roles?.includes('Seller') ? '/seller-dashboard/messages' : '/chat';
 
   return (
     <>
-      <header className="site-header glass-panel">
+      <header className={`site-header ${location.pathname === '/' ? 'is-home' : ''}`}>
         <div className="header-container">
-          <div className="header-left">
-            <Link to="/" className="header-logo" style={{ textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>
-              <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-primary, #02241B)', letterSpacing: '1px' }}>RETRADE</span>
-            </Link>
 
+          {/* Logo & Mobile Menu Toggle */}
+          <div className="header-left">
             <button
               className="mobile-menu-toggle"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle navigation menu"
-              aria-expanded={mobileMenuOpen}
+              aria-label="Toggle Navigation Menu"
             >
-              <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
+              <span className="material-symbols-outlined">
+                {mobileMenuOpen ? 'close' : 'menu'}
+              </span>
             </button>
 
-            <nav className={`header-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-              <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-                Home
-              </NavLink>
-              <NavLink to="/product" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-                Product
-              </NavLink>
-              <NavLink to="/auction" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-                Auction
-              </NavLink>
-              <NavLink to="/category" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-                Category
-              </NavLink>
-              <NavLink to="/wishlist" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"} onClick={() => setMobileMenuOpen(false)}>
-                Wishlist
-              </NavLink>
-              {user && (
-                <NavLink to={messagesPath} className={({ isActive }) => isActive ? "nav-link active nav-chat-link" : "nav-link nav-chat-link"} onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
-                  Messages
-                  {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
-                </NavLink>
-              )}
-
-              <div className="mobile-only-menu-items">
-                <form
-                  className="search-input-wrapper mobile-search-wrapper"
-                  onSubmit={(e) => {
-                    handleSearchSubmit(e);
-                    setMobileMenuOpen(false);
-                  }}
-                >
-                  <input
-                    type="text"
-                    className="search-input"
-                    placeholder="Search products..."
-                    aria-label="Search products"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  <button type="submit" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Submit search">
-                    <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </button>
-                </form>
-
-                <button className="btn-subscription mobile-sub-btn" onClick={() => { setSubscriptionModalOpen(true); setMobileMenuOpen(false); }}>
-                  Subscription
-                </button>
-                {!user ? (
-                  <div className="mobile-auth-links">
-                    <Link to="/login" className="btn-login-link nav-link" onClick={() => setMobileMenuOpen(false)}>Login</Link>
-                    <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>Register</Link>
-                  </div>
-                ) : (
-                  <div className="mobile-auth-links">
-                    <Link to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Profile</Link>
-                    <Link to={messagesPath} className="nav-link nav-chat-link" onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
-                      Messages
-                      {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
-                    </Link>
-                    {isSeller && <Link to="/seller-dashboard" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Seller Dashboard</Link>}
-                    <button className="nav-link logout-item-btn" onClick={handleLogoutClick}>Logout</button>
-                  </div>
-                )}
-              </div>
-            </nav>
+            <Link to="/" className="header-logo">
+              <span>RETRADE</span>
+            </Link>
           </div>
 
-          <form className="header-search desktop-only-search" onSubmit={handleSearchSubmit} ref={searchRef} style={{ position: 'relative' }}>
-            <div className="search-input-wrapper">
-              <input
-                type="text"
-                className="search-input"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onFocus={() => searchHistory.length > 0 && setShowHistory(true)}
-                placeholder="Search products..."
-              />
-              <button type="submit" className="search-btn-inside">
-                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ffffff', fontWeight: 'bold' }}>search</span>
-              </button>
-            </div>
+          {/* Navigation Links */}
+          <nav className={`header-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+            <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
+              {t('nav.home')}
+            </NavLink>
+            <NavLink to="/product" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
+              {t('nav.product')}
+            </NavLink>
+            <NavLink to="/auction" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
+              {t('nav.auction')}
+            </NavLink>
+            <NavLink to="/category" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
+              {t('nav.category')}
+            </NavLink>
+            <NavLink to="/wishlist" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setMobileMenuOpen(false)}>
+              {t('nav.wishlist')}
+            </NavLink>
+            <NavLink to={messagesPath} className={({ isActive }) => `nav-link nav-chat-link ${isActive ? 'active' : ''}`} onClick={() => { setMobileMenuOpen(false); setChatUnreadCount(0); }}>
+              {t('nav.chat')}
+              {chatUnreadCount > 0 && <span className="nav-chat-badge">{chatUnreadCount}</span>}
+            </NavLink>
 
-            {/* Search History Dropdown */}
+            {/* Mobile Drawer Actions */}
+            <div className="mobile-drawer-footer">
+              <LanguageSwitcher className="mobile-lang-switcher" />
+              {user ? (
+                <div className="mobile-user-info">
+                  <div className="avatar-circle">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                    ) : (
+                      getInitials()
+                    )}
+                  </div>
+                  <span className="mobile-username">{getDisplayName()}</span>
+                </div>
+              ) : (
+                <div className="mobile-auth-btns">
+                  <Link to="/login" className="btn btn-outline" onClick={() => setMobileMenuOpen(false)}>{t('nav.login')}</Link>
+                  <Link to="/register" className="btn btn-primary" onClick={() => setMobileMenuOpen(false)}>{t('nav.register')}</Link>
+                </div>
+              )}
+            </div>
+          </nav>
+
+          {/* Search Bar */}
+          <div className="header-search" ref={searchRef}>
+            <form onSubmit={handleSearchSubmit}>
+              <div className="search-input-wrapper">
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder={t('common.search_placeholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowHistory(true)}
+                />
+                <button type="submit" className="search-btn-inside" aria-label={t('common.search')}>
+                  <span className="material-symbols-outlined">search</span>
+                </button>
+              </div>
+            </form>
+
             {showHistory && searchHistory.length > 0 && (
               <div className="search-history-dropdown">
-                <div className="search-history-header">
-                  <span>Recent Searches</span>
-                  <button type="button" className="search-history-clear-all" onClick={handleClearAllHistory}>Clear All</button>
+                <div className="history-header">
+                  <span>Search History</span>
+                  <button type="button" onClick={handleClearAllHistory} className="clear-history-btn">Clear all</button>
                 </div>
-                {searchHistory.map((item, index) => (
-                  <div
-                    key={index}
-                    className="search-history-item"
-                    onClick={() => handleHistoryClick(item)}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: 'var(--text-muted)' }}>
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <span className="search-history-keyword">{item}</span>
-                    <button
-                      type="button"
-                      className="search-history-delete"
-                      onClick={(e) => handleDeleteHistory(e, item)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                <ul className="history-list">
+                  {searchHistory.map((term, index) => (
+                    <li key={index} onClick={() => handleSelectHistoryItem(term)}>
+                      <span className="material-symbols-outlined history-icon">history</span>
+                      <span className="history-term">{term}</span>
+                      <button
+                        type="button"
+                        className="remove-history-btn"
+                        onClick={(e) => handleRemoveHistoryItem(e, term)}
+                        title="Remove"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-          </form>
+          </div>
 
+          {/* Desktop Right Actions */}
           <div className="header-actions">
-            <button className="btn-subscription" onClick={() => setSubscriptionModalOpen(true)}>
+
+            {/* Language Switcher */}
+            <LanguageSwitcher />
+
+            {/* Subscription Upgrade Button */}
+            <button
+              className="btn-subscription"
+              onClick={() => setSubscriptionModalOpen(true)}
+            >
               <span className="sub-glow"></span>
-              Subscription
+              {t('nav.my_subscriptions')}
             </button>
 
+            {/* Notifications Dropdown */}
             <div className="notification-wrapper" ref={notifRef}>
-              <button className="icon-btn notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
-                <svg className="bell-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-                {unreadCount > 0 && <span className="notif-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+              <button
+                className="icon-btn"
+                onClick={() => setNotifOpen(!notifOpen)}
+                aria-label="Notifications"
+              >
+                <span className="material-symbols-outlined">notifications</span>
+                {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
               </button>
 
               {notifOpen && (
-                <div className="notif-dropdown animate-fade-in">
+                <div className="notif-dropdown">
                   <div className="notif-header">
-                    <h4>Notifications</h4>
+                    <h4>{t('nav.notifications')}</h4>
                     {unreadCount > 0 && (
-                      <button className="text-btn" onClick={() => markAllAsRead()}>Mark all read</button>
+                      <button className="text-btn" onClick={markAllAsRead}>
+                        {language === 'vi' ? 'Đánh dấu tất cả đã đọc' : 'Mark all read'}
+                      </button>
                     )}
                   </div>
                   <div className="notif-list">
-                    {notifications.length === 0 ? (
-                      <div className="notif-empty">No notifications yet</div>
-                    ) : (
-                      notifications.slice(0, 5).map(n => (
-                        <div key={n.notificationId} className={`notif-item ${!n.isRead ? 'unread' : ''}`} onClick={() => handleNotificationClick(n)}>
-                          <div className="notif-content-wrap">
-                            <h5 className="notif-title">{n.title}</h5>
-                            <p className="notif-text">{n.message}</p>
-                            <span className="notif-time">{timeAgo(n.createdAt)}</span>
-                          </div>
-                          <button 
-                            className="notif-delete-btn" 
-                            onClick={(e) => { e.stopPropagation(); deleteNotification(n.notificationId); }}
-                            title="Delete"
+                    {notifications.length > 0 ? (
+                      notifications.map((item) => {
+                        const { translatedTitle, translatedMessage } = formatNotificationContent(item.title, item.message || item.content, language);
+                        return (
+                          <div
+                            key={item.notificationId || item.id}
+                            className={`notif-item ${!item.isRead ? 'unread' : ''}`}
+                            onClick={() => markAsRead(item.notificationId || item.id)}
                           >
-                            ×
-                          </button>
-                        </div>
-                      ))
+                            <div className="notif-content-wrap">
+                              <div className="notif-title">{translatedTitle}</div>
+                              <div className="notif-text">{translatedMessage}</div>
+                              <div className="notif-time">
+                                {item.createdAt ? new Date(item.createdAt).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : (language === 'vi' ? 'Vừa xong' : 'Just now')}
+                              </div>
+                            </div>
+                            <button
+                              className="notif-delete-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNotification(item.notificationId || item.id);
+                              }}
+                              title={language === 'vi' ? 'Xóa' : 'Delete'}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="notif-empty">{t('common.no_data')}</div>
                     )}
-                  </div>
-                  <div className="notif-footer">
-                    <Link to="/notifications" className="notif-view-all" onClick={() => setNotifOpen(false)}>View All Notifications</Link>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* User Account / Profile Dropdown */}
             {user ? (
               <div className="user-dropdown-wrapper" ref={dropdownRef}>
-                <button className="user-profile-trigger" onClick={() => setDropdownOpen(!dropdownOpen)}>
+                <button
+                  className="user-profile-trigger"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  aria-expanded={dropdownOpen}
+                >
                   <div className="avatar-circle">
-                    {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
-                      <img
-                        src={user.avatarUrl}
-                        alt="Avatar"
-                        className="user-avatar-img"
-                        onError={() => setAvatarError(true)}
-                      />
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
                     ) : (
                       getInitials()
                     )}
                   </div>
                   <span className="username-text">{getDisplayName()}</span>
-                  <span className={`dropdown-arrow ${dropdownOpen ? 'open' : ''}`}>▾</span>
+                  <span className={`material-symbols-outlined dropdown-arrow ${dropdownOpen ? 'open' : ''}`}>
+                    expand_more
+                  </span>
                 </button>
 
                 {dropdownOpen && (
-                  <div className="user-dropdown animate-fade-in">
+                  <div className="user-dropdown">
                     <div className="dropdown-user-info">
-                      <p className="dropdown-name">{getDisplayName()}</p>
-                      <p className="dropdown-email">{user.email || `@${user.username}`}</p>
-                      {user.roles && (
-                        <div className="dropdown-roles">
-                          {user.roles.map((r, idx) => (
-                            <span key={idx} className="badge badge-success">{r}</span>
-                          ))}
-                        </div>
-                      )}
+                      <div className="dropdown-name">{getDisplayName()}</div>
+                      <div className="dropdown-email">{user.email}</div>
                     </div>
                     <hr className="dropdown-divider" />
-                    <Link to="/profile" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
-                      Profile
+
+                    <Link to="/my-account" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <span className="material-symbols-outlined item-symbol-icon">person</span>
+                      {t('nav.profile')}
                     </Link>
 
-                    {isSeller && (
+                    <Link to="/address-book" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <span className="material-symbols-outlined item-symbol-icon">location_on</span>
+                      {t('nav.address_book')}
+                    </Link>
+
+                    <Link to="/purchase-history" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <span className="material-symbols-outlined item-symbol-icon">shopping_bag</span>
+                      {t('nav.purchase_history')}
+                    </Link>
+
+                    <Link to="/bid-history" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <span className="material-symbols-outlined item-symbol-icon">gavel</span>
+                      {t('nav.bid_history')}
+                    </Link>
+
+                    <Link to="/refund-history" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      <span className="material-symbols-outlined item-symbol-icon">currency_exchange</span>
+                      {t('nav.refund_history')}
+                    </Link>
+
+                    {user.roles?.includes('Seller') && (
                       <Link to="/seller-dashboard" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
                         <span className="material-symbols-outlined item-symbol-icon">storefront</span>
-                        Seller Dashboard
+                        {t('nav.seller_center')}
                       </Link>
                     )}
 
                     <Link to={messagesPath} className="dropdown-item" onClick={() => { setDropdownOpen(false); setChatUnreadCount(0); }}>
                       <span className="material-symbols-outlined item-symbol-icon">forum</span>
-                      Messages
+                      {t('nav.chat')}
                       {chatUnreadCount > 0 && <span className="dropdown-chat-badge">{chatUnreadCount}</span>}
                     </Link>
 
@@ -616,10 +544,9 @@ export default function Header() {
                           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                           <line x1="9" y1="3" x2="9" y2="21"></line>
                         </svg>
-                        Admin Panel
+                        {t('nav.admin_center')}
                       </Link>
                     )}
-
 
                     <button className="dropdown-item logout-item" onClick={handleLogoutClick}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
@@ -627,15 +554,15 @@ export default function Header() {
                         <polyline points="16 17 21 12 16 7"></polyline>
                         <line x1="21" y1="12" x2="9" y2="12"></line>
                       </svg>
-                      Logout
+                      {t('nav.logout')}
                     </button>
                   </div>
                 )}
               </div>
             ) : (
               <div className="auth-buttons">
-                <Link to="/login" className="btn-login-link">Login</Link>
-                <Link to="/register" className="btn btn-primary btn-register-nav">Register</Link>
+                <Link to="/login" className="btn-login-link">{t('nav.login')}</Link>
+                <Link to="/register" className="btn btn-primary btn-register-nav">{t('nav.register')}</Link>
               </div>
             )}
           </div>
@@ -644,23 +571,24 @@ export default function Header() {
       {subscriptionModalOpen && (
         <div className="sub-modal-overlay animate-fade-in" onClick={() => setSubscriptionModalOpen(false)}>
           <div className="sub-modal-container" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="sub-modal-title">
-            <button className="sub-modal-close" onClick={() => setSubscriptionModalOpen(false)} aria-label="Close modal">
+            <button className="sub-modal-close" onClick={() => setSubscriptionModalOpen(false)} aria-label={t('common.close')}>
               <span className="material-symbols-outlined">close</span>
             </button>
             <div className="sub-modal-header">
-              <h2 id="sub-modal-title">Elevate your experience</h2>
-              <p>Choose a subscription package suitable for your role and pay immediately with VNPAY.</p>
+              <h2 id="sub-modal-title">{t('subscriptions.title')}</h2>
+              <p>{t('subscriptions.subtitle')}</p>
             </div>
             <div className="sub-modal-grid">
               {loadingPackages ? (
-                <div className="sub-loading-state">Loading subscription packages...</div>
+                <div className="sub-loading-state">{t('subscriptions.loading')}</div>
               ) : packages.length === 0 ? (
-                <div className="sub-empty-state">No subscription packages to display.</div>
+                <div className="sub-empty-state">{t('subscriptions.empty')}</div>
               ) : (
-                packages.map((pkg, index) => {
+                packages.map((pkg) => {
+                  if (!pkg) return null;
                   const visual = getPackageVisual(pkg.serviceId);
                   const featureLines = getFeatureLines(pkg);
-                  const activePackage = activePackages.find(a => a.serviceId === pkg.serviceId);
+                  const activePackage = activePackages.find(a => a?.serviceId === pkg.serviceId);
 
                   let daysLeft = 0;
                   if (activePackage && activePackage.endDate) {
@@ -668,28 +596,64 @@ export default function Header() {
                     daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                   }
 
+                  const pkgNameStr = String(pkg.name || '');
+                  const pkgServiceIdStr = String(pkg.serviceId || '');
+                  const pkgNameLower = pkgNameStr.toLowerCase();
+                  const pkgServiceIdLower = pkgServiceIdStr.toLowerCase();
+
+                  let displayName = pkgNameStr;
+                  if (language === 'vi') {
+                    if (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller')) {
+                      displayName = 'Gói Nâng Cấp Người Bán';
+                    } else if (pkgServiceIdLower.includes('voucher') || pkgServiceIdLower === 'sub_20260701_100002' || pkgNameLower.includes('voucher')) {
+                      displayName = 'Gói Voucher Ưu Đãi';
+                    } else if (pkgServiceIdLower.includes('priority') || pkgServiceIdLower === 'sub_20260701_100003' || pkgNameLower.includes('priority')) {
+                      displayName = 'Gói Ưu Tiên Hiển Thị';
+                    }
+                  }
+
                   return (
-                    <div key={pkg.serviceId} className={visual.cardClass}>
-                      {(pkg.serviceId === 'SERVICE_UPGRADE_SELLER' || pkg.serviceId === 'sub_20260701_100001') && <div className="popular-badge">POPULAR</div>}
+                    <div key={pkg.serviceId || pkg.id} className={visual.cardClass}>
+                      {(pkgServiceIdLower.includes('seller') || pkgServiceIdStr === 'sub_20260701_100001') && (
+                        <div className="popular-badge">{t('subscriptions.popular')}</div>
+                      )}
                       <div className="sub-card-header">
                         <div className={visual.iconWrapClass}>
                           <span className="material-symbols-outlined">{visual.icon}</span>
                         </div>
-                        <h3>{pkg.name}</h3>
+                        <h3>{displayName}</h3>
                         <p>{visual.tagline}</p>
                       </div>
-                      <div className="sub-role-badge">Target: {pkg.targetRole}</div>
+                      <div className="sub-role-badge">
+                        {(pkgServiceIdLower.includes('voucher') || pkgServiceIdLower === 'sub_20260701_100002' || pkgNameLower.includes('voucher'))
+                          ? (language === 'vi' ? 'ĐỐI TƯỢNG: TẤT CẢ NGƯỜI DÙNG' : 'TARGET: ALL USERS')
+                          : t('subscriptions.target_role', { role: pkg.targetRole === 'Buyer' ? t('subscriptions.buyer') : t('subscriptions.seller') })}
+                      </div>
                       <div className="sub-price">
                         <span className="price-num">{formatCurrency(pkg.price)}</span>
-                        <span className="price-period"> / {pkg.durationDays} days</span>
+                        <span className="price-period"> {t('subscriptions.days_suffix', { days: pkg.durationDays || 30 })}</span>
                       </div>
                       <ul className="sub-features">
-                        {featureLines.map((feature, featureIndex) => (
-                          <li key={`${pkg.serviceId}-${featureIndex}`}>
-                            <span className="material-symbols-outlined check-icon">check_circle</span>
-                            <span>{feature}</span>
-                          </li>
-                        ))}
+                        {featureLines.map((feature, featureIndex) => {
+                          const translatedFeature = language === 'vi' ? {
+                            'Unlock Seller privileges': 'Mở khóa đặc quyền Người bán',
+                            'Allowed to list products for sale': 'Được phép đăng bán sản phẩm',
+                            'Professional store management': 'Quản lý cửa hàng chuyên nghiệp',
+                            'Receive 30 exclusive discount & freeship vouchers': 'Nhận 30 voucher giảm giá & freeship độc quyền',
+                            'Valid for 30 days of shopping': 'Có hiệu lực trong 30 ngày mua sắm',
+                            'Unlock progressive savings every week': 'Mở khóa ưu đãi tiết kiệm mỗi tuần',
+                            'Activate priority display rights': 'Kích hoạt quyền hiển thị ưu tiên',
+                            'Bring products to the top of search results': 'Đưa sản phẩm lên top tìm kiếm',
+                            'Reach tens of thousands of potential buyers': 'Tiếp cận hàng chục ngàn người mua tiềm năng',
+                          }[feature] || feature : feature;
+
+                          return (
+                            <li key={`${pkg.serviceId}-${featureIndex}`}>
+                              <span className="material-symbols-outlined check-icon">check_circle</span>
+                              <span>{translatedFeature}</span>
+                            </li>
+                          );
+                        })}
                         {visual.note && (
                           <li className="note-li"><p>{visual.note}</p></li>
                         )}
@@ -698,16 +662,35 @@ export default function Header() {
                       {activePackage ? (
                         <button className="sub-card-btn white-btn active-package-btn" disabled>
                           <span className="material-symbols-outlined">verified</span>
-                          Activated ({daysLeft} days left)
+                          {t('subscriptions.activated', { days: daysLeft })}
                         </button>
-                      ) : (user && user.roles && !user.roles.includes(pkg.targetRole)) ? (
+                      ) : (user?.roles?.includes('Seller') && (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller'))) ? (
+                        <button
+                          className="sub-card-btn white-btn active-package-btn"
+                          disabled
+                          style={{
+                            background: '#e7f7ec',
+                            color: '#1b7a3d',
+                            border: '1px solid #cfe9d6',
+                            opacity: 1,
+                            cursor: 'default',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            padding: '10px 6px',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>verified</span>
+                          {language === 'vi' ? 'Đã là Người bán (Vô hạn)' : 'Already Seller (Unlimited)'}
+                        </button>
+                      ) : (user && user.roles && !user.roles.includes(pkg.targetRole) && !pkgServiceIdLower.includes('voucher') && pkgServiceIdLower !== 'sub_20260701_100002' && !pkgNameLower.includes('voucher')) ? (
                         <button
                           className={`${visual.buttonClass} role-blocked-btn`}
                           disabled
                           style={{ opacity: 0.5, cursor: 'not-allowed', padding: '10px' }}
-                          title={`This package is only available for ${pkg.targetRole} role`}
+                          title={t('subscriptions.requires_role', { role: pkg.targetRole })}
                         >
-                          Requires purchasing {pkg.targetRole} package to buy this
+                          {t('subscriptions.requires_role', { role: pkg.targetRole })}
                         </button>
                       ) : (
                         <button
@@ -715,7 +698,7 @@ export default function Header() {
                           disabled={purchaseLoadingId === pkg.serviceId}
                           onClick={() => handlePurchasePackage(pkg.serviceId)}
                         >
-                          {purchaseLoadingId === pkg.serviceId ? 'Redirecting to VNPAY...' : 'Buy via VNPAY'}
+                          {purchaseLoadingId === pkg.serviceId ? t('subscriptions.redirecting') : t('subscriptions.buy_now')}
                         </button>
                       )}
                     </div>

@@ -4,11 +4,14 @@ import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import voucherService from '../../../services/voucherService';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/MyVouchers.css';
 
 export default function MyVouchers() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
   const [allVouchers, setAllVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +26,6 @@ export default function MyVouchers() {
   const loadVouchers = async () => {
     setLoading(true);
     try {
-      // Fetch all user vouchers with OData ordering
       const params = {
         '$orderby': 'CreatedAt desc'
       };
@@ -32,7 +34,7 @@ export default function MyVouchers() {
       const items = Array.isArray(res) ? res : (res?.value || res?.items || []);
       setAllVouchers(items);
     } catch (err) {
-      showToast(typeof err?.response?.data === 'string' ? err.response.data : 'Failed to load vouchers.', 'error');
+      showToast(typeof err?.response?.data === 'string' ? err.response.data : (isVi ? 'Không thể tải danh sách voucher.' : 'Failed to load vouchers.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -47,7 +49,7 @@ export default function MyVouchers() {
     return (
       <div className="profile-loading-wrapper">
         <span className="btn-spinner"></span>
-        <p>Loading your vouchers...</p>
+        <p>{isVi ? 'Đang tải voucher của bạn...' : 'Loading your vouchers...'}</p>
       </div>
     );
   }
@@ -57,24 +59,30 @@ export default function MyVouchers() {
   const handleCopyCode = (e, code, isUpcoming) => {
     e.stopPropagation();
     if (isUpcoming) {
-      showToast('This voucher is not active yet. It will unlock on its start date!', 'info');
+      showToast(isVi ? 'Voucher này chưa có hiệu lực. Voucher sẽ mở khóa vào ngày bắt đầu!' : 'This voucher is not active yet. It will unlock on its start date!', 'info');
       return;
     }
     if (!code) return;
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
-    showToast(`Code "${code}" copied to clipboard!`, 'success');
+    showToast(isVi ? `Đã sao chép mã "${code}" vào bộ nhớ tạm!` : `Code "${code}" copied to clipboard!`, 'success');
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  // Helper to generate dynamic English description
-  const getEnglishDescription = (mv) => {
+  // Helper to generate dynamic description based on language
+  const getVoucherDescription = (mv) => {
     const minSpendStr = mv.minOrderValue && mv.minOrderValue > 0 
-      ? `${mv.minOrderValue.toLocaleString('en-US')} VND` 
+      ? `${mv.minOrderValue.toLocaleString(isVi ? 'vi-VN' : 'en-US')} VND` 
       : null;
     
     if (mv.discountType === 'Fixed') {
-      const discountStr = mv.discountValue ? `${mv.discountValue.toLocaleString('en-US')} VND` : 'shipping';
+      const discountStr = mv.discountValue ? `${mv.discountValue.toLocaleString(isVi ? 'vi-VN' : 'en-US')} VND` : (isVi ? 'phí vận chuyển' : 'shipping');
+      if (isVi) {
+        if (minSpendStr) {
+          return `Giảm giá vận chuyển đến ${discountStr} cho đơn từ ${minSpendStr}`;
+        }
+        return `Giảm giá vận chuyển đến ${discountStr} cho mọi đơn hàng`;
+      }
       if (minSpendStr) {
         return `Free shipping discount up to ${discountStr} on orders from ${minSpendStr}`;
       }
@@ -84,8 +92,18 @@ export default function MyVouchers() {
     // Percentage discount
     const pct = mv.discountValue || 0;
     const maxCapStr = mv.maxDiscountValue && mv.maxDiscountValue > 0 
-      ? `${mv.maxDiscountValue.toLocaleString('en-US')} VND` 
+      ? `${mv.maxDiscountValue.toLocaleString(isVi ? 'vi-VN' : 'en-US')} VND` 
       : null;
+
+    if (isVi) {
+      if (maxCapStr && minSpendStr) {
+        return `Giảm ${pct}% tối đa ${maxCapStr} cho đơn hàng từ ${minSpendStr}`;
+      }
+      if (maxCapStr) {
+        return `Giảm ${pct}% tối đa ${maxCapStr} cho đơn hàng`;
+      }
+      return `Giảm ${pct}% cho các đơn hàng hợp lệ`;
+    }
 
     if (maxCapStr && minSpendStr) {
       return `${pct}% discount up to ${maxCapStr} for orders from ${minSpendStr}`;
@@ -118,24 +136,24 @@ export default function MyVouchers() {
       if (activeTab === 'upcoming') {
         return isUpcoming && !isUsed && !isExpired;
       }
-      // Available tab (Default)
-      return !isUsed && !isExpired && !isUpcoming && (mv.status === 'Active' || !mv.status);
+      // 'active' tab: available right now
+      return !isUsed && !isExpired && !isUpcoming;
     });
   };
 
-  const filteredAll = getFilteredVouchers();
-  const totalCount = filteredAll.length;
+  const filteredVouchers = getFilteredVouchers();
+  const totalCount = filteredVouchers.length;
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
-  // Paginate current page
-  const paginatedVouchers = filteredAll.slice((page - 1) * pageSize, page * pageSize);
+  // Pagination slice
+  const paginatedVouchers = filteredVouchers.slice((page - 1) * pageSize, page * pageSize);
 
   // Tab count badges
   const now = new Date();
-  const availableCount = allVouchers.filter(mv => (mv.status === 'Active' || !mv.status) && !mv.usedAt && (mv.expirationDate ? new Date(mv.expirationDate) >= now : true) && (mv.startDate ? new Date(mv.startDate) <= now : true)).length;
-  const upcomingCount = allVouchers.filter(mv => (mv.status === 'Active' || !mv.status) && !mv.usedAt && (mv.expirationDate ? new Date(mv.expirationDate) >= now : true) && (mv.startDate ? new Date(mv.startDate) > now : false)).length;
-  const usedCount = allVouchers.filter(mv => mv.status === 'Used' || !!mv.usedAt).length;
-  const expiredCount = allVouchers.filter(mv => mv.status !== 'Used' && !mv.usedAt && mv.expirationDate && new Date(mv.expirationDate) < now).length;
+  const availableCount = allVouchers.filter(v => (!v.status || v.status === 'Active') && !v.usedAt && (!v.expirationDate || new Date(v.expirationDate) >= now) && (!v.startDate || new Date(v.startDate) <= now)).length;
+  const upcomingCount = allVouchers.filter(v => (!v.usedAt) && (!v.expirationDate || new Date(v.expirationDate) >= now) && (v.startDate && new Date(v.startDate) > now)).length;
+  const usedCount = allVouchers.filter(v => v.status === 'Used' || !!v.usedAt).length;
+  const expiredCount = allVouchers.filter(v => !v.usedAt && v.expirationDate && new Date(v.expirationDate) < now).length;
 
   return (
     <>
@@ -146,12 +164,12 @@ export default function MyVouchers() {
           <main className="ma-main">
             <div className="ma-card ma-header-card">
               <div className="ma-header-info">
-                <div className="ma-header-icon">
+                <div className="ma-header-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
                   <span className="material-symbols-outlined">local_activity</span>
                 </div>
                 <div>
-                  <h1 className="ma-headline">My Vouchers</h1>
-                  <p className="ma-subtitle">View, copy, and apply your member subscription vouchers during checkout</p>
+                  <h1 className="ma-headline">{isVi ? 'Voucher Của Tôi' : 'My Vouchers'}</h1>
+                  <p className="ma-subtitle">{isVi ? 'Xem, sao chép và áp dụng các voucher giảm giá thành viên khi đặt hàng' : 'View, copy, and apply your member subscription vouchers during checkout'}</p>
                 </div>
               </div>
             </div>
@@ -162,52 +180,52 @@ export default function MyVouchers() {
                   className={`v-tab-btn ${activeTab === 'active' ? 'active' : ''}`}
                   onClick={() => { setActiveTab('active'); setPage(1); }}
                 >
-                  Available ({availableCount})
+                  {isVi ? 'Khả dụng' : 'Available'} ({availableCount})
                 </button>
                 <button 
                   className={`v-tab-btn ${activeTab === 'upcoming' ? 'active' : ''}`}
                   onClick={() => { setActiveTab('upcoming'); setPage(1); }}
                 >
-                  Upcoming ({upcomingCount})
+                  {isVi ? 'Sắp có' : 'Upcoming'} ({upcomingCount})
                 </button>
                 <button 
                   className={`v-tab-btn ${activeTab === 'used' ? 'active' : ''}`}
                   onClick={() => { setActiveTab('used'); setPage(1); }}
                 >
-                  Used ({usedCount})
+                  {isVi ? 'Đã sử dụng' : 'Used'} ({usedCount})
                 </button>
                 <button 
                   className={`v-tab-btn ${activeTab === 'expired' ? 'active' : ''}`}
                   onClick={() => { setActiveTab('expired'); setPage(1); }}
                 >
-                  Expired ({expiredCount})
+                  {isVi ? 'Đã hết hạn' : 'Expired'} ({expiredCount})
                 </button>
               </div>
 
               {/* Sub-filter by Voucher Type */}
               <div className="v-subfilters-bar flex items-center justify-between pt-3 mt-3 border-t border-gray-100 flex-wrap gap-2 px-1">
                 <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-                  <span>Filter by Type:</span>
+                  <span>{isVi ? 'Lọc theo loại:' : 'Filter by Type:'}</span>
                   <button
                     type="button"
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${typeFilter === 'all' ? 'bg-secondary text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                     onClick={() => { setTypeFilter('all'); setPage(1); }}
                   >
-                    All Types
+                    {isVi ? 'Tất cả loại' : 'All Types'}
                   </button>
                   <button
                     type="button"
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${typeFilter === 'Percentage' ? 'bg-secondary text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                     onClick={() => { setTypeFilter('Percentage'); setPage(1); }}
                   >
-                    Discount (%)
+                    {isVi ? 'Giảm %' : 'Discount (%)'}
                   </button>
                   <button
                     type="button"
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${typeFilter === 'Fixed' ? 'bg-secondary text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                     onClick={() => { setTypeFilter('Fixed'); setPage(1); }}
                   >
-                    Free Shipping / Ship
+                    {isVi ? 'Miễn phí vận chuyển' : 'Free Shipping / Ship'}
                   </button>
                 </div>
               </div>
@@ -216,12 +234,12 @@ export default function MyVouchers() {
             {loading ? (
               <div className="voucher-loading">
                 <span className="btn-spinner"></span>
-                <p>Fetching your vouchers...</p>
+                <p>{isVi ? 'Đang tải voucher của bạn...' : 'Fetching your vouchers...'}</p>
               </div>
             ) : paginatedVouchers.length === 0 ? (
               <div className="voucher-empty glass-panel text-center">
-                <h3>No vouchers found</h3>
-                <p>You don't have any vouchers in the <strong>{activeTab}</strong> tab at the moment.</p>
+                <h3>{isVi ? 'Không tìm thấy voucher nào' : 'No vouchers found'}</h3>
+                <p>{isVi ? `Bạn hiện không có voucher nào trong mục ${activeTab === 'active' ? 'Khả dụng' : activeTab === 'upcoming' ? 'Sắp có' : activeTab === 'used' ? 'Đã sử dụng' : 'Đã hết hạn'}.` : `You don't have any vouchers in the ${activeTab} tab at the moment.`}</p>
               </div>
             ) : (
               <>
@@ -229,22 +247,22 @@ export default function MyVouchers() {
                   {paginatedVouchers.map((mv) => {
                     const isUpcoming = mv.startDate ? new Date(mv.startDate) > now : false;
                     const formattedStartDate = mv.startDate
-                      ? new Date(mv.startDate).toLocaleDateString('en-US', {
+                      ? new Date(mv.startDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric'
                         })
-                      : 'Immediate';
+                      : (isVi ? 'Tức thì' : 'Immediate');
 
                     const formattedExpiry = mv.expirationDate 
-                      ? new Date(mv.expirationDate).toLocaleDateString('en-US', {
+                      ? new Date(mv.expirationDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric'
                         })
-                      : 'No expiry';
+                      : (isVi ? 'Không thời hạn' : 'No expiry');
 
-                    const englishDesc = getEnglishDescription(mv);
+                    const desc = getVoucherDescription(mv);
 
                     return (
                       <div 
@@ -257,14 +275,14 @@ export default function MyVouchers() {
                             {mv.discountType === 'Percentage' ? (
                               <>
                                 <span className="val">{mv.discountValue}%</span>
-                                <span className="lbl">OFF</span>
+                                <span className="lbl">{isVi ? 'GIẢM' : 'OFF'}</span>
                               </>
                             ) : (
                               <>
                                 <span className="val" style={{ fontSize: '18px' }}>
                                   {(mv.discountValue || 0).toLocaleString('vi-VN')} VND
                                 </span>
-                                <span className="lbl">Discount</span>
+                                <span className="lbl">{isVi ? 'GIẢM' : 'Discount'}</span>
                               </>
                             )}
                           </div>
@@ -276,24 +294,23 @@ export default function MyVouchers() {
                               <span className="v-code-tag">{mv.code}</span>
                               {isUpcoming && (
                                 <span className="v-upcoming-badge">
-                                  Unlocks {formattedStartDate}
+                                  {isVi ? `Mở khóa ${formattedStartDate}` : `Unlocks ${formattedStartDate}`}
                                 </span>
                               )}
                               {mv.sellerName && (
-                                <span className="v-shop-name">Store: {mv.sellerName}</span>
+                                <span className="v-shop-name">{isVi ? 'Cửa hàng:' : 'Store:'} {mv.sellerName}</span>
                               )}
                             </div>
 
-                            {/* Clear English Description */}
                             <div className="v-desc-text">
-                              {englishDesc}
+                              {desc}
                             </div>
 
                             <div className="v-expiry">
                               {isUpcoming ? (
-                                <span>Valid: <strong>{formattedStartDate}</strong> - <strong>{formattedExpiry}</strong></span>
+                                <span>{isVi ? 'Hiệu lực:' : 'Valid:'} <strong>{formattedStartDate}</strong> - <strong>{formattedExpiry}</strong></span>
                               ) : (
-                                <span>Expires on: <strong>{formattedExpiry}</strong></span>
+                                <span>{isVi ? 'Hạn dùng:' : 'Expires on:'} <strong>{formattedExpiry}</strong></span>
                               )}
                             </div>
                           </div>
@@ -303,18 +320,18 @@ export default function MyVouchers() {
                                 className="btn btn-primary v-copy-btn"
                                 onClick={(e) => handleCopyCode(e, mv.code, false)}
                               >
-                                {copiedCode === mv.code ? 'Copied' : 'Copy Code'}
+                                {copiedCode === mv.code ? (isVi ? 'Đã chép' : 'Copied') : (isVi ? 'Sao Chép Mã' : 'Copy Code')}
                               </button>
                             ) : activeTab === 'upcoming' ? (
                               <button 
                                 className="btn btn-secondary v-copy-btn disabled"
                                 onClick={(e) => handleCopyCode(e, mv.code, true)}
                               >
-                                Upcoming
+                                {isVi ? 'Sắp Có' : 'Upcoming'}
                               </button>
                             ) : (
                               <span className={`v-status-badge ${activeTab}`}>
-                                {activeTab.toUpperCase()}
+                                {activeTab === 'used' ? (isVi ? 'ĐÃ SỬ DỤNG' : 'USED') : (isVi ? 'ĐÃ HẾT HẠN' : 'EXPIRED')}
                               </span>
                             )}
                           </div>
@@ -328,7 +345,9 @@ export default function MyVouchers() {
                 {totalPages > 1 && (
                   <div className="v-pagination-bar glass-panel">
                     <span className="v-page-info">
-                      Page {page} of {totalPages} ({totalCount} vouchers in this tab)
+                      {isVi 
+                        ? `Trang ${page} / ${totalPages} (${totalCount} voucher trong mục này)`
+                        : `Page ${page} of ${totalPages} (${totalCount} vouchers in this tab)`}
                     </span>
                     <div className="v-pagination-buttons">
                       <button 
@@ -336,7 +355,7 @@ export default function MyVouchers() {
                         disabled={page <= 1}
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                       >
-                        Previous
+                        {isVi ? 'Trước' : 'Previous'}
                       </button>
                       
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -354,7 +373,7 @@ export default function MyVouchers() {
                         disabled={page >= totalPages}
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       >
-                        Next
+                        {isVi ? 'Tiếp' : 'Next'}
                       </button>
                     </div>
                   </div>
@@ -379,39 +398,39 @@ export default function MyVouchers() {
                   {selectedVoucher.discountType === 'Percentage' ? (
                     <>
                       <span className="amount">{selectedVoucher.discountValue}%</span>
-                      <span className="label">OFF</span>
+                      <span className="label">{isVi ? 'GIẢM' : 'OFF'}</span>
                     </>
                   ) : (
                     <>
                       <span className="amount" style={{ fontSize: '24px' }}>
                         {(selectedVoucher.discountValue || 0).toLocaleString('vi-VN')} VND
                       </span>
-                      <span className="label">OFF</span>
+                      <span className="label">{isVi ? 'GIẢM' : 'OFF'}</span>
                     </>
                   )}
                 </div>
                 <div className="v-modal-status-badge">
                   {selectedVoucher.status === 'Used' 
-                    ? 'Used' 
+                    ? (isVi ? 'Đã sử dụng' : 'Used') 
                     : (selectedVoucher.expirationDate && new Date(selectedVoucher.expirationDate) < new Date() 
-                      ? 'Expired' 
+                      ? (isVi ? 'Đã hết hạn' : 'Expired') 
                       : (selectedVoucher.startDate && new Date(selectedVoucher.startDate) > new Date()
-                        ? 'Upcoming'
-                        : 'Available'))}
+                        ? (isVi ? 'Sắp có' : 'Upcoming')
+                        : (isVi ? 'Khả dụng' : 'Available')))}
                 </div>
               </div>
 
               <div className="v-modal-right">
                 <div className="v-modal-header">
-                  <h2>Voucher Details</h2>
+                  <h2>{isVi ? 'Chi Tiết Voucher' : 'Voucher Details'}</h2>
                   <p className="v-modal-desc-text">
-                    {getEnglishDescription(selectedVoucher)}
+                    {getVoucherDescription(selectedVoucher)}
                   </p>
                 </div>
 
                 <div className="v-modal-info-grid">
                   <div className="v-info-row">
-                    <span className="v-info-lbl">Voucher Code:</span>
+                    <span className="v-info-lbl">{isVi ? 'Mã Voucher:' : 'Voucher Code:'}</span>
                     <div className="v-info-val-code">
                       <span className="code-font">{selectedVoucher.code}</span>
                       {selectedVoucher.status === 'Active' && !(selectedVoucher.startDate && new Date(selectedVoucher.startDate) > new Date()) && !(selectedVoucher.expirationDate && new Date(selectedVoucher.expirationDate) < new Date()) && (
@@ -419,7 +438,7 @@ export default function MyVouchers() {
                           className="v-detail-copy-btn" 
                           onClick={(e) => handleCopyCode(e, selectedVoucher.code, false)}
                         >
-                          {copiedCode === selectedVoucher.code ? 'Copied' : 'Copy'}
+                          {copiedCode === selectedVoucher.code ? (isVi ? 'Đã chép' : 'Copied') : (isVi ? 'Sao chép' : 'Copy')}
                         </button>
                       )}
                     </div>
@@ -427,46 +446,46 @@ export default function MyVouchers() {
 
                   {selectedVoucher.sellerName && (
                     <div className="v-info-row">
-                      <span className="v-info-lbl">Applicable Store:</span>
-                      <span className="v-info-val">Only at {selectedVoucher.sellerName}</span>
+                      <span className="v-info-lbl">{isVi ? 'Cửa Hàng Áp Dụng:' : 'Applicable Store:'}</span>
+                      <span className="v-info-val">{isVi ? `Chỉ tại ${selectedVoucher.sellerName}` : `Only at ${selectedVoucher.sellerName}`}</span>
                     </div>
                   )}
 
                   <div className="v-info-row">
-                    <span className="v-info-lbl">Minimum Order Value:</span>
+                    <span className="v-info-lbl">{isVi ? 'Đơn Hàng Tối Thiểu:' : 'Minimum Order Value:'}</span>
                     <span className="v-info-val">{selectedVoucher.minOrderValue ? `${selectedVoucher.minOrderValue.toLocaleString('vi-VN')} VND` : '0 VND'}</span>
                   </div>
 
                   {selectedVoucher.maxDiscountValue > 0 && (
                     <div className="v-info-row">
-                      <span className="v-info-lbl">Maximum Discount Cap:</span>
+                      <span className="v-info-lbl">{isVi ? 'Mức Giảm Tối Đa:' : 'Maximum Discount Cap:'}</span>
                       <span className="v-info-val">{selectedVoucher.maxDiscountValue.toLocaleString('vi-VN')} VND</span>
                     </div>
                   )}
 
                   <div className="v-info-row">
-                    <span className="v-info-lbl">Valid From:</span>
+                    <span className="v-info-lbl">{isVi ? 'Bắt Đầu Từ:' : 'Valid From:'}</span>
                     <span className="v-info-val">
                       {selectedVoucher.startDate 
-                        ? new Date(selectedVoucher.startDate).toLocaleDateString('en-US', { dateStyle: 'long' })
-                        : 'N/A'}
+                        ? new Date(selectedVoucher.startDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', { dateStyle: 'long' })
+                        : (isVi ? 'Tức thì' : 'N/A')}
                     </span>
                   </div>
 
                   <div className="v-info-row">
-                    <span className="v-info-lbl">Expires On:</span>
+                    <span className="v-info-lbl">{isVi ? 'Hạn Sử Dụng Đến:' : 'Expires On:'}</span>
                     <span className="v-info-val">
                       {selectedVoucher.expirationDate 
-                        ? new Date(selectedVoucher.expirationDate).toLocaleDateString('en-US', { dateStyle: 'long' })
-                        : 'No expiry'}
+                        ? new Date(selectedVoucher.expirationDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', { dateStyle: 'long' })
+                        : (isVi ? 'Không thời hạn' : 'No expiry')}
                     </span>
                   </div>
 
                   {selectedVoucher.usedAt && (
                     <div className="v-info-row">
-                      <span className="v-info-lbl">Used On:</span>
+                      <span className="v-info-lbl">{isVi ? 'Đã Sử Dụng Vào:' : 'Used On:'}</span>
                       <span className="v-info-val">
-                        {new Date(selectedVoucher.usedAt).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}
+                        {new Date(selectedVoucher.usedAt).toLocaleString(isVi ? 'vi-VN' : 'en-US', { dateStyle: 'long', timeStyle: 'short' })}
                       </span>
                     </div>
                   )}
@@ -475,11 +494,11 @@ export default function MyVouchers() {
             </div>
 
             <div className="v-modal-terms">
-              <h3>Terms & Conditions</h3>
+              <h3>{isVi ? 'Điều Khoản & Điều Kiện' : 'Terms & Conditions'}</h3>
               <ul>
-                <li>This voucher is non-transferable and exclusive to your active subscription.</li>
-                <li>Vouchers must be applied during checkout before completing payment.</li>
-                <li>Each voucher can only be redeemed once within its validity period.</li>
+                <li>{isVi ? 'Voucher này không thể chuyển nhượng và dành riêng cho gói hội viên của bạn.' : 'This voucher is non-transferable and exclusive to your active subscription.'}</li>
+                <li>{isVi ? 'Voucher phải được áp dụng tại bước thanh toán trước khi hoàn tất.' : 'Vouchers must be applied during checkout before completing payment.'}</li>
+                <li>{isVi ? 'Mỗi voucher chỉ có thể sử dụng 1 lần trong thời hạn cho phép.' : 'Each voucher can only be redeemed once within its validity period.'}</li>
               </ul>
             </div>
           </div>

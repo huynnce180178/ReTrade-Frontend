@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 const GOOGLE_CLIENT_ID = '743075993817-g2um0aknujbhp10vtfjmtg12gq6iaoid.apps.googleusercontent.com';
@@ -83,7 +84,8 @@ function ScrollToTop() {
 function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
         <NotificationProvider>
           <ToastProvider>
             <BrowserRouter>
@@ -168,6 +170,7 @@ function App() {
         </ToastProvider>
         </NotificationProvider>
       </AuthProvider>
+      </LanguageProvider>
     </GoogleOAuthProvider>
   );
 }

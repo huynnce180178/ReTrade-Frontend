@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import productService from '../../../services/productService';
 import wishlistService from '../../../services/wishlistService';
 import offerService from '../../../services/offerService';
@@ -12,21 +13,16 @@ import { createVnPayPaymentUrl } from '../../../services/paymentService';
 import chatService from '../../../services/chatService';
 import '../../../styles/ProductDetail.css';
 
-function formatPrice(price) {
-  if (price == null) return null;
-  return new Intl.NumberFormat('vi-VN').format(price);
-}
-
-function formatDate(dateStr) {
+function formatDate(dateStr, language) {
   if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('vi-VN', {
+  return new Date(dateStr).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', {
     year: 'numeric', month: 'long', day: 'numeric'
   });
 }
 
-function formatDateTime(dateStr) {
+function formatDateTime(dateStr, language) {
   if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleString('vi-VN', {
+  return new Date(dateStr).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit'
   });
@@ -39,13 +35,13 @@ function getSellerInitials(name) {
   return parts[0][0]?.toUpperCase() || '?';
 }
 
-function getOfferStatusConfig(status) {
+function getOfferStatusConfig(status, language) {
   switch (status) {
-    case 'Pending': return { label: 'Pending', color: '#f59e0b', bg: '#fef3c7', icon: 'schedule' };
-    case 'Accepted': return { label: 'Accepted', color: '#0f7b5f', bg: '#e6f5ef', icon: 'check_circle' };
-    case 'Rejected': return { label: 'Rejected', color: '#dc2626', bg: '#fee2e2', icon: 'cancel' };
-    case 'Cancelled': return { label: 'Cancelled', color: '#6b7280', bg: '#f3f4f6', icon: 'block' };
-    case 'Completed': return { label: 'Completed', color: '#2563eb', bg: '#dbeafe', icon: 'verified' };
+    case 'Pending': return { label: language === 'vi' ? 'Chờ duyệt' : 'Pending', color: '#f59e0b', bg: '#fef3c7', icon: 'schedule' };
+    case 'Accepted': return { label: language === 'vi' ? 'Đã chấp nhận' : 'Accepted', color: '#0f7b5f', bg: '#e6f5ef', icon: 'check_circle' };
+    case 'Rejected': return { label: language === 'vi' ? 'Bị từ chối' : 'Rejected', color: '#dc2626', bg: '#fee2e2', icon: 'cancel' };
+    case 'Cancelled': return { label: language === 'vi' ? 'Đã hủy' : 'Cancelled', color: '#6b7280', bg: '#f3f4f6', icon: 'block' };
+    case 'Completed': return { label: language === 'vi' ? 'Đã hoàn tất' : 'Completed', color: '#2563eb', bg: '#dbeafe', icon: 'verified' };
     default: return { label: status, color: '#6b7280', bg: '#f3f4f6', icon: 'help' };
   }
 }
@@ -55,6 +51,7 @@ function getOfferStatusConfig(status) {
    ============================================= */
 function MakeOfferModal({ product, onClose, onSuccess }) {
   const { showToast } = useToast();
+  const { language, formatCurrency } = useLanguage();
   const [offerPrice, setOfferPrice] = useState('');
   const [message, setMessage] = useState('');
   const [expiresInHours, setExpiresInHours] = useState(48);
@@ -76,11 +73,11 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!parsedOffer || parsedOffer <= 0) {
-      showToast('Please enter a valid offer price.', 'error');
+      showToast(language === 'vi' ? 'Vui lòng nhập giá đề xuất hợp lệ.' : 'Please enter a valid offer price.', 'error');
       return;
     }
     if (isPriceInvalid) {
-      showToast(`Offer must be lower than the listed price (${formatPrice(originalPrice)} VND).`, 'error');
+      showToast(language === 'vi' ? `Mức giá trả phải nhỏ hơn giá niêm yết (${formatCurrency(originalPrice)}).` : `Offer must be lower than the listed price (${formatCurrency(originalPrice)}).`, 'error');
       return;
     }
     setSubmitting(true);
@@ -88,12 +85,12 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
       const result = await offerService.makeOffer(
         product.productId, parsedOffer, message, expiresInHours
       );
-      showToast('Offer submitted successfully!', 'success');
+      showToast(language === 'vi' ? 'Đã gửi đề xuất trả giá thành công!' : 'Offer submitted successfully!', 'success');
       onSuccess(result);
       onClose();
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Failed to submit offer.';
-      showToast(typeof msg === 'string' ? msg : 'Failed to submit offer.', 'error');
+      const msg = err.response?.data || err.message || (language === 'vi' ? 'Không thể gửi đề xuất trả giá.' : 'Failed to submit offer.');
+      showToast(typeof msg === 'string' ? msg : (language === 'vi' ? 'Không thể gửi đề xuất trả giá.' : 'Failed to submit offer.'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -107,8 +104,8 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
           <div className="offer-modal-header-left">
             <span className="material-symbols-outlined offer-modal-icon">local_offer</span>
             <div>
-              <h2 className="offer-modal-title">Make an Offer</h2>
-              <p className="offer-modal-subtitle">Negotiate a price with the seller</p>
+              <h2 className="offer-modal-title">{language === 'vi' ? 'Đề xuất trả giá' : 'Make an Offer'}</h2>
+              <p className="offer-modal-subtitle">{language === 'vi' ? 'Thương lượng mức giá mong muốn với người bán' : 'Negotiate a price with the seller'}</p>
             </div>
           </div>
           <button className="offer-modal-close" onClick={onClose}>
@@ -130,7 +127,7 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
           <div className="offer-product-info">
             <span className="offer-product-name">{product?.name}</span>
             <span className="offer-product-price">
-              Listed at: <strong>{formatPrice(originalPrice)} VND</strong>
+              {language === 'vi' ? 'Giá niêm yết:' : 'Listed at:'} <strong>{formatCurrency(originalPrice)}</strong>
             </span>
           </div>
         </div>
@@ -139,14 +136,14 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
         <form onSubmit={handleSubmit} className="offer-form">
           {/* Price input */}
           <div className="offer-field">
-            <label className="offer-label">Your Offer Price (VND) *</label>
+            <label className="offer-label">{language === 'vi' ? 'Mức giá bạn đề xuất (VND) *' : 'Your Offer Price (VND) *'}</label>
             <div className="offer-price-input-wrapper">
               <input
                 type="text"
                 className={`offer-price-input${isPriceInvalid ? ' offer-price-input-error' : ''}`}
                 value={offerPrice}
                 onChange={handlePriceInput}
-                placeholder={originalPrice ? `Max ${formatPrice(originalPrice - 1)} VND` : 'e.g. 1,500,000'}
+                placeholder={originalPrice ? (language === 'vi' ? `Tối đa ${formatCurrency(originalPrice - 1)}` : `Max ${formatCurrency(originalPrice - 1)}`) : '1,500,000'}
                 required
                 autoFocus
               />
@@ -157,28 +154,28 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
               )}
               {isPriceInvalid && (
                 <div className="offer-discount-badge up">
-                  Too high!
+                  {language === 'vi' ? 'Quá cao!' : 'Too high!'}
                 </div>
               )}
             </div>
             {isPriceInvalid ? (
               <span className="offer-price-error">
                 <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>warning</span>
-                Offer must be lower than the listed price ({formatPrice(originalPrice)} VND)
+                {language === 'vi' ? `Mức giá trả phải nhỏ hơn giá niêm yết (${formatCurrency(originalPrice)})` : `Offer must be lower than the listed price (${formatCurrency(originalPrice)})`}
               </span>
             ) : parsedOffer > 0 ? (
-              <span className="offer-price-preview">{formatPrice(parsedOffer)} VND — save {formatPrice(originalPrice - parsedOffer)} VND</span>
+              <span className="offer-price-preview">{formatCurrency(parsedOffer)} — {language === 'vi' ? `tiết kiệm ${formatCurrency(originalPrice - parsedOffer)}` : `save ${formatCurrency(originalPrice - parsedOffer)}`}</span>
             ) : null}
           </div>
 
           {/* Message */}
           <div className="offer-field">
-            <label className="offer-label">Message to Seller (optional)</label>
+            <label className="offer-label">{language === 'vi' ? 'Lời nhắn gửi người bán (không bắt buộc)' : 'Message to Seller (optional)'}</label>
             <textarea
               className="offer-textarea"
               value={message}
               onChange={e => setMessage(e.target.value)}
-              placeholder="Explain why you're offering this price..."
+              placeholder={language === 'vi' ? 'Giải thích lý do bạn trả mức giá này...' : "Explain why you're offering this price..."}
               rows={3}
               maxLength={300}
             />
@@ -187,7 +184,7 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
 
           {/* Expiry */}
           <div className="offer-field">
-            <label className="offer-label">Offer expires in</label>
+            <label className="offer-label">{language === 'vi' ? 'Thời hạn đề xuất' : 'Offer expires in'}</label>
             <div className="offer-expiry-options">
               {[24, 48, 72].map(h => (
                 <button
@@ -196,7 +193,7 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
                   className={`offer-expiry-btn ${expiresInHours === h ? 'active' : ''}`}
                   onClick={() => setExpiresInHours(h)}
                 >
-                  {h}h
+                  {h}{language === 'vi' ? 'giờ' : 'h'}
                 </button>
               ))}
             </div>
@@ -205,13 +202,13 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
           {/* Actions */}
           <div className="offer-modal-actions">
             <button type="button" className="offer-btn-cancel" onClick={onClose}>
-              Cancel
+              {language === 'vi' ? 'Hủy' : 'Cancel'}
             </button>
             <button type="submit" className="offer-btn-submit" disabled={submitting || !parsedOffer || isPriceInvalid}>
               {submitting ? (
-                <><span className="offer-spinner" /> Submitting...</>
+                <><span className="offer-spinner" /> {language === 'vi' ? 'Đang gửi...' : 'Submitting...'}</>
               ) : (
-                <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>price_check</span> Make Offer</>
+                <><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>price_check</span> {language === 'vi' ? 'Gửi trả giá' : 'Make Offer'}</>
               )}
             </button>
           </div>
@@ -222,8 +219,6 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
   );
 }
 
-
-
 /* =============================================
    MAIN COMPONENT
    ============================================= */
@@ -232,6 +227,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { user } = useAuth();
+  const { language, formatCurrency } = useLanguage();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -306,11 +302,11 @@ export default function ProductDetail() {
 
   const handleToggleWishlist = async () => {
     if (!user) {
-      showToast('Please sign in to use the wishlist.', 'error');
+      showToast(language === 'vi' ? 'Vui lòng đăng nhập để dùng danh sách yêu thích.' : 'Please sign in to use the wishlist.', 'error');
       return;
     }
     if (product?.sellerId === user.userId || product?.sellerId === user.id || product?.sellerId === user.accountId) {
-      showToast('You cannot add your own product to your wishlist.', 'error');
+      showToast(language === 'vi' ? 'Bạn không thể thêm sản phẩm của chính mình vào danh sách yêu thích.' : 'You cannot add your own product to your wishlist.', 'error');
       return;
     }
     setTogglingWishlist(true);
@@ -321,15 +317,15 @@ export default function ProductDetail() {
         if (item) {
           await wishlistService.removeItem(item.wishlistItemId);
           setIsWishlisted(false);
-          showToast('Removed from wishlist.', 'success');
+          showToast(language === 'vi' ? 'Đã xóa khỏi danh sách yêu thích.' : 'Removed from wishlist.', 'success');
         }
       } else {
         await wishlistService.addToWishlist(product.productId);
         setIsWishlisted(true);
-        showToast('Added to wishlist!', 'success');
+        showToast(language === 'vi' ? 'Đã thêm vào danh sách yêu thích!' : 'Added to wishlist!', 'success');
       }
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Something went wrong.';
+      const msg = err.response?.data || err.message || (language === 'vi' ? 'Đã xảy ra lỗi.' : 'Something went wrong.');
       showToast(msg, 'error');
     } finally {
       setTogglingWishlist(false);
@@ -341,15 +337,23 @@ export default function ProductDetail() {
     navigate(`/checkout/${product.productId}`, { state: { product } });
   };
 
+  const handlePlaceBid = () => {
+    if (product?.auctionId) {
+      navigate(`/auction/${product.auctionId}`);
+    } else {
+      navigate('/auction');
+    }
+  };
+
   const handleContactSeller = async () => {
     if (!user) {
-      showToast('Please sign in to contact the seller.', 'warning');
+      showToast(language === 'vi' ? 'Vui lòng đăng nhập để nhắn tin với người bán.' : 'Please sign in to contact the seller.', 'warning');
       navigate('/login');
       return;
     }
 
     if (isSeller) {
-      showToast('You cannot chat with yourself about your own product.', 'warning');
+      showToast(language === 'vi' ? 'Bạn không thể tự nhắn tin cho sản phẩm của mình.' : 'You cannot chat with yourself about your own product.', 'warning');
       return;
     }
 
@@ -359,7 +363,7 @@ export default function ProductDetail() {
         navigate(`/chat/${room.roomId}`);
       }
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Failed to open chat.';
+      const msg = error.response?.data || error.message || (language === 'vi' ? 'Không thể mở cuộc trò chuyện.' : 'Failed to open chat.');
       showToast(String(msg), 'error');
     }
   };
@@ -379,7 +383,7 @@ export default function ProductDetail() {
         if (err?.response?.status === 404) {
           setProduct(null);
         } else {
-          showToast('Failed to load product details.', 'error');
+          showToast(language === 'vi' ? 'Không thể tải chi tiết sản phẩm.' : 'Failed to load product details.', 'error');
         }
       } finally {
         setLoading(false);
@@ -389,7 +393,7 @@ export default function ProductDetail() {
       fetchProduct();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [productId]);
+  }, [productId, language, showToast]);
 
   // Determine if current user is the seller
   const isSeller = user && product && (
@@ -404,7 +408,7 @@ export default function ProductDetail() {
       <div className="product-detail-page container animate-fade-in">
         <div className="pd-loading">
           <div className="product-loading-spinner" />
-          <p>Loading product details...</p>
+          <p>{language === 'vi' ? 'Đang tải thông tin sản phẩm...' : 'Loading product details...'}</p>
         </div>
       </div>
     );
@@ -416,10 +420,10 @@ export default function ProductDetail() {
       <div className="product-detail-page container animate-fade-in">
         <div className="pd-not-found">
           <span className="pd-not-found-icon">📦</span>
-          <h2>Product Not Found</h2>
-          <p>The product you're looking for doesn't exist or has been removed.</p>
+          <h2>{language === 'vi' ? 'Không tìm thấy sản phẩm' : 'Product Not Found'}</h2>
+          <p>{language === 'vi' ? 'Sản phẩm bạn tìm kiếm không tồn tại hoặc đã bị gỡ bỏ.' : "The product you're looking for doesn't exist or has been removed."}</p>
           <Link to="/product" className="btn btn-primary" style={{ marginTop: '8px' }}>
-            Browse All Products
+            {language === 'vi' ? 'Xem tất cả sản phẩm' : 'Browse All Products'}
           </Link>
         </div>
       </div>
@@ -434,9 +438,9 @@ export default function ProductDetail() {
     <div className="product-detail-page container animate-fade-in">
       {/* Breadcrumb */}
       <nav className="pd-breadcrumb">
-        <Link to="/">Home</Link>
+        <Link to="/">{language === 'vi' ? 'Trang chủ' : 'Home'}</Link>
         <span className="sep">›</span>
-        <Link to="/product">Products</Link>
+        <Link to="/product">{language === 'vi' ? 'Sản phẩm' : 'Products'}</Link>
         {product.categoryName && (
           <>
             <span className="sep">›</span>
@@ -461,7 +465,7 @@ export default function ProductDetail() {
                 <img src={mainImage.imageUrl} alt={mainImage.altText || product.name} />
                 <div className="pd-main-image-overlay">
                   <span className="material-symbols-outlined">zoom_in</span>
-                  <span>Click to expand</span>
+                  <span>{language === 'vi' ? 'Nhấn để xem ảnh lớn' : 'Click to expand'}</span>
                 </div>
               </>
             ) : (
@@ -503,11 +507,10 @@ export default function ProductDetail() {
           <div className="pd-price-section">
             {product.price != null ? (
               <>
-                <span className="pd-price">{formatPrice(product.price)}</span>
-                <span className="pd-price-label">VND</span>
+                <span className="pd-price">{formatCurrency(product.price)}</span>
               </>
             ) : (
-              <span className="pd-price" style={{ fontSize: '22px', color: 'var(--accent)' }}>Auction Item</span>
+              <span className="pd-price" style={{ fontSize: '22px', color: 'var(--accent)' }}>{language === 'vi' ? 'Sản phẩm Đấu giá' : 'Auction Item'}</span>
             )}
           </div>
 
@@ -518,7 +521,7 @@ export default function ProductDetail() {
                 <svg className="meta-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="10" />
                 </svg>
-                <span className="meta-label">Condition</span>
+                <span className="meta-label">{language === 'vi' ? 'Tình trạng' : 'Condition'}</span>
                 <span className="meta-val">{product.condition}</span>
               </div>
             )}
@@ -527,8 +530,8 @@ export default function ProductDetail() {
                 <svg className="meta-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                 </svg>
-                <span className="meta-label">Stock</span>
-                <span className="meta-val">{product.stockQuantity} available</span>
+                <span className="meta-label">{language === 'vi' ? 'Kho hàng' : 'Stock'}</span>
+                <span className="meta-val">{product.stockQuantity} {language === 'vi' ? 'sản phẩm' : 'available'}</span>
               </div>
             )}
             {product.status && (
@@ -536,7 +539,7 @@ export default function ProductDetail() {
                 <svg className="meta-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
-                <span className="meta-label">Status</span>
+                <span className="meta-label">{language === 'vi' ? 'Trạng thái' : 'Status'}</span>
                 <span className="meta-val">{product.status}</span>
               </div>
             )}
@@ -554,12 +557,12 @@ export default function ProductDetail() {
               {getSellerInitials(product.sellerName)}
             </div>
             <div className="pd-seller-info">
-              <span className="pd-seller-label">Seller</span>
-              <span className="pd-seller-name">{product.sellerName || 'Unknown Seller'}</span>
+              <span className="pd-seller-label">{language === 'vi' ? 'Người bán' : 'Seller'}</span>
+              <span className="pd-seller-name">{product.sellerName || 'ReTrade Seller'}</span>
             </div>
             {product.sellerId && (
               <span className="pd-seller-link">
-                View Profile
+                {language === 'vi' ? 'Xem hồ sơ' : 'View Profile'}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
@@ -572,13 +575,13 @@ export default function ProductDetail() {
           {/* Dates */}
           <div className="pd-date-info">
             <div className="pd-date-item">
-              <span>Listed</span>
-              <strong>{formatDate(product.createdAt)}</strong>
+              <span>{language === 'vi' ? 'Ngày đăng' : 'Listed'}</span>
+              <strong>{formatDate(product.createdAt, language)}</strong>
             </div>
             {product.updatedAt && product.updatedAt !== product.createdAt && (
               <div className="pd-date-item">
-                <span>Updated</span>
-                <strong>{formatDate(product.updatedAt)}</strong>
+                <span>{language === 'vi' ? 'Cập nhật' : 'Updated'}</span>
+                <strong>{formatDate(product.updatedAt, language)}</strong>
               </div>
             )}
           </div>
@@ -588,24 +591,24 @@ export default function ProductDetail() {
             {product.price != null ? (
               <button className="btn btn-primary pd-btn-buy" onClick={handleGoToCheckout}>
                 <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>shopping_cart</span>
-                Buy Now
+                {language === 'vi' ? 'Mua ngay' : 'Buy Now'}
               </button>
             ) : (
-              <button className="btn btn-primary pd-btn-buy" onClick={handleGoToCheckout}>
+              <button className="btn btn-primary pd-btn-buy" onClick={handlePlaceBid}>
                 <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>gavel</span>
-                Place Bid
+                {language === 'vi' ? 'Đặt giá thầu' : 'Place Bid'}
               </button>
             )}
 
             <div className="pd-actions-icons">
-              <button className="btn btn-outline pd-btn-icon" title="Contact Seller" onClick={handleContactSeller}>
+              <button className="btn btn-outline pd-btn-icon" title={language === 'vi' ? 'Nhắn tin người bán' : 'Contact Seller'} onClick={handleContactSeller}>
                 <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>chat</span>
               </button>
               <button
                 className={`btn ${isWishlisted ? 'btn-primary' : 'btn-outline'} pd-btn-icon`}
                 onClick={handleToggleWishlist}
                 disabled={togglingWishlist}
-                title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                title={isWishlisted ? (language === 'vi' ? 'Xóa khỏi yêu thích' : 'Remove from Wishlist') : (language === 'vi' ? 'Thêm vào yêu thích' : 'Add to Wishlist')}
               >
                 {togglingWishlist ? (
                   <span className="pd-wl-spinner" />
@@ -623,26 +626,26 @@ export default function ProductDetail() {
             <div className="pd-offer-section">
               <div className="pd-offer-label">
                 <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#0f7b5f' }}>local_offer</span>
-                Negotiate Price
+                {language === 'vi' ? 'Thương lượng giá' : 'Negotiate Price'}
               </div>
 
               {myPendingOffer ? (
                 <div className="pd-offer-existing">
                   <div className="pd-offer-existing-info">
                     <span className="pd-offer-existing-price">
-                      Your offer: <strong>{formatPrice(myPendingOffer.offerPrice)} VND</strong>
+                      {language === 'vi' ? 'Giá bạn trả:' : 'Your offer:'} <strong>{formatCurrency(myPendingOffer.offerPrice)}</strong>
                     </span>
                     <span
                       className="pd-offer-existing-status"
                       style={{
-                        color: getOfferStatusConfig(myPendingOffer.status).color,
-                        background: getOfferStatusConfig(myPendingOffer.status).bg
+                        color: getOfferStatusConfig(myPendingOffer.status, language).color,
+                        background: getOfferStatusConfig(myPendingOffer.status, language).bg
                       }}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
-                        {getOfferStatusConfig(myPendingOffer.status).icon}
+                        {getOfferStatusConfig(myPendingOffer.status, language).icon}
                       </span>
-                      {myPendingOffer.status}
+                      {getOfferStatusConfig(myPendingOffer.status, language).label}
                     </span>
                   </div>
                   <button
@@ -650,7 +653,7 @@ export default function ProductDetail() {
                     onClick={() => navigate('/offer-history')}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>history</span>
-                    View Offer History
+                    {language === 'vi' ? 'Xem lịch sử trả giá' : 'View Offer History'}
                   </button>
                 </div>
               ) : (
@@ -658,19 +661,19 @@ export default function ProductDetail() {
                   <button
                     className="pd-offer-btn pd-offer-btn-make"
                     onClick={() => {
-                      if (!user) { showToast('Please sign in to make an offer.', 'error'); return; }
+                      if (!user) { showToast(language === 'vi' ? 'Vui lòng đăng nhập để đề xuất trả giá.' : 'Please sign in to make an offer.', 'error'); return; }
                       setShowMakeOffer(true);
                     }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>local_offer</span>
-                    Make an Offer
+                    {language === 'vi' ? 'Đề xuất trả giá' : 'Make an Offer'}
                   </button>
                   <button
                     className="pd-offer-btn pd-offer-btn-history-alt"
                     onClick={() => navigate('/offer-history')}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>history</span>
-                    View History
+                    {language === 'vi' ? 'Xem lịch sử' : 'View History'}
                   </button>
                 </div>
               )}
@@ -686,11 +689,11 @@ export default function ProductDetail() {
           <div className="pd-offer-alert accepted">
             <span className="material-symbols-outlined">check_circle</span>
             <div className="pd-offer-alert-text">
-              <strong>Offer Accepted!</strong>
-              <span>The seller accepted your offer of {formatPrice(myPendingOffer.offerPrice)} VND.</span>
+              <strong>{language === 'vi' ? 'Đề xuất giá đã được chấp nhận!' : 'Offer Accepted!'}</strong>
+              <span>{language === 'vi' ? `Người bán đã đồng ý mức giá ${formatCurrency(myPendingOffer.offerPrice)}.` : `The seller accepted your offer of ${formatCurrency(myPendingOffer.offerPrice)}.`}</span>
             </div>
             <button className="pd-offer-alert-btn" onClick={() => navigate('/offer-history')}>
-              Checkout Now
+              {language === 'vi' ? 'Thanh toán ngay' : 'Checkout Now'}
             </button>
           </div>
         )}
@@ -699,11 +702,11 @@ export default function ProductDetail() {
           <div className="pd-offer-alert pending">
             <span className="material-symbols-outlined">schedule</span>
             <div className="pd-offer-alert-text">
-              <strong>Offer Pending</strong>
-              <span>You have a pending offer of {formatPrice(myPendingOffer.offerPrice)} VND.</span>
+              <strong>{language === 'vi' ? 'Đang chờ người bán phản hồi' : 'Offer Pending'}</strong>
+              <span>{language === 'vi' ? `Bạn có đề xuất trả giá ${formatCurrency(myPendingOffer.offerPrice)}.` : `You have a pending offer of ${formatCurrency(myPendingOffer.offerPrice)}.`}</span>
             </div>
             <button className="pd-offer-alert-btn" onClick={() => navigate('/offer-history')}>
-              View Status
+              {language === 'vi' ? 'Xem trạng thái' : 'View Status'}
             </button>
           </div>
         )}
@@ -711,7 +714,7 @@ export default function ProductDetail() {
         {/* Description */}
         {product.description && (
           <div className="pd-description-section">
-            <h2 className="pd-section-title">Description</h2>
+            <h2 className="pd-section-title">{language === 'vi' ? 'Mô tả sản phẩm' : 'Description'}</h2>
             <div className="pd-description-text">{product.description}</div>
           </div>
         )}
@@ -719,7 +722,7 @@ export default function ProductDetail() {
         {/* Attributes */}
         {attributes.length > 0 && (
           <div className="pd-attributes-section">
-            <h2 className="pd-section-title">Specifications</h2>
+            <h2 className="pd-section-title">{language === 'vi' ? 'Thông số kỹ thuật' : 'Specifications'}</h2>
             <div className="pd-attributes-grid">
               {attributes.map((attr, idx) => (
                 <div key={attr.attributeId || idx} className="pd-attr-item">
@@ -737,30 +740,30 @@ export default function ProductDetail() {
         {/* Dimensions */}
         {hasDimensions && (
           <div className="pd-dimensions-section">
-            <h2 className="pd-section-title">Dimensions & Weight</h2>
+            <h2 className="pd-section-title">{language === 'vi' ? 'Kích thước & Trọng lượng' : 'Dimensions & Weight'}</h2>
             <div className="pd-dimensions-grid">
               {product.weightGram != null && (
                 <div className="pd-dim-card">
                   <span className="pd-dim-value">{product.weightGram}g</span>
-                  <span className="pd-dim-label">Weight</span>
+                  <span className="pd-dim-label">{language === 'vi' ? 'Trọng lượng' : 'Weight'}</span>
                 </div>
               )}
               {product.lengthCm != null && (
                 <div className="pd-dim-card">
                   <span className="pd-dim-value">{product.lengthCm}cm</span>
-                  <span className="pd-dim-label">Length</span>
+                  <span className="pd-dim-label">{language === 'vi' ? 'Chiều dài' : 'Length'}</span>
                 </div>
               )}
               {product.widthCm != null && (
                 <div className="pd-dim-card">
                   <span className="pd-dim-value">{product.widthCm}cm</span>
-                  <span className="pd-dim-label">Width</span>
+                  <span className="pd-dim-label">{language === 'vi' ? 'Chiều rộng' : 'Width'}</span>
                 </div>
               )}
               {product.heightCm != null && (
                 <div className="pd-dim-card">
                   <span className="pd-dim-value">{product.heightCm}cm</span>
-                  <span className="pd-dim-label">Height</span>
+                  <span className="pd-dim-label">{language === 'vi' ? 'Chiều cao' : 'Height'}</span>
                 </div>
               )}
             </div>
@@ -822,7 +825,7 @@ export default function ProductDetail() {
         <MakeOfferModal
           product={product}
           onClose={() => setShowMakeOffer(false)}
-          onSuccess={(newOffer) => setMyPendingOffer(newOffer)}
+          onSuccess={handleMakeOfferSuccess}
         />
       )}
     </div>

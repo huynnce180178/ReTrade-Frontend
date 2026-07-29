@@ -4,11 +4,13 @@ import accountService from '../../../services/accountService';
 import { useToast } from '../../../context/ToastContext';
 import { forceLogout } from '../../../utils/authUtils';
 import { useAuth } from '../../../context/AuthContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/MyAccount.css';
 
 export default function ChangePassword() {
   const { showToast } = useToast();
   const { user, setUser } = useAuth();
+  const { t, language } = useLanguage();
   const isPasswordSet = user?.isPasswordSet !== false;
 
   const [oldPassword, setOldPassword] = useState('');
@@ -33,15 +35,15 @@ export default function ChangePassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if ((isPasswordSet && !oldPassword) || !newPassword || !confirmPassword) {
-      showToast('All fields are required.', 'error');
+      showToast(language === 'vi' ? 'Vui lòng nhập đầy đủ các trường.' : 'All fields are required.', 'error');
       return;
     }
     if (!isPasswordValid) {
-      showToast('Please satisfy all password requirements.', 'error');
+      showToast(language === 'vi' ? 'Vui lòng đáp ứng đầy đủ yêu cầu mật khẩu.' : 'Please satisfy all password requirements.', 'error');
       return;
     }
     if (newPassword !== confirmPassword) {
-      showToast('New passwords do not match.', 'error');
+      showToast(t('validation.password_mismatch'), 'error');
       return;
     }
 
@@ -52,7 +54,12 @@ export default function ChangePassword() {
       } else {
         await accountService.setPassword(newPassword);
       }
-      showToast(isPasswordSet ? 'Password changed successfully. Logging out...' : 'Password set successfully. Logging out...', 'success');
+      showToast(
+        isPasswordSet
+          ? (language === 'vi' ? 'Đổi mật khẩu thành công. Đang đăng xuất...' : 'Password changed successfully. Logging out...')
+          : (language === 'vi' ? 'Đặt mật khẩu thành công. Đang đăng xuất...' : 'Password set successfully. Logging out...'),
+        'success'
+      );
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -65,7 +72,10 @@ export default function ChangePassword() {
         forceLogout();
       }, 1500);
     } catch (err) {
-      showToast(err?.response?.data || `Failed to ${isPasswordSet ? 'change' : 'set'} password.`, 'error');
+      showToast(
+        err?.response?.data || (language === 'vi' ? `Không thể ${isPasswordSet ? 'đổi' : 'đặt'} mật khẩu.` : `Failed to ${isPasswordSet ? 'change' : 'set'} password.`),
+        'error'
+      );
     } finally {
       setLoading(false);
     }
@@ -87,8 +97,12 @@ export default function ChangePassword() {
                     <span className="material-symbols-outlined">shield_lock</span>
                   </div>
                   <div>
-                    <h1 className="ma-headline">{isPasswordSet ? 'Change Password' : 'Set Password'}</h1>
-                    <p className="ma-subtitle">{isPasswordSet ? 'Update your password to keep your account secure.' : 'Create a password for your account to sign in using username/password next time.'}</p>
+                    <h1 className="ma-headline">{isPasswordSet ? (language === 'vi' ? 'Đổi Mật Khẩu' : 'Change Password') : (language === 'vi' ? 'Tạo Mật Khẩu' : 'Set Password')}</h1>
+                    <p className="ma-subtitle">
+                      {isPasswordSet
+                        ? (language === 'vi' ? 'Cập nhật mật khẩu để bảo vệ tài khoản của bạn an toàn.' : 'Update your password to keep your account secure.')
+                        : (language === 'vi' ? 'Tạo mật khẩu cho tài khoản để đăng nhập bằng tên người dùng/mật khẩu vào lần sau.' : 'Create a password for your account to sign in using username/password next time.')}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -98,7 +112,7 @@ export default function ChangePassword() {
                   {/* Current Password */}
                   {isPasswordSet && (
                     <div className="ma-form-group" style={{ marginBottom: '24px' }}>
-                      <label className="ma-label">Current Password</label>
+                      <label className="ma-label">{language === 'vi' ? 'Mật Khẩu Hiện Tại' : 'Current Password'}</label>
                       <div style={{ position: 'relative' }}>
                         <input
                           type={showCurrentPassword ? 'text' : 'password'}
@@ -134,7 +148,7 @@ export default function ChangePassword() {
 
                   {/* New Password */}
                   <div className="ma-form-group" style={{ marginBottom: '24px' }}>
-                    <label className="ma-label">New Password</label>
+                    <label className="ma-label">{language === 'vi' ? 'Mật Khẩu Mới' : 'New Password'}</label>
                     <div style={{ position: 'relative' }}>
                       <input
                         type={showNewPassword ? 'text' : 'password'}
@@ -169,7 +183,7 @@ export default function ChangePassword() {
 
                   {/* Confirm Password */}
                   <div className="ma-form-group" style={{ marginBottom: '24px' }}>
-                    <label className="ma-label">Confirm New Password</label>
+                    <label className="ma-label">{language === 'vi' ? 'Xác Nhận Mật Khẩu Mới' : 'Confirm New Password'}</label>
                     <div style={{ position: 'relative' }}>
                       <input
                         type={showConfirmPassword ? 'text' : 'password'}
@@ -204,10 +218,12 @@ export default function ChangePassword() {
 
                   <div className="ma-form-actions">
                     <button type="submit" className="ma-btn-primary" disabled={loading}>
-                      {loading ? (isPasswordSet ? 'Saving Changes...' : 'Setting Password...') : (isPasswordSet ? 'Save Changes' : 'Set Password')}
+                      {loading
+                        ? (isPasswordSet ? (language === 'vi' ? 'Đang lưu...' : 'Saving Changes...') : (language === 'vi' ? 'Đang thiết lập...' : 'Setting Password...'))
+                        : (isPasswordSet ? (language === 'vi' ? 'Lưu Thay Đổi' : 'Save Changes') : (language === 'vi' ? 'Tạo Mật Khẩu' : 'Set Password'))}
                     </button>
                     <button type="button" className="ma-btn-secondary" onClick={() => { setOldPassword(''); setNewPassword(''); setConfirmPassword(''); }}>
-                      Cancel
+                      {language === 'vi' ? 'Hủy' : 'Cancel'}
                     </button>
                   </div>
                 </form>
@@ -217,9 +233,9 @@ export default function ChangePassword() {
               <div className="ma-privacy-card" style={{ borderLeft: '4px solid #1b6b51', borderRadius: '4px 12px 12px 4px' }}>
                 <span className="material-symbols-outlined ma-privacy-icon">info</span>
                 <div>
-                  <h4 className="ma-privacy-title">Security Notice</h4>
+                  <h4 className="ma-privacy-title">{language === 'vi' ? 'Lưu Ý Bảo Mật' : 'Security Notice'}</h4>
                   <p className="ma-privacy-text" style={{ fontSize: '14px', margin: 0 }}>
-                    Changing your password will sign you out from other active sessions for security purposes. You will need to log back in on all other devices.
+                    {language === 'vi' ? 'Thay đổi mật khẩu sẽ đăng xuất tất cả các phiên hoạt động khác của bạn để bảo mật. Bạn sẽ cần đăng nhập lại trên các thiết bị khác.' : 'Changing your password will sign you out from other active sessions for security purposes. You will need to log back in on all other devices.'}
                   </p>
                 </div>
               </div>
@@ -228,37 +244,37 @@ export default function ChangePassword() {
             {/* Requirements Column */}
             <div className="ma-col-right">
               <div className="ma-card">
-                <h4 className="ma-card-title" style={{ marginBottom: '24px' }}>Password Requirements</h4>
+                <h4 className="ma-card-title" style={{ marginBottom: '24px' }}>{language === 'vi' ? 'Yêu Cầu Mật Khẩu' : 'Password Requirements'}</h4>
                 <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: checks.length ? '#1b6b51' : '#717975', transition: 'color 0.2s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: checks.length ? '#1b6b51' : '#717975', fontVariationSettings: checks.length ? "'FILL' 1" : "'FILL' 0", transition: 'color 0.2s' }}>
                       {checks.length ? 'check_circle' : 'circle'}
                     </span>
-                    8+ characters
+                    {language === 'vi' ? 'Ít nhất 8 ký tự' : '8+ characters'}
                   </li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: checks.upper ? '#1b6b51' : '#717975', transition: 'color 0.2s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: checks.upper ? '#1b6b51' : '#717975', fontVariationSettings: checks.upper ? "'FILL' 1" : "'FILL' 0", transition: 'color 0.2s' }}>
                       {checks.upper ? 'check_circle' : 'circle'}
                     </span>
-                    One uppercase letter
+                    {language === 'vi' ? 'Ít nhất một chữ in hoa' : 'One uppercase letter'}
                   </li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: checks.lower ? '#1b6b51' : '#717975', transition: 'color 0.2s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: checks.lower ? '#1b6b51' : '#717975', fontVariationSettings: checks.lower ? "'FILL' 1" : "'FILL' 0", transition: 'color 0.2s' }}>
                       {checks.lower ? 'check_circle' : 'circle'}
                     </span>
-                    One lowercase letter
+                    {language === 'vi' ? 'Ít nhất một chữ in thường' : 'One lowercase letter'}
                   </li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: checks.number ? '#1b6b51' : '#717975', transition: 'color 0.2s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: checks.number ? '#1b6b51' : '#717975', fontVariationSettings: checks.number ? "'FILL' 1" : "'FILL' 0", transition: 'color 0.2s' }}>
                       {checks.number ? 'check_circle' : 'circle'}
                     </span>
-                    One number
+                    {language === 'vi' ? 'Ít nhất một chữ số' : 'One number'}
                   </li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: checks.special ? '#1b6b51' : '#717975', transition: 'color 0.2s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: checks.special ? '#1b6b51' : '#717975', fontVariationSettings: checks.special ? "'FILL' 1" : "'FILL' 0", transition: 'color 0.2s' }}>
                       {checks.special ? 'check_circle' : 'circle'}
                     </span>
-                    One special character
+                    {language === 'vi' ? 'Ít nhất một ký tự đặc biệt' : 'One special character'}
                   </li>
                 </ul>
               </div>
@@ -267,10 +283,10 @@ export default function ChangePassword() {
                 <div className="ma-pro-tip-content">
                   <div className="ma-pro-tip-header">
                     <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '6px' }}>tips_and_updates</span>
-                    PRO TIP
+                    {language === 'vi' ? 'MẸO BẢO MẬT' : 'PRO TIP'}
                   </div>
                   <p className="ma-pro-tip-text" style={{ margin: 0, color: 'rgba(255, 255, 255, 0.8)' }}>
-                    Use a combination of words and characters that are easy for you to remember but hard for others to guess.
+                    {language === 'vi' ? 'Sử dụng sự kết hợp giữa các từ và ký tự dễ nhớ với bạn nhưng người khác khó có thể đoán được.' : 'Use a combination of words and characters that are easy for you to remember but hard for others to guess.'}
                   </p>
                 </div>
                 <div className="ma-pro-tip-glow"></div>

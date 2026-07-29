@@ -3,11 +3,13 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import categoryService from '../../../services/categoryService';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/Category.css';
 
 export default function Category() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
   const location = useLocation();
   const isAdmin = user?.roles?.includes('Admin') || false;
   const isAdminView = isAdmin && location.pathname.startsWith('/admin');

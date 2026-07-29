@@ -1,5 +1,14 @@
 const GMT7_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
+function getActiveLocale() {
+  try {
+    const lang = localStorage.getItem('retrade_language');
+    return lang === 'en' ? 'en-US' : 'vi-VN';
+  } catch {
+    return 'vi-VN';
+  }
+}
+
 function hasExplicitTimeZone(value) {
   return typeof value === 'string' && /(z|[+-]\d{2}:\d{2})$/i.test(value.trim());
 }
@@ -19,7 +28,9 @@ export function formatDateTimeGmt7(value, options = {}) {
   const date = parseBackendUtcDate(value);
   if (!date || Number.isNaN(date.getTime())) return '-';
 
-  return new Intl.DateTimeFormat(options.locale || 'vi-VN', {
+  const locale = options.locale || getActiveLocale();
+
+  return new Intl.DateTimeFormat(locale, {
     timeZone: GMT7_TIME_ZONE,
     year: options.year || 'numeric',
     month: options.month || '2-digit',
@@ -35,7 +46,9 @@ export function formatDateGmt7(value, options = {}) {
   const date = parseBackendUtcDate(value);
   if (!date || Number.isNaN(date.getTime())) return '-';
 
-  return new Intl.DateTimeFormat(options.locale || 'vi-VN', {
+  const locale = options.locale || getActiveLocale();
+
+  return new Intl.DateTimeFormat(locale, {
     timeZone: GMT7_TIME_ZONE,
     year: options.year || 'numeric',
     month: options.month || '2-digit',

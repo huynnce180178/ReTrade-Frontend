@@ -264,26 +264,26 @@
     align-items: flex-start;
     gap: 16px;
   }
-  
+
   .notifications-filters {
     padding: 16px;
     gap: 20px;
   }
-  
+
   .notification-card {
     padding: 16px;
     gap: 12px;
   }
-  
+
   .notif-card-icon {
     width: 40px;
     height: 40px;
   }
-  
+
   .notif-card-icon .material-symbols-outlined {
     font-size: 20px;
   }
-  
+
   .notif-card-header {
     flex-direction: column;
     gap: 4px;

@@ -1,49 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 import wishlistService from '../../../services/wishlistService';
 import { useAuth } from '../../../context/AuthContext';
 import '../../../styles/Product.css';
 
-const CONDITIONS = [
-  { value: 'New', label: 'New (Sealed)' },
-  { value: 'LikeNew', label: 'Like New (99%)' },
-  { value: 'Excellent', label: 'Excellent' },
-  { value: 'Good', label: 'Good' },
-  { value: 'Fair', label: 'Fair' },
-  { value: 'Used', label: 'Used' },
-  { value: 'Damaged', label: 'Damaged' },
-  { value: 'ForParts', label: 'For Parts' }
-];
-const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest First' },
-  { value: 'oldest', label: 'Oldest First' },
-  { value: 'price_asc', label: 'Price: Low to High' },
-  { value: 'price_desc', label: 'Price: High to Low' },
-  { value: 'name_asc', label: 'Name: A → Z' },
-  { value: 'name_desc', label: 'Name: Z → A' },
-];
-
-function formatPrice(price) {
-  if (price == null) return null;
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-}
-
-function timeAgo(dateStr) {
+function timeAgo(dateStr, language) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return language === 'vi' ? `${mins} phút trước` : `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return language === 'vi' ? `${hrs} giờ trước` : `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('vi-VN');
+  if (days < 30) return language === 'vi' ? `${days} ngày trước` : `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US');
 }
 
-// Skeleton Card
 function SkeletonCard() {
   return (
     <div className="product-card-skeleton">
@@ -62,8 +38,28 @@ export default function Product() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
+  const { t, language, formatCurrency } = useLanguage();
 
-  // Data states
+  const CONDITIONS = [
+    { value: 'New', label: language === 'vi' ? 'Mới (100%)' : 'New (Sealed)' },
+    { value: 'LikeNew', label: language === 'vi' ? 'Như mới (99%)' : 'Like New (99%)' },
+    { value: 'Excellent', label: language === 'vi' ? 'Xuất sắc' : 'Excellent' },
+    { value: 'Good', label: language === 'vi' ? 'Tốt' : 'Good' },
+    { value: 'Fair', label: language === 'vi' ? 'Khá' : 'Fair' },
+    { value: 'Used', label: language === 'vi' ? 'Đã sử dụng' : 'Used' },
+    { value: 'Damaged', label: language === 'vi' ? 'Hỏng nhẹ' : 'Damaged' },
+    { value: 'ForParts', label: language === 'vi' ? 'Lấy linh kiện' : 'For Parts' }
+  ];
+
+  const SORT_OPTIONS = [
+    { value: 'newest', label: language === 'vi' ? 'Mới nhất' : 'Newest First' },
+    { value: 'oldest', label: language === 'vi' ? 'Cũ nhất' : 'Oldest First' },
+    { value: 'price_asc', label: language === 'vi' ? 'Giá: Thấp đến Cao' : 'Price: Low to High' },
+    { value: 'price_desc', label: language === 'vi' ? 'Giá: Cao đến Thấp' : 'Price: High to Low' },
+    { value: 'name_asc', label: language === 'vi' ? 'Tên: A → Z' : 'Name: A → Z' },
+    { value: 'name_desc', label: language === 'vi' ? 'Tên: Z → A' : 'Name: Z → A' },
+  ];
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +70,6 @@ export default function Product() {
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [togglingId, setTogglingId] = useState(null);
 
-  // Filter states — sync from URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
   const searchTerm = searchParams.get('search') || '';
   const condition = searchParams.get('condition') || '';
@@ -82,103 +77,87 @@ export default function Product() {
   const minPriceParam = searchParams.get('minPrice') || '';
   const maxPriceParam = searchParams.get('maxPrice') || '';
 
-  // Local states for price inputs (debounced)
   const [minPriceInput, setMinPriceInput] = useState(minPriceParam);
   const [maxPriceInput, setMaxPriceInput] = useState(maxPriceParam);
   const [showMobileFilter, setShowMobileFilter] = useState(false);
 
-  // Category name for breadcrumb
-  const [categoryName, setCategoryName] = useState('');
-
-  // Sync price inputs when URL changes
   useEffect(() => {
     setMinPriceInput(minPriceParam);
     setMaxPriceInput(maxPriceParam);
   }, [minPriceParam, maxPriceParam]);
 
-  // Fetch categories (once)
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const data = await categoryService.getAllActive("?$filter=Status eq 'Active'&$orderby=Name asc");
-        const arr = Array.isArray(data) ? data : (data?.value || []);
+    categoryService.getAllActive("?$filter=Status eq 'Active'")
+      .then(res => {
+        const arr = Array.isArray(res) ? res : (res?.value || []);
         setCategories(arr);
-      } catch {
-        // Silently fail
-      }
-    };
-    fetchCategories();
+      })
+      .catch(() => {});
   }, []);
 
-  const fetchWishlist = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await wishlistService.getWishlist();
-      const ids = new Set((data.items ?? []).map(i => i.productId));
-      setWishlistIds(ids);
-    } catch {
+  useEffect(() => {
+    if (user) {
+      wishlistService.getWishlist()
+        .then(data => {
+          const ids = new Set((data.items ?? []).map(i => i.productId));
+          setWishlistIds(ids);
+        })
+        .catch(() => {});
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchWishlist();
-  }, [fetchWishlist]);
-
-  // Fetch products
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const params = {
-          Status: 'Accepted',
-          Page: currentPage,
-          PageSize: 12,
-        };
-        if (searchTerm) params.SearchTerm = searchTerm;
-        if (condition) params.Condition = condition;
-        if (minPriceParam) params.MinPrice = parseFloat(minPriceParam);
-        if (maxPriceParam) params.MaxPrice = parseFloat(maxPriceParam);
-        if (sortBy) params.SortBy = sortBy;
-
-        const data = await productService.getAll(params);
-        setProducts(data.items || []);
-        setTotalItems(data.totalItems || 0);
-        setTotalPages(data.totalPages || 1);
-      } catch (err) {
-        showToast('Failed to load products.', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [currentPage, searchTerm, condition, sortBy, minPriceParam, maxPriceParam]);
-
-  // Update URL search params helper
-  const updateParams = useCallback((updates) => {
-    const newParams = new URLSearchParams(searchParams);
-    Object.entries(updates).forEach(([key, val]) => {
-      if (val) {
-        newParams.set(key, val);
-      } else {
-        newParams.delete(key);
-      }
+  const updateParams = useCallback((newParams) => {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev);
+      Object.entries(newParams).forEach(([key, value]) => {
+        if (value) p.set(key, value);
+        else p.delete(key);
+      });
+      if (!('page' in newParams)) p.set('page', '1');
+      return p;
     });
-    // Reset to page 1 when filters change (except when explicitly setting page)
-    if (!updates.page) {
-      newParams.set('page', '1');
-    }
-    setSearchParams(newParams);
-  }, [searchParams, setSearchParams]);
+  }, [setSearchParams]);
 
-  // Price filter debounce
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {
+        Page: currentPage,
+        PageSize: 12,
+        SortBy: sortBy,
+      };
+      if (searchTerm) params.SearchTerm = searchTerm;
+      if (condition) params.Condition = condition;
+      if (minPriceParam) params.MinPrice = Number(minPriceParam);
+      if (maxPriceParam) params.MaxPrice = Number(maxPriceParam);
+
+      const data = await productService.getAll(params);
+      const itemsList = Array.isArray(data) ? data : (data?.items || data?.value || []);
+      setProducts(itemsList);
+      setTotalItems(data?.totalItems || itemsList.length);
+      setTotalPages(data?.totalPages || Math.ceil((data?.totalItems || itemsList.length) / 12) || 1);
+    } catch (err) {
+      showToast(t('common.error_occurred'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, searchTerm, condition, sortBy, minPriceParam, maxPriceParam, showToast, t]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (minPriceInput !== minPriceParam || maxPriceInput !== maxPriceParam) {
-        updateParams({ minPrice: minPriceInput, maxPrice: maxPriceInput });
+        updateParams({
+          minPrice: minPriceInput || '',
+          maxPrice: maxPriceInput || '',
+        });
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [minPriceInput, maxPriceInput]);
+  }, [minPriceInput, maxPriceInput, minPriceParam, maxPriceParam, updateParams]);
 
   const handlePageChange = (page) => {
     updateParams({ page: String(page) });
@@ -197,11 +176,11 @@ export default function Product() {
 
   const handleToggleWishlist = async (product) => {
     if (!user) {
-      showToast('Please sign in to use the wishlist.', 'error');
+      showToast(t('auth.login_title'), 'error');
       return;
     }
     if (product.sellerId === user.userId || product.sellerId === user.id) {
-      showToast('You cannot add your own product to your wishlist.', 'error');
+      showToast(t('common.warning'), 'error');
       return;
     }
     setTogglingId(product.productId);
@@ -213,26 +192,21 @@ export default function Product() {
         if (item) {
           await wishlistService.removeItem(item.wishlistItemId);
           setWishlistIds(prev => { const n = new Set(prev); n.delete(product.productId); return n; });
-          showToast('Removed from wishlist.', 'success');
+          showToast(t('product.remove_from_wishlist'), 'success');
         }
       } else {
         await wishlistService.addToWishlist(product.productId);
         setWishlistIds(prev => new Set([...prev, product.productId]));
-        showToast('Added to wishlist!', 'success');
+        showToast(t('product.add_to_wishlist'), 'success');
       }
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Something went wrong.';
+      const msg = err.response?.data || t('common.error_occurred');
       showToast(msg, 'error');
     } finally {
       setTogglingId(null);
     }
   };
 
-  // Build hierarchical categories (only root + 1 level for filter sidebar)
-  const rootCategories = categories.filter(c => !c.parentId);
-  const getCategoryChildren = (parentId) => categories.filter(c => c.parentId === parentId);
-
-  // Pagination renderer
   const renderPagination = () => {
     if (totalPages <= 1) return null;
     const pages = [];
@@ -245,7 +219,7 @@ export default function Product() {
 
     pages.push(
       <button key="prev" className="pagination-btn" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage <= 1}>
-        ‹ Prev
+        ‹ {t('common.previous')}
       </button>
     );
 
@@ -269,7 +243,7 @@ export default function Product() {
 
     pages.push(
       <button key="next" className="pagination-btn" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages}>
-        Next ›
+        {t('common.next')} ›
       </button>
     );
 
@@ -280,34 +254,29 @@ export default function Product() {
 
   return (
     <div className="product-page container animate-fade-in">
-      {/* Page Top */}
       <div className="product-page-top">
         <div className="product-breadcrumb">
-          <Link to="/">Home</Link>
+          <Link to="/">{t('nav.home')}</Link>
           <span className="breadcrumb-sep">›</span>
-          <span>{searchTerm ? `Search Results` : 'All Products'}</span>
+          <span>{searchTerm ? `${t('common.search')} (${searchTerm})` : t('product.title')}</span>
         </div>
         
         <button className="mobile-filter-toggle" onClick={() => setShowMobileFilter(!showMobileFilter)}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
           </svg>
-          Filters
+          {t('common.filter')}
         </button>
       </div>
 
       <div className="product-layout">
-          {/* Mobile Backdrop Overlay */}
           {showMobileFilter && (
             <div
               className="filter-mobile-backdrop"
               onClick={() => setShowMobileFilter(false)}
               style={{
                 position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
+                top: 0, left: 0, right: 0, bottom: 0,
                 backgroundColor: 'rgba(0, 0, 0, 0.4)',
                 backdropFilter: 'blur(4px)',
                 zIndex: 99,
@@ -315,23 +284,20 @@ export default function Product() {
             />
           )}
 
-          {/* Filter Sidebar */}
           <aside className={`filter-sidebar ${showMobileFilter ? 'show-mobile' : ''}`}>
             <div className="filter-sidebar-title">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
               </svg>
-              Filters
+              {t('common.filter')}
             </div>
 
-
-            {/* Price Range */}
             <div className="filter-section">
-              <div className="filter-section-title">Price Range</div>
+              <div className="filter-section-title">{t('product.price_range')}</div>
               <div className="price-range-inputs">
                 <input
                   type="number"
-                  placeholder="Min"
+                  placeholder={t('product.min_price')}
                   value={minPriceInput}
                   onChange={(e) => setMinPriceInput(e.target.value)}
                   min="0"
@@ -339,7 +305,7 @@ export default function Product() {
                 <span className="price-range-sep">—</span>
                 <input
                   type="number"
-                  placeholder="Max"
+                  placeholder={t('product.max_price')}
                   value={maxPriceInput}
                   onChange={(e) => setMaxPriceInput(e.target.value)}
                   min="0"
@@ -347,15 +313,14 @@ export default function Product() {
               </div>
             </div>
 
-            {/* Condition */}
             <div className="filter-section">
-              <div className="filter-section-title">Condition</div>
+              <div className="filter-section-title">{t('product.condition')}</div>
               <div className="condition-chips">
                 <button
                   className={`condition-chip ${!condition ? 'active' : ''}`}
                   onClick={() => updateParams({ condition: '' })}
                 >
-                  All
+                  {t('common.all')}
                 </button>
                 {CONDITIONS.map(c => (
                   <button
@@ -369,38 +334,34 @@ export default function Product() {
               </div>
             </div>
 
-            {/* Reset */}
             {hasActiveFilters && (
               <button className="filter-reset-btn" onClick={handleResetFilters}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                   <path d="M3 3v5h5" />
                 </svg>
-                Reset All Filters
+                {t('common.reset')}
               </button>
             )}
           </aside>
 
-          {/* Main Content */}
           <div className="product-main-content">
-            {/* Active Search Display */}
             {searchTerm && (
               <div className="active-search-display">
                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--text-muted)', marginRight: '6px' }}>search</span>
-                Search results for: <strong>"{searchTerm}"</strong>
-                <button className="active-search-clear" onClick={handleClearSearch}>Clear Search</button>
+                {t('common.search')}: <strong>"{searchTerm}"</strong>
+                <button className="active-search-clear" onClick={handleClearSearch}>{t('common.reset')}</button>
               </div>
             )}
 
-            {/* Toolbar: results count + sort */}
             <div className="product-toolbar">
               <div className="product-result-count">
-                {loading ? 'Loading...' : (
-                  <>Showing <strong>{products.length}</strong> of <strong>{totalItems}</strong> products</>
+                {loading ? t('common.loading') : (
+                  <>{t('common.page')} <strong>{currentPage}</strong> {t('common.of')} <strong>{totalPages}</strong> ({totalItems} {t('nav.product')})</>
                 )}
               </div>
               <div className="product-sort-wrapper">
-                <span className="product-sort-label">Sort:</span>
+                <span className="product-sort-label">{t('common.sort')}:</span>
                 <select
                   className="product-sort-select"
                   value={sortBy}
@@ -413,7 +374,6 @@ export default function Product() {
               </div>
             </div>
 
-            {/* Product Grid */}
             {loading ? (
               <div className="product-grid">
                 {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
@@ -421,15 +381,11 @@ export default function Product() {
             ) : products.length === 0 ? (
               <div className="product-empty-state">
                 <span className="material-symbols-outlined product-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>search</span>
-                <h3>No Products Found</h3>
-                <p>
-                  {searchTerm
-                    ? `We couldn't find any products matching "${searchTerm}". Try different keywords or remove some filters.`
-                    : 'No products match your current filters. Try adjusting your search criteria.'}
-                </p>
+                <h3>{t('common.no_data')}</h3>
+                <p>{t('home.latest_subtitle_user')}</p>
                 {hasActiveFilters && (
                   <button className="btn btn-outline" style={{ marginTop: '16px' }} onClick={handleResetFilters}>
-                    Clear All Filters
+                    {t('common.reset')}
                   </button>
                 )}
               </div>
@@ -459,7 +415,7 @@ export default function Product() {
                               handleToggleWishlist(product);
                             }}
                             disabled={togglingId === product.productId}
-                            title={wishlistIds.has(product.productId) ? 'Remove from wishlist' : 'Add to wishlist'}
+                            title={wishlistIds.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
                           >
                             {togglingId === product.productId
                               ? <span className="product-wl-spinner" />
@@ -468,7 +424,7 @@ export default function Product() {
                                   style={{ fontVariationSettings: wishlistIds.has(product.productId) ? "'FILL' 1" : "'FILL' 0" }}
                                 >
                                 favorite
-                              </span>
+                               </span>
                             }
                           </button>
                           {product.price != null && (
@@ -478,7 +434,7 @@ export default function Product() {
                                 e.stopPropagation();
                                 navigate(`/checkout/${product.productId}`);
                               }}
-                              title="Buy Now"
+                              title={t('product.buy_now')}
                             >
                               <span className="material-symbols-outlined">shopping_cart</span>
                             </button>
@@ -487,30 +443,29 @@ export default function Product() {
                       )}
                     </div>
                     <div className="product-card-body">
-                      <span className="product-card-category">{product.categoryName || 'Uncategorized'}</span>
+                      <span className="product-card-category">{product.categoryName || t('common.none')}</span>
                       <span className="product-card-name">{product.name}</span>
                       <span className="product-card-seller">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                           <circle cx="12" cy="7" r="4" />
                         </svg>
-                        {product.sellerName || 'Unknown Seller'}
+                        {product.sellerName || 'ReTrade Seller'}
                       </span>
                     </div>
                     <div className="product-card-footer">
                       {product.price != null ? (
-                        <span className="product-card-price">{formatPrice(product.price)}</span>
+                        <span className="product-card-price">{formatCurrency(product.price)}</span>
                       ) : (
-                        <span className="product-card-price-no">Auction</span>
+                        <span className="product-card-price-no">{t('nav.auction')}</span>
                       )}
-                      <span className="product-card-date">{timeAgo(product.createdAt)}</span>
+                      <span className="product-card-date">{timeAgo(product.createdAt, language)}</span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Pagination */}
           {!loading && renderPagination()}
         </div>
       </div>

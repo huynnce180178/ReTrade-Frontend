@@ -8,6 +8,7 @@ import reviewService from '../../../services/reviewService';
 import { createSellerHubConnection } from '../../../services/sellerRealtimeService';
 import wishlistService from '../../../services/wishlistService';
 import chatService from '../../../services/chatService';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/ProfileView.css';
 import './SellerProfileReviews.css';
 
@@ -26,10 +27,10 @@ const getInitials = (seller) => {
 };
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
 
-const formatAddress = (address) => {
-  if (!address) return 'No default address yet';
-  const parts = [address.street, address.wardCode, address.districtId && `District ${address.districtId}`, address.provinceId && `Province ${address.provinceId}`].filter(Boolean);
-  return parts.length ? parts.join(', ') : 'No default address yet';
+const formatAddress = (address, language) => {
+  if (!address) return language === 'vi' ? 'Chưa có địa chỉ mặc định' : 'No default address yet';
+  const parts = [address.street, address.wardCode, address.districtId && `Quận ${address.districtId}`, address.provinceId && `Tỉnh/TP ${address.provinceId}`].filter(Boolean);
+  return parts.length ? parts.join(', ') : (language === 'vi' ? 'Chưa có địa chỉ mặc định' : 'No default address yet');
 };
 
 const hasRole = (user, roleName) => {
@@ -60,6 +61,7 @@ export default function SellerProfile() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, language, formatCurrency, formatDate } = useLanguage();
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -294,10 +296,10 @@ export default function SellerProfile() {
         isFollowing: result.isFollowing,
         followersCount: result.followersCount,
       }));
-      showToast(result.message || 'Seller follow status updated.', 'success');
+      showToast(language === 'vi' ? (nextIsFollowing ? 'Theo dõi người bán thành công!' : 'Đã bỏ theo dõi người bán!') : (result.message || 'Seller follow status updated.'), 'success');
     } catch (err) {
       setSeller(previousSeller);
-      showToast(err?.response?.data || 'Failed to update follow status.', 'error');
+      showToast(err?.response?.data || (language === 'vi' ? 'Không thể cập nhật trạng thái theo dõi.' : 'Failed to update follow status.'), 'error');
     } finally {
       setFollowLoading(false);
     }
@@ -305,13 +307,13 @@ export default function SellerProfile() {
 
   const handleMessageSeller = async () => {
     if (!user) {
-      showToast('Please sign in to message this seller.', 'warning');
+      showToast(language === 'vi' ? 'Vui lòng đăng nhập để nhắn tin với người bán.' : 'Please sign in to message this seller.', 'warning');
       navigate('/login');
       return;
     }
 
     if (!seller?.sellerId || isOwnSellerPage) {
-      showToast('You cannot message your own seller profile.', 'warning');
+      showToast(language === 'vi' ? 'Bạn không thể tự nhắn tin cho hồ sơ của mình.' : 'You cannot message your own seller profile.', 'warning');
       return;
     }
 
@@ -355,11 +357,11 @@ export default function SellerProfile() {
   const canFollowSeller = Boolean(user && seller.isSeller && !isOwnSellerPage && !hasRole(user, 'Admin'));
   const reviewCount = Number(seller.reviewCount || 0);
   const ratingValue = reviewCount && seller.averageRating ? seller.averageRating.toFixed(1) : '-';
-  const ratingText = reviewCount && seller.averageRating ? `${ratingValue} / 5` : 'No rating yet';
-  const reviewText = `${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'}`;
+  const ratingText = reviewCount && seller.averageRating ? `${ratingValue} / 5` : (language === 'vi' ? 'Chưa có đánh giá' : 'No rating yet');
+  const reviewText = `${reviewCount} ${language === 'vi' ? 'đánh giá' : (reviewCount === 1 ? 'review' : 'reviews')}`;
   const visibleProductCount = productsTotal || seller.productCount || 0;
-  const memberSince = seller.createdAt ? new Date(seller.createdAt).getFullYear() : 'New seller';
-  const locationText = formatAddress(seller.defaultAddress);
+  const memberSince = seller.createdAt ? new Date(seller.createdAt).getFullYear() : (language === 'vi' ? 'Người bán mới' : 'New seller');
+  const locationText = formatAddress(seller.defaultAddress, language);
   const isBuyerViewingSeller = !isOwnSellerPage;
 
   const renderBuyerShopContent = () => {
@@ -383,8 +385,8 @@ export default function SellerProfile() {
       return (
         <div className="buyer-shop-empty">
           <span className="material-symbols-outlined">gavel</span>
-          <h2>Live Auctions</h2>
-          <p>Active auctions from this seller will appear here when auction listings are connected.</p>
+          <h2>{language === 'vi' ? 'Đấu giá trực tiếp' : 'Live Auctions'}</h2>
+          <p>{language === 'vi' ? 'Các phiên đấu giá từ người bán này sẽ hiển thị ở đây khi có sản phẩm đấu giá.' : 'Active auctions from this seller will appear here when auction listings are connected.'}</p>
         </div>
       );
     }
@@ -418,32 +420,32 @@ export default function SellerProfile() {
       return (
         <div className="seller-tab-panel profile-view-grid seller-tab-grid">
           <article className="profile-view-card">
-            <h2>Contact</h2>
+            <h2>{language === 'vi' ? 'Liên hệ' : 'Contact'}</h2>
             <div className="profile-view-list">
               <div>
                 <span>Email</span>
-                <strong>{seller.email || 'Not available'}</strong>
+                <strong>{seller.email || (language === 'vi' ? 'Chưa cập nhật' : 'Not available')}</strong>
               </div>
               <div>
-                <span>Phone</span>
-                <strong>{seller.phone || 'Not available'}</strong>
+                <span>{language === 'vi' ? 'Số điện thoại' : 'Phone'}</span>
+                <strong>{seller.phone || (language === 'vi' ? 'Chưa cập nhật' : 'Not available')}</strong>
               </div>
               <div>
-                <span>Location</span>
+                <span>{language === 'vi' ? 'Địa chỉ' : 'Location'}</span>
                 <strong>{locationText}</strong>
               </div>
             </div>
           </article>
           <article className="profile-view-card">
-            <h2>Seller Reference</h2>
+            <h2>{language === 'vi' ? 'Mã định danh' : 'Seller Reference'}</h2>
             <div className="profile-view-list">
               <div>
-                <span>Seller ID</span>
+                <span>Mã người bán</span>
                 <strong>{seller.sellerId}</strong>
               </div>
               <div>
-                <span>Account ID</span>
-                <strong>{seller.accountId || 'Not available'}</strong>
+                <span>Mã tài khoản</span>
+                <strong>{seller.accountId || (language === 'vi' ? 'Chưa cập nhật' : 'Not available')}</strong>
               </div>
             </div>
           </article>
@@ -454,29 +456,29 @@ export default function SellerProfile() {
     return (
       <div className="seller-tab-panel profile-view-grid seller-tab-grid">
         <article className="profile-view-card seller-about-card">
-          <h2>About Shop</h2>
+          <h2>{language === 'vi' ? 'Giới thiệu Cửa hàng' : 'About Shop'}</h2>
           <p>
-            {seller.username || 'This seller'} has been part of ReTrade since {memberSince}, offering curated second-hand listings with a focus on trustworthy trading.
+            {seller.username || 'This seller'} {language === 'vi' ? `đã tham gia ReTrade từ năm ${memberSince}, cung cấp các sản phẩm đã qua sử dụng chất lượng.` : `has been part of ReTrade since ${memberSince}, offering curated second-hand listings with a focus on trustworthy trading.`}
           </p>
           <div className="seller-trust-row">
-            <span><span className="material-symbols-outlined">verified</span> Verified profile</span>
-            <span><span className="material-symbols-outlined">eco</span> ReTrade seller</span>
+            <span><span className="material-symbols-outlined">verified</span> {language === 'vi' ? 'Hồ sơ đã xác minh' : 'Verified profile'}</span>
+            <span><span className="material-symbols-outlined">eco</span> {language === 'vi' ? 'Người bán ReTrade' : 'ReTrade seller'}</span>
           </div>
         </article>
         <article className="profile-view-card">
-          <h2>Shop Snapshot</h2>
+          <h2>{language === 'vi' ? 'Tổng quan Cửa hàng' : 'Shop Snapshot'}</h2>
           <div className="profile-view-list">
             <div>
-              <span>Followers</span>
+              <span>{language === 'vi' ? 'Người theo dõi' : 'Followers'}</span>
               <strong>{seller.followersCount}</strong>
             </div>
             <div>
-              <span>Following</span>
+              <span>{language === 'vi' ? 'Đang theo dõi' : 'Following'}</span>
               <strong>{seller.followingCount}</strong>
             </div>
             <div>
-              <span>Relationship</span>
-              <strong>{isOwnSellerPage ? 'Your shop' : seller.isFollowing ? 'Following' : 'Not following'}</strong>
+              <span>{language === 'vi' ? 'Mối quan hệ' : 'Relationship'}</span>
+              <strong>{isOwnSellerPage ? (language === 'vi' ? 'Cửa hàng của bạn' : 'Your shop') : seller.isFollowing ? (language === 'vi' ? 'Đang theo dõi' : 'Following') : (language === 'vi' ? 'Chưa theo dõi' : 'Not following')}</strong>
             </div>
           </div>
         </article>
@@ -506,12 +508,12 @@ export default function SellerProfile() {
                 {canFollowSeller && (
                   <button className={`buyer-follow-btn ${seller.isFollowing ? 'following' : ''}`} onClick={handleFollowToggle} disabled={followLoading}>
                     <span className="material-symbols-outlined">{seller.isFollowing ? 'person_remove' : 'person_add'}</span>
-                    {followLoading ? 'Updating...' : seller.isFollowing ? 'Unfollow' : 'Follow'}
+                    {followLoading ? (language === 'vi' ? 'Đang cập nhật...' : 'Updating...') : seller.isFollowing ? (language === 'vi' ? 'Bỏ theo dõi' : 'Unfollow') : (language === 'vi' ? 'Theo dõi' : 'Follow')}
                   </button>
                 )}
                 <button className="buyer-message-btn" type="button" onClick={handleMessageSeller}>
                   <span className="material-symbols-outlined">mail</span>
-                  Message
+                  {language === 'vi' ? 'Nhắn tin' : 'Message'}
                 </button>
               </div>
             </div>
@@ -520,24 +522,24 @@ export default function SellerProfile() {
           <div className="buyer-shop-kpis">
             <div>
               <strong>{seller.followersCount}</strong>
-              <span>Followers</span>
+              <span>{language === 'vi' ? 'Người theo dõi' : 'Followers'}</span>
             </div>
             <div>
               <strong>{ratingValue}</strong>
-              <span>Rating</span>
+              <span>{language === 'vi' ? 'Đánh giá' : 'Rating'}</span>
             </div>
             <div>
               <strong>{reviewCount}</strong>
-              <span>Reviews</span>
+              <span>{language === 'vi' ? 'Lượt đánh giá' : 'Reviews'}</span>
             </div>
           </div>
         </section>
 
         <section className="buyer-shop-tabs">
           {[
-            ['items', 'Product'],
-            ['auction', 'Live Auctions'],
-            ['reviews', 'Reviews'],
+            ['items', language === 'vi' ? 'Sản phẩm' : 'Product'],
+            ['auction', language === 'vi' ? 'Đấu giá trực tiếp' : 'Live Auctions'],
+            ['reviews', language === 'vi' ? 'Đánh giá' : 'Reviews'],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -567,14 +569,14 @@ export default function SellerProfile() {
             </span>
           </div>
           <div className="seller-shop-heading">
-            <span className="seller-badge">{isOwnSellerPage ? 'Your Seller Profile' : seller.isSeller ? 'Trusted Seller' : 'Member Profile'}</span>
+            <span className="seller-badge">{isOwnSellerPage ? (language === 'vi' ? 'Hồ sơ người bán của bạn' : 'Your Seller Profile') : seller.isSeller ? (language === 'vi' ? 'Người bán uy tín' : 'Trusted Seller') : (language === 'vi' ? 'Hồ sơ thành viên' : 'Member Profile')}</span>
             <h1>{getDisplayName(seller)}</h1>
             <div className="seller-shop-meta">
               <span><span className="material-symbols-outlined">location_on</span>{locationText}</span>
               <span><span className="material-symbols-outlined">star</span>{ratingText}</span>
             </div>
             <p className="seller-hero-desc">
-              {seller.username || 'This seller'} has been part of ReTrade since {memberSince}, offering curated second-hand listings with a focus on trustworthy trading.
+              {seller.username || 'This seller'} {language === 'vi' ? `đã tham gia ReTrade từ năm ${memberSince}, cung cấp các sản phẩm đã qua sử dụng chất lượng.` : `has been part of ReTrade since ${memberSince}, offering curated second-hand listings with a focus on trustworthy trading.`}
             </p>
           </div>
         </div>
@@ -583,19 +585,19 @@ export default function SellerProfile() {
             {canFollowSeller && (
               <button className={`profile-follow-btn ${seller.isFollowing ? 'following' : ''}`} onClick={handleFollowToggle} disabled={followLoading}>
                 <span className="material-symbols-outlined">{seller.isFollowing ? 'person_remove' : 'person_add'}</span>
-                {followLoading ? 'Updating...' : seller.isFollowing ? 'Unfollow' : 'Follow'}
+                {followLoading ? (language === 'vi' ? 'Đang cập nhật...' : 'Updating...') : seller.isFollowing ? (language === 'vi' ? 'Bỏ theo dõi' : 'Unfollow') : (language === 'vi' ? 'Theo dõi' : 'Follow')}
               </button>
             )}
             {!isOwnSellerPage && (
               <button className="seller-message-btn" type="button" onClick={handleMessageSeller}>
                 <span className="material-symbols-outlined">mail</span>
-                Message
+                {language === 'vi' ? 'Nhắn tin' : 'Message'}
               </button>
             )}
             {isOwnSellerPage && (
               <Link to="/profile" className="seller-message-btn owner-action">
                 <span className="material-symbols-outlined">manage_accounts</span>
-                Edit Profile
+                {language === 'vi' ? 'Chỉnh sửa hồ sơ' : 'Edit Profile'}
               </Link>
             )}
           </div>
@@ -603,23 +605,23 @@ export default function SellerProfile() {
           <div className="seller-hero-stats">
             <div className="seller-hero-stat">
               <strong>{visibleProductCount}</strong>
-              <span>Listings</span>
+              <span>{language === 'vi' ? 'Sản phẩm' : 'Listings'}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{seller.followersCount}</strong>
-              <span>Followers</span>
+              <span>{language === 'vi' ? 'Người theo dõi' : 'Followers'}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{seller.followingCount}</strong>
-              <span>Following</span>
+              <span>{language === 'vi' ? 'Đang theo dõi' : 'Following'}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{ratingValue}</strong>
-              <span>Rating</span>
+              <span>{language === 'vi' ? 'Đánh giá' : 'Rating'}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{reviewCount}</strong>
-              <span>Reviews</span>
+              <span>{language === 'vi' ? 'Lượt đánh giá' : 'Reviews'}</span>
             </div>
           </div>
         </div>
@@ -628,9 +630,9 @@ export default function SellerProfile() {
       <section className="seller-shop-tabs">
         <div className="seller-tab-list" role="tablist" aria-label="Seller sections">
           {[
-            ['items', 'Product'],
-            ['reviews', 'Reviews'],
-            ['contact', 'Contact'],
+            ['items', language === 'vi' ? 'Sản phẩm' : 'Product'],
+            ['reviews', language === 'vi' ? 'Đánh giá' : 'Reviews'],
+            ['contact', language === 'vi' ? 'Liên hệ' : 'Contact'],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -649,11 +651,12 @@ export default function SellerProfile() {
 }
 
 function SellerProductGrid({ products, loading, total, compact = false, productStatus, setProductStatus, productPage, setProductPage, totalPages, wishlistIds, togglingId, onWishlistToggle }) {
+  const { language } = useLanguage();
   const statusTabs = [
-    { key: '', label: 'All' },
-    { key: 'Accepted', label: 'For Sale' },
-    { key: 'Ready', label: 'Auction' },
-    { key: 'Sold', label: 'Sold' },
+    { key: '', label: language === 'vi' ? 'Tất cả' : 'All' },
+    { key: 'Accepted', label: language === 'vi' ? 'Đang bán' : 'For Sale' },
+    { key: 'Ready', label: language === 'vi' ? 'Đấu giá' : 'Auction' },
+    { key: 'Sold', label: language === 'vi' ? 'Đã bán' : 'Sold' },
   ];
 
   return (
@@ -729,6 +732,7 @@ function SellerProductGrid({ products, loading, total, compact = false, productS
 }
 
 function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle }) {
+  const { language, formatCurrency } = useLanguage();
   const isWishlist = wishlistIds?.has(product.productId) ?? false;
   const isAuction = product.price == null;
 
@@ -745,11 +749,11 @@ function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle 
         </div>
 
         <div className="seller-profile-product-body">
-          <span>{product.categoryName || 'Uncategorized'}</span>
-          <strong>{product.name || 'Untitled product'}</strong>
+          <span>{product.categoryName || (language === 'vi' ? 'Chưa phân loại' : 'Uncategorized')}</span>
+          <strong>{product.name || (language === 'vi' ? 'Sản phẩm' : 'Untitled product')}</strong>
           <div>
-            <b>{product.price != null ? formatPrice(product.price) : 'Auction'}</b>
-            <small>{product.stockQuantity ?? 0} left</small>
+            <b>{product.price != null ? formatCurrency(product.price) : (language === 'vi' ? 'Đấu giá' : 'Auction')}</b>
+            <small>{product.stockQuantity ?? 0} {language === 'vi' ? 'có sẵn' : 'left'}</small>
           </div>
         </div>
       </Link>
@@ -786,6 +790,7 @@ function SellerRatingPanel({
   reviewTotalPages = 1,
   reviewTotalItems = 0,
 }) {
+  const { language } = useLanguage();
   const [selectedReview, setSelectedReview] = useState(null);
   const stats = seller.ratingStats?.length
     ? seller.ratingStats
@@ -821,20 +826,20 @@ function SellerRatingPanel({
 
       <section className="seller-public-review-list">
         <div className="seller-public-review-head">
-          <h2>Buyer Reviews</h2>
-          <span>{firstReview}-{lastReview} of {reviewTotalItems}</span>
+          <h2>{language === 'vi' ? 'Đánh giá từ người mua' : 'Buyer Reviews'}</h2>
+          <span>{language === 'vi' ? `Hiển thị ${firstReview}-${lastReview} trong ${reviewTotalItems}` : `${firstReview}-${lastReview} of ${reviewTotalItems}`}</span>
         </div>
 
         {loadingReviews ? (
           <div className="seller-public-review-loading">
             <span className="btn-spinner"></span>
-            <p>Loading reviews...</p>
+            <p>{language === 'vi' ? 'Đang tải đánh giá...' : 'Loading reviews...'}</p>
           </div>
         ) : reviews.length === 0 ? (
           <div className="seller-public-review-empty">
             <span className="material-symbols-outlined">rate_review</span>
-            <h2>No reviews yet</h2>
-            <p>This seller has not received any completed-order reviews.</p>
+            <h2>{language === 'vi' ? 'Chưa có đánh giá nào' : 'No reviews yet'}</h2>
+            <p>{language === 'vi' ? 'Người bán này chưa nhận được đánh giá nào từ các đơn hàng đã hoàn tất.' : 'This seller has not received any completed-order reviews.'}</p>
           </div>
         ) : (
           <>

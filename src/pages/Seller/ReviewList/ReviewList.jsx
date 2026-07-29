@@ -3,41 +3,10 @@ import { Link, useOutletContext } from 'react-router-dom';
 import reviewService from '../../../services/reviewService';
 import reportService from '../../../services/reportService';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import './ReviewList.css';
 
 const PAGE_SIZE = 8;
-
-const RATING_FILTERS = [
-  { value: '', label: 'All ratings' },
-  { value: '5', label: '5 stars' },
-  { value: '4', label: '4 stars' },
-  { value: '3', label: '3 stars' },
-  { value: '2', label: '2 stars' },
-  { value: '1', label: '1 star' },
-];
-
-const STATUS_FILTERS = [
-  { value: '', label: 'All reviews' },
-  { value: 'Unreported', label: 'Unreported' },
-  { value: 'Reported', label: 'Reported' },
-];
-
-const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'rating_desc', label: 'Highest rating' },
-  { value: 'rating_asc', label: 'Lowest rating' },
-  { value: 'reported', label: 'Most reported' },
-];
-
-const REPORT_REASONS = [
-  'False Information',
-  'Inappropriate Content',
-  'Spam',
-  'Harassment',
-  'Misleading',
-  'Other',
-];
 
 function formatDate(dateStr) {
   if (!dateStr) return 'N/A';
@@ -92,6 +61,8 @@ export default function ReviewList() {
   const outlet = useOutletContext();
   const { user } = outlet || {};
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -117,50 +88,58 @@ export default function ReviewList() {
   const [reportDescription, setReportDescription] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
+  const ratingFilterOptions = useMemo(() => [
+    { value: '', label: isVi ? 'Tất cả đánh giá' : 'All ratings' },
+    { value: '5', label: '5 sao' },
+    { value: '4', label: '4 sao' },
+    { value: '3', label: '3 sao' },
+    { value: '2', label: '2 sao' },
+    { value: '1', label: '1 sao' },
+  ], [isVi]);
+
+  const statusFilterOptions = useMemo(() => [
+    { value: '', label: isVi ? 'Tất cả trạng thái' : 'All reviews' },
+    { value: 'Unreported', label: isVi ? 'Chưa báo cáo' : 'Unreported' },
+    { value: 'Reported', label: isVi ? 'Đã báo cáo' : 'Reported' },
+  ], [isVi]);
+
+  const sortOptions = useMemo(() => [
+    { value: 'newest', label: isVi ? 'Mới nhất' : 'Newest first' },
+    { value: 'oldest', label: isVi ? 'Cũ nhất' : 'Oldest first' },
+    { value: 'rating_desc', label: isVi ? 'Điểm đánh giá cao nhất' : 'Highest rating' },
+    { value: 'rating_asc', label: isVi ? 'Điểm đánh giá thấp nhất' : 'Lowest rating' },
+    { value: 'reported', label: isVi ? 'Báo cáo nhiều nhất' : 'Most reported' },
+  ], [isVi]);
+
+  const reportReasons = useMemo(() => [
+    isVi ? 'Thông tin sai sự thật' : 'False Information',
+    isVi ? 'Nội dung không phù hợp' : 'Inappropriate Content',
+    isVi ? 'Spam / Rác' : 'Spam',
+    isVi ? 'Quấy rối / Độc hại' : 'Harassment',
+    isVi ? 'Gây hiểu lầm' : 'Misleading',
+    isVi ? 'Khác' : 'Other',
+  ], [isVi]);
+
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const timer = setTimeout(() => {
       setSearchTerm(searchInput.trim());
       setPage(1);
-    }, 450);
+    }, 300);
 
-    return () => window.clearTimeout(timer);
+    return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const queryParams = useMemo(() => {
-    const params = {
-      Page: page,
-      PageSize: PAGE_SIZE,
-      SortBy: sortBy,
-    };
-
-    if (ratingFilter) params.Rating = Number(ratingFilter);
-    if (statusFilter) params.Status = statusFilter;
-    if (searchTerm) params.SearchTerm = searchTerm;
-
-    return params;
-  }, [page, ratingFilter, searchTerm, sortBy, statusFilter]);
-
-  const fetchReviews = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await reviewService.getSellerReviews(queryParams);
-      setReviews(data?.items || []);
-      setTotalItems(Number(data?.totalItems || 0));
-      setTotalPages(Math.max(1, Number(data?.totalPages || 1)));
-    } catch (error) {
-      setReviews([]);
-      setTotalItems(0);
-      setTotalPages(1);
-      showToast(error?.response?.data || 'Failed to load reviews.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [queryParams, showToast]);
-
   const fetchSummary = useCallback(async () => {
-    setSummaryLoading(true);
+    if (!user?.userId) return;
+
     try {
-      const data = await reviewService.getSellerSummary({});
+      setSummaryLoading(true);
+      let data;
+      try {
+        data = await reviewService.getSellerSummary(user.userId);
+      } catch {
+        data = await reviewService.getPublicSellerSummary(user.userId);
+      }
       setSummary({
         totalReviews: Number(data?.totalReviews || 0),
         averageRating: Number(data?.averageRating || 0),
@@ -168,28 +147,59 @@ export default function ReviewList() {
         ratingStats: data?.ratingStats || {},
       });
     } catch {
-      setSummary({
-        totalReviews: 0,
-        averageRating: 0,
-        reportedReviews: 0,
-        ratingStats: {},
-      });
+      // Quiet fail
     } finally {
       setSummaryLoading(false);
     }
-  }, []);
+  }, [user?.userId]);
+
+  const fetchReviews = useCallback(async () => {
+    if (!user?.userId) return;
+
+    try {
+      setLoading(true);
+      const params = {
+        sellerId: user.userId,
+        pageNumber: page,
+        pageSize: PAGE_SIZE,
+        rating: ratingFilter ? Number(ratingFilter) : undefined,
+        reportStatus: statusFilter || undefined,
+        sortBy: sortBy || 'newest',
+        searchTerm: searchTerm || undefined,
+      };
+
+      let data;
+      try {
+        data = await reviewService.getSellerReviews(user.userId, params);
+      } catch {
+        data = await reviewService.getPublicSellerReviews(user.userId, params);
+      }
+
+      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      setReviews(items);
+      setTotalItems(data?.totalCount ?? items.length);
+      setTotalPages(data?.totalPages ?? Math.max(1, Math.ceil((data?.totalCount ?? items.length) / PAGE_SIZE)));
+    } catch (error) {
+      setReviews([]);
+      setTotalItems(0);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, ratingFilter, searchTerm, sortBy, statusFilter, user?.userId]);
 
   useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
+    if (user?.userId) {
+      fetchSummary();
+    }
+  }, [fetchSummary, user?.userId]);
 
   useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
+    if (user?.userId) {
+      fetchReviews();
+    }
+  }, [fetchReviews, user?.userId]);
 
-  const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
-  const firstItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const lastItem = Math.min(page * PAGE_SIZE, totalItems);
   const ratingStats = summary.ratingStats || {};
 
   const handleFilterChange = (setter) => (event) => {
@@ -199,56 +209,58 @@ export default function ReviewList() {
 
   const openReportModal = (review) => {
     setReportingReview(review);
-    setReportReason('');
+    setReportReason(reportReasons[0]);
     setReportDescription('');
-  };
-
-  const openPreviewModal = (review) => {
-    setPreviewReview(review);
-  };
-
-  const closePreviewModal = () => {
-    setPreviewReview(null);
   };
 
   const closeReportModal = () => {
+    if (reportSubmitting) return;
     setReportingReview(null);
     setReportReason('');
     setReportDescription('');
-    setReportSubmitting(false);
   };
 
-  const submitReport = async (event) => {
+  const handleReportSubmit = async (event) => {
     event.preventDefault();
-
     if (!reportingReview || !reportReason.trim()) {
-      showToast('Please select a report reason.', 'error');
+      showToast(isVi ? 'Vui lòng chọn lý do báo cáo.' : 'Please select a report reason.', 'warning');
       return;
     }
 
-    setReportSubmitting(true);
     try {
-      await reportService.reportReview(reportingReview.reviewId, {
+      setReportSubmitting(true);
+      await reportService.create({
+        targetId: reportingReview.reviewId,
+        targetType: 'Review',
+        reportType: 'ReviewViolation',
         reason: reportReason.trim(),
-        description: reportDescription.trim() || null,
+        description: reportDescription.trim() || reportReason.trim(),
       });
-      showToast('Review report submitted.', 'success');
+
+      showToast(isVi ? 'Đã gửi báo cáo đánh giá thành công!' : 'Review reported successfully.', 'success');
       closeReportModal();
-      fetchReviews();
       fetchSummary();
+      fetchReviews();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to report this review.', 'error');
+      showToast(error?.response?.data || (isVi ? 'Không thể gửi báo cáo đánh giá.' : 'Failed to report review.'), 'error');
     } finally {
       setReportSubmitting(false);
     }
   };
 
+  const openPreviewModal = (review) => setPreviewReview(review);
+  const closePreviewModal = () => setPreviewReview(null);
+
+  const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
+  const firstItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastItem = Math.min(page * PAGE_SIZE, totalItems);
+
   if (!user) {
     return (
       <div className="seller-review-page">
-        <div className="seller-review-state">
+        <div className="seller-dashboard-loading">
           <span className="btn-spinner"></span>
-          <p>Loading seller account...</p>
+          <p>{isVi ? 'Đang tải tài khoản...' : 'Loading seller account...'}</p>
         </div>
       </div>
     );
@@ -258,9 +270,9 @@ export default function ReviewList() {
     <div className="seller-review-page animate-fade-in">
       <header className="seller-review-header">
         <div>
-          <span>Review Management</span>
-          <h1>View Reviews</h1>
-          <p>Track buyer feedback, inspect review context, and report reviews that need admin review.</p>
+          <span>{isVi ? 'Quản Lý Đánh Giá' : 'Review Management'}</span>
+          <h1>{isVi ? 'Đánh Giá Từ Người Mua' : 'View Reviews'}</h1>
+          <p>{isVi ? 'Theo dõi phản hồi từ khách hàng, kiểm tra nội dung và báo cáo các đánh giá vi phạm quy chuẩn.' : 'Track buyer feedback, inspect review context, and report reviews that need admin review.'}</p>
         </div>
       </header>
 
@@ -268,21 +280,21 @@ export default function ReviewList() {
         <article className="seller-review-summary-card">
           <span className="material-symbols-outlined">reviews</span>
           <div>
-            <p>Total Reviews</p>
+            <p>{isVi ? 'Tổng Số Đánh Giá' : 'Total Reviews'}</p>
             <strong>{summaryLoading ? '-' : summary.totalReviews}</strong>
           </div>
         </article>
         <article className="seller-review-summary-card">
           <span className="material-symbols-outlined">star</span>
           <div>
-            <p>Average Rating</p>
+            <p>{isVi ? 'Điểm Trung Bình' : 'Average Rating'}</p>
             <strong>{summaryLoading ? '-' : summary.averageRating.toFixed(1)}</strong>
           </div>
         </article>
         <article className="seller-review-summary-card warning">
           <span className="material-symbols-outlined">flag</span>
           <div>
-            <p>Reported Reviews</p>
+            <p>{isVi ? 'Đánh Giá Bị Báo Cáo' : 'Reported Reviews'}</p>
             <strong>{summaryLoading ? '-' : summary.reportedReviews}</strong>
           </div>
         </article>
@@ -313,24 +325,24 @@ export default function ReviewList() {
             type="search"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search reviewer, order, product, or comment"
+            placeholder={isVi ? 'Tìm theo tên người đánh giá, đơn hàng, sản phẩm hoặc bình luận...' : 'Search reviewer, order, product, or comment'}
           />
         </div>
 
         <select value={ratingFilter} onChange={handleFilterChange(setRatingFilter)} aria-label="Filter by rating">
-          {RATING_FILTERS.map((option) => (
+          {ratingFilterOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
 
         <select value={statusFilter} onChange={handleFilterChange(setStatusFilter)} aria-label="Filter by report status">
-          {STATUS_FILTERS.map((option) => (
+          {statusFilterOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
 
         <select value={sortBy} onChange={handleFilterChange(setSortBy)} aria-label="Sort reviews">
-          {SORT_OPTIONS.map((option) => (
+          {sortOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
@@ -339,9 +351,9 @@ export default function ReviewList() {
       <section className="seller-review-results">
         <div className="seller-review-results-head">
           <span>
-            Showing <strong>{firstItem}-{lastItem}</strong> of <strong>{totalItems}</strong> reviews
+            {isVi ? 'Hiển thị' : 'Showing'} <strong>{firstItem}-{lastItem}</strong> {isVi ? 'trên' : 'of'} <strong>{totalItems}</strong> {isVi ? 'đánh giá' : 'reviews'}
           </span>
-          <span>Page {page} of {totalPages}</span>
+          <span>{isVi ? 'Trang' : 'Page'} {page} / {totalPages}</span>
         </div>
 
         {loading ? (
@@ -356,8 +368,8 @@ export default function ReviewList() {
         ) : reviews.length === 0 ? (
           <div className="seller-review-empty">
             <span className="material-symbols-outlined">rate_review</span>
-            <h2>No reviews found</h2>
-            <p>No buyer reviews match the current search or filters.</p>
+            <h2>{isVi ? 'Không tìm thấy đánh giá nào' : 'No reviews found'}</h2>
+            <p>{isVi ? 'Không có đánh giá nào của người mua khớp với từ khóa hoặc bộ lọc.' : 'No buyer reviews match the current search or filters.'}</p>
           </div>
         ) : (
           <div className="seller-review-list">
@@ -377,8 +389,8 @@ export default function ReviewList() {
                     )}
                   </button>
                   <div>
-                    <span>Product</span>
-                    <Link to={review.productId ? `/product/${review.productId}` : '#'}>{review.productName || 'Unknown product'}</Link>
+                    <span>{isVi ? 'Sản phẩm' : 'Product'}</span>
+                    <Link to={review.productId ? `/product/${review.productId}` : '#'}>{review.productName || (isVi ? 'Sản phẩm chưa đặt tên' : 'Unknown product')}</Link>
                     <small>{review.productId || 'No product id'}</small>
                   </div>
                 </div>
@@ -393,42 +405,42 @@ export default function ReviewList() {
                       )}
                     </div>
                     <div>
-                      <span>Buyer</span>
-                      <strong>{review.reviewerName || 'Unknown buyer'}</strong>
-                      <small>{review.reviewerEmail || 'No email available'}</small>
+                      <span>{isVi ? 'Người mua' : 'Buyer'}</span>
+                      <strong>{review.reviewerName || (isVi ? 'Khách hàng' : 'Unknown buyer')}</strong>
+                      <small>{review.reviewerEmail || (isVi ? 'Chưa cập nhật email' : 'No email available')}</small>
                     </div>
                   </div>
 
                   <div className="seller-review-card-top">
                     <div>
                       <StarRating value={review.rating} />
-                      <p>{review.comment || 'No written comment.'}</p>
+                      <p>{review.comment || (isVi ? 'Không có bình luận chữ.' : 'No written comment.')}</p>
                     </div>
                     <div className={`seller-review-report-badge ${review.reportCount ? 'reported' : ''}`}>
                       <span className="material-symbols-outlined">flag</span>
-                      {review.reportCount ? `${review.reportCount} report${review.reportCount > 1 ? 's' : ''}` : 'No report'}
+                      {review.reportCount ? `${review.reportCount} ${isVi ? 'báo cáo' : `report${review.reportCount > 1 ? 's' : ''}`}` : (isVi ? 'Chưa có báo cáo' : 'No report')}
                     </div>
                   </div>
 
                   <dl className="seller-review-meta-grid">
                     <div>
-                      <dt>Review ID</dt>
+                      <dt>{isVi ? 'Mã Đánh Giá' : 'Review ID'}</dt>
                       <dd>{review.reviewId}</dd>
                     </div>
                     <div>
-                      <dt>Target Type</dt>
+                      <dt>{isVi ? 'Đối Tượng' : 'Target Type'}</dt>
                       <dd>{review.targetType || 'Review'}</dd>
                     </div>
                     <div>
-                      <dt>Order</dt>
+                      <dt>{isVi ? 'Đơn Hàng' : 'Order'}</dt>
                       <dd>{review.orderCode || review.orderId || 'N/A'}</dd>
                     </div>
                     <div>
-                      <dt>Reviewer</dt>
-                      <dd>{review.reviewerName || 'Unknown buyer'}</dd>
+                      <dt>{isVi ? 'Người Đánh Giá' : 'Reviewer'}</dt>
+                      <dd>{review.reviewerName || (isVi ? 'Khách hàng' : 'Unknown buyer')}</dd>
                     </div>
                     <div>
-                      <dt>Created At</dt>
+                      <dt>{isVi ? 'Ngày Tạo' : 'Created At'}</dt>
                       <dd>{formatDate(review.createdAt)}</dd>
                     </div>
                   </dl>
@@ -437,7 +449,8 @@ export default function ReviewList() {
                     <div className="seller-review-current-report">
                       <span className="material-symbols-outlined">task_alt</span>
                       <p>
-                        You reported this review for <strong>{review.currentUserReport?.reason || review.latestReportReason || 'policy review'}</strong>.
+                        {isVi ? 'Bạn đã báo cáo đánh giá này vì lý do: ' : 'You reported this review for '}
+                        <strong>{review.currentUserReport?.reason || review.latestReportReason || (isVi ? 'Vi phạm quy định' : 'policy review')}</strong>.
                       </p>
                     </div>
                   ) : null}
@@ -448,10 +461,9 @@ export default function ReviewList() {
                     type="button"
                     className="seller-review-report-btn"
                     onClick={() => openReportModal(review)}
-                    disabled={review.reportedByCurrentUser}
                   >
-                    <span className="material-symbols-outlined">outlined_flag</span>
-                    {review.reportedByCurrentUser ? 'Reported' : 'Report'}
+                    <span className="material-symbols-outlined">flag</span>
+                    {review.reportedByCurrentUser ? (isVi ? 'Đã Báo Cáo' : 'Reported') : (isVi ? 'Báo Cáo Vi Phạm' : 'Report Review')}
                   </button>
                 </div>
               </article>
@@ -459,156 +471,123 @@ export default function ReviewList() {
           </div>
         )}
 
-        {!loading && totalPages > 1 && (
-          <nav className="seller-review-pagination" aria-label="Review pagination">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
-              <span className="material-symbols-outlined">chevron_left</span>
-              Prev
+        {totalPages > 1 ? (
+          <div className="seller-review-pagination">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage((curr) => Math.max(1, curr - 1))}
+            >
+              {isVi ? 'Trước' : 'Previous'}
             </button>
-            {paginationItems.map((item, index) => (
-              item === 'start-ellipsis' || item === 'end-ellipsis' ? (
-                <span key={`${item}-${index}`} className="seller-review-pagination-ellipsis">...</span>
-              ) : (
+            {paginationItems.map((item, index) => {
+              if (typeof item === 'string') {
+                return <span key={`${item}-${index}`}>...</span>;
+              }
+
+              return (
                 <button
-                  key={item}
                   type="button"
+                  key={item}
                   className={page === item ? 'active' : ''}
                   onClick={() => setPage(item)}
-                  aria-current={page === item ? 'page' : undefined}
                 >
                   {item}
                 </button>
-              )
-            ))}
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
-              Next
-              <span className="material-symbols-outlined">chevron_right</span>
+              );
+            })}
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => setPage((curr) => Math.min(totalPages, curr + 1))}
+            >
+              {isVi ? 'Sau' : 'Next'}
             </button>
-          </nav>
-        )}
+          </div>
+        ) : null}
       </section>
 
-      {reportingReview && (
-        <div className="seller-review-modal-backdrop" role="presentation">
-          <section className="seller-review-modal" role="dialog" aria-modal="true" aria-labelledby="seller-review-report-title">
-            <header>
-              <div>
-                <span>Report Target</span>
-                <h2 id="seller-review-report-title">Report Review</h2>
-              </div>
-              <button type="button" onClick={closeReportModal} aria-label="Close report modal">
+      {/* Report Modal */}
+      {reportingReview ? (
+        <div className="seller-review-modal-backdrop animate-fade-in" onClick={closeReportModal}>
+          <div className="seller-review-modal-card" onClick={(event) => event.stopPropagation()}>
+            <header className="seller-review-modal-head">
+              <h3>{isVi ? 'Báo Cáo Đánh Giá Vi Phạm' : 'Report Review'}</h3>
+              <button type="button" onClick={closeReportModal} aria-label="Close">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
 
-            <div className="seller-review-modal-target">
-              <dl>
-                <div>
-                  <dt>Target Type</dt>
-                  <dd>{reportingReview.targetType || 'Review'}</dd>
-                </div>
-                <div>
-                  <dt>Target ID</dt>
-                  <dd>{reportingReview.reviewId}</dd>
-                </div>
-                <div>
-                  <dt>Order</dt>
-                  <dd>{reportingReview.orderCode || reportingReview.orderId || 'N/A'}</dd>
-                </div>
-                <div>
-                  <dt>Reviewer</dt>
-                  <dd>{reportingReview.reviewerName || 'Unknown buyer'}</dd>
-                </div>
-              </dl>
-              <div>
-                <StarRating value={reportingReview.rating} compact />
-                <p>{reportingReview.comment || 'No written comment.'}</p>
+            <form onSubmit={handleReportSubmit} className="seller-review-modal-body">
+              <div className="seller-review-modal-context">
+                <strong>{reportingReview.productName || (isVi ? 'Sản phẩm' : 'Product')}</strong>
+                <p>"{reportingReview.comment || (isVi ? 'Không có bình luận chữ' : 'No comment')}"</p>
+                <small>{isVi ? 'Người đánh giá:' : 'By'} {reportingReview.reviewerName || (isVi ? 'Khách hàng' : 'Buyer')}</small>
               </div>
-            </div>
 
-            <form onSubmit={submitReport}>
-              <label>
-                Reason
-                <select value={reportReason} onChange={(event) => setReportReason(event.target.value)} required>
-                  <option value="">Select a reason</option>
-                  {REPORT_REASONS.map((reason) => (
+              <div className="seller-review-field">
+                <label htmlFor="seller-report-reason">{isVi ? 'Lý do báo cáo *' : 'Reason *'}</label>
+                <select
+                  id="seller-report-reason"
+                  value={reportReason}
+                  onChange={(event) => setReportReason(event.target.value)}
+                  required
+                >
+                  {reportReasons.map((reason) => (
                     <option key={reason} value={reason}>{reason}</option>
                   ))}
                 </select>
-              </label>
+              </div>
 
-              <label>
-                Description
+              <div className="seller-review-field">
+                <label htmlFor="seller-report-desc">{isVi ? 'Mô tả chi tiết' : 'Details / Description'}</label>
                 <textarea
+                  id="seller-report-desc"
+                  rows={4}
                   value={reportDescription}
-                  onChange={(event) => setReportDescription(event.target.value.slice(0, 500))}
-                  rows="4"
-                  placeholder="Add context for the admin team"
+                  onChange={(event) => setReportDescription(event.target.value)}
+                  placeholder={isVi ? 'Giải thích lý do tại sao đánh giá này vi phạm quy định...' : 'Explain why this review violates policies...'}
                 />
-                <span>{reportDescription.length}/500</span>
-              </label>
+              </div>
 
-              <footer>
-                <button type="button" onClick={closeReportModal} disabled={reportSubmitting}>
-                  Cancel
+              <footer className="seller-review-modal-actions">
+                <button type="button" className="secondary" onClick={closeReportModal} disabled={reportSubmitting}>
+                  {isVi ? 'Hủy Bỏ' : 'Cancel'}
                 </button>
-                <button type="submit" disabled={reportSubmitting || !reportReason.trim()}>
-                  {reportSubmitting ? 'Submitting...' : 'Submit Report'}
+                <button type="submit" className="primary" disabled={reportSubmitting}>
+                  {reportSubmitting ? (isVi ? 'Đang gửi...' : 'Submitting...') : (isVi ? 'Gửi Báo Cáo' : 'Submit Report')}
                 </button>
               </footer>
             </form>
-          </section>
+          </div>
         </div>
-      )}
+      ) : null}
 
-      {previewReview && (
-        <div className="seller-review-modal-backdrop" role="presentation" onMouseDown={closePreviewModal}>
-          <section
-            className="seller-review-modal seller-review-detail-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="seller-review-preview-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header>
-              <div>
-                <span>Review Preview</span>
-                <h2 id="seller-review-preview-title">{previewReview.productName || 'Reviewed Product'}</h2>
-              </div>
-              <button type="button" onClick={closePreviewModal} aria-label="Close review preview">
+      {/* Preview Modal */}
+      {previewReview ? (
+        <div className="seller-review-modal-backdrop animate-fade-in" onClick={closePreviewModal}>
+          <div className="seller-review-modal-card preview-mode" onClick={(event) => event.stopPropagation()}>
+            <header className="seller-review-modal-head">
+              <h3>{isVi ? 'Xem Trước Đánh Giá' : 'Review Context'}</h3>
+              <button type="button" onClick={closePreviewModal} aria-label="Close">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
 
-            <div className="seller-review-detail-media">
+            <div className="seller-review-modal-body">
               {previewReview.productImageUrl ? (
-                <img src={previewReview.productImageUrl} alt={previewReview.productName || 'Reviewed product'} />
-              ) : (
-                <span className="material-symbols-outlined">inventory_2</span>
-              )}
-            </div>
-
-            <div className="seller-review-detail-body">
-              <div className="seller-review-detail-buyer">
-                <div className="seller-review-buyer-avatar">
-                  {previewReview.reviewerAvatarUrl ? (
-                    <img src={previewReview.reviewerAvatarUrl} alt={previewReview.reviewerName || 'Buyer'} />
-                  ) : (
-                    getBuyerInitials(previewReview.reviewerName)
-                  )}
-                </div>
-                <div>
-                  <span>Buyer</span>
-                  <strong>{previewReview.reviewerName || 'Unknown buyer'}</strong>
-                  <small>{previewReview.orderCode || previewReview.orderId || 'N/A'}</small>
-                </div>
-              </div>
+                <img className="seller-review-preview-img" src={previewReview.productImageUrl} alt={previewReview.productName || 'Product'} />
+              ) : null}
+              <strong>{previewReview.productName || (isVi ? 'Sản phẩm' : 'Product')}</strong>
               <StarRating value={previewReview.rating} />
-              <p>{previewReview.comment || 'No written comment.'}</p>
+              <p>"{previewReview.comment || (isVi ? 'Không có bình luận chữ' : 'No comment')}"</p>
+              <footer className="seller-review-modal-actions">
+                <button type="button" className="primary" onClick={closePreviewModal}>{isVi ? 'Đóng' : 'Close'}</button>
+              </footer>
             </div>
-          </section>
+          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
