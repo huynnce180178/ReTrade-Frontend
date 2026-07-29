@@ -29,6 +29,8 @@ export default function ManageRefunds() {
   const [searchTerm, setSearchTerm] = useState('');
   const [processingRefund, setProcessingRefund] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   const fetchRefunds = async () => {
     try {
@@ -59,6 +61,33 @@ export default function ManageRefunds() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleReject = async () => {
+    if (!processingRefund) return;
+    if (!rejectReason.trim()) {
+      showToast('Please provide a reason for rejection.', 'error');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      await adminRefundService.rejectRefund(processingRefund.refundRequestId, { reason: rejectReason.trim() });
+      showToast('Refund request rejected successfully.', 'success');
+      setProcessingRefund(null);
+      setIsRejecting(false);
+      setRejectReason('');
+      await fetchRefunds();
+    } catch (error) {
+      showToast(error?.response?.data || 'Failed to reject refund request.', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setProcessingRefund(null);
+    setIsRejecting(false);
+    setRejectReason('');
   };
 
   // Calculations for stats
@@ -254,11 +283,11 @@ export default function ManageRefunds() {
     </div>
 
     {processingRefund && (
-        <div className="admin-refund-modal-overlay" onClick={() => setProcessingRefund(null)}>
+        <div className="admin-refund-modal-overlay" onClick={handleCloseModal}>
           <div className="admin-refund-modal" onClick={(e) => e.stopPropagation()}>
             <header className="admin-refund-modal-header">
               <h3>Refund Request Details</h3>
-              <button type="button" className="admin-refund-modal-close" onClick={() => setProcessingRefund(null)} disabled={actionLoading}>
+              <button type="button" className="admin-refund-modal-close" onClick={handleCloseModal} disabled={actionLoading}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
@@ -290,6 +319,13 @@ export default function ManageRefunds() {
                   <span style={{ fontSize: '13px', color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{processingRefund.note || 'No notes provided.'}</span>
                 </div>
 
+                {processingRefund.status === 'Rejected' && processingRefund.rejectReason && (
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Reject Reason</span>
+                    <span style={{ fontSize: '13px', color: '#b91c1c', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{processingRefund.rejectReason}</span>
+                  </div>
+                )}
+
                 <div>
                   <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Transfer Account</span>
                   {processingRefund.bankName ? (
@@ -313,23 +349,71 @@ export default function ManageRefunds() {
             </div>
 
             <footer className="admin-refund-modal-footer">
-              <button
-                type="button"
-                className="admin-refund-action-btn outline"
-                onClick={() => setProcessingRefund(null)}
-                disabled={actionLoading}
-              >
-                Close
-              </button>
-              {processingRefund.status === 'Pending' && (
-                <button
-                  type="button"
-                  className="admin-refund-action-btn"
-                  onClick={handleMarkDone}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? <span className="page-btn-spinner"></span> : 'Confirm Sent'}
-                </button>
+              {!isRejecting ? (
+                <>
+                  <button
+                    type="button"
+                    className="admin-refund-action-btn outline"
+                    onClick={handleCloseModal}
+                    disabled={actionLoading}
+                  >
+                    Close
+                  </button>
+                  {processingRefund.status === 'Pending' && (
+                    <>
+                      <button
+                        type="button"
+                        className="admin-refund-action-btn"
+                        style={{ backgroundColor: '#ef4444', color: 'white' }}
+                        onClick={() => setIsRejecting(true)}
+                        disabled={actionLoading}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-refund-action-btn"
+                        onClick={handleMarkDone}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? <span className="page-btn-spinner"></span> : 'Confirm Sent'}
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Reject Reason *</label>
+                    <textarea 
+                      autoFocus
+                      placeholder="Enter the reason for rejecting this refund..."
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      disabled={actionLoading}
+                      style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', minHeight: '80px', resize: 'vertical' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                    <button
+                      type="button"
+                      className="admin-refund-action-btn outline"
+                      onClick={() => { setIsRejecting(false); setRejectReason(''); }}
+                      disabled={actionLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-refund-action-btn"
+                      style={{ backgroundColor: '#ef4444', color: 'white' }}
+                      onClick={handleReject}
+                      disabled={actionLoading || !rejectReason.trim()}
+                    >
+                      {actionLoading ? <span className="page-btn-spinner"></span> : 'Submit Reject'}
+                    </button>
+                  </div>
+                </div>
               )}
             </footer>
           </div>

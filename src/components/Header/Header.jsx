@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useNotification } from '../../context/NotificationContext';
 import subscriptionService from '../../services/subscriptionService';
 import userSearchService from '../../services/userSearchService';
 import chatService from '../../services/chatService';
@@ -11,6 +12,7 @@ import './Header.css';
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { unreadCount, notifications, markAsRead, markAllAsRead, deleteNotification } = useNotification();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -335,6 +337,27 @@ export default function Header() {
     }
   };
 
+  const timeAgo = (dateStr) => {
+    if (!dateStr) return '';
+    const now = new Date();
+    // Assuming backend returns UTC without Z, append Z if needed, or simply parse
+    const then = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} mins ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    return `${Math.floor(diff / 86400)} days ago`;
+  };
+
+  const handleNotificationClick = (n) => {
+    if (!n.isRead) {
+      markAsRead(n.notificationId);
+    }
+    setNotifOpen(false);
+    // Navigation logic based on referenceId/type could go here. For now, navigate to notifications page
+    // navigate(`/notifications`);
+  };
+
   return (
     <>
       <header className="site-header glass-panel">
@@ -466,28 +489,41 @@ export default function Header() {
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                 </svg>
-                <span className="notif-badge">3</span>
+                {unreadCount > 0 && <span className="notif-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>}
               </button>
 
               {notifOpen && (
                 <div className="notif-dropdown animate-fade-in">
                   <div className="notif-header">
                     <h4>Notifications</h4>
-                    <button className="text-btn">Mark all read</button>
+                    {unreadCount > 0 && (
+                      <button className="text-btn" onClick={() => markAllAsRead()}>Mark all read</button>
+                    )}
                   </div>
                   <div className="notif-list">
-                    <div className="notif-item unread">
-                      <p className="notif-text">Your item <strong>Vespa Sprint 2022</strong> has a new auction bid!</p>
-                      <span className="notif-time">2 mins ago</span>
-                    </div>
-                    <div className="notif-item unread">
-                      <p className="notif-text">Welcome to ReTrade! Get verified to start listing products.</p>
-                      <span className="notif-time">1 hour ago</span>
-                    </div>
-                    <div className="notif-item">
-                      <p className="notif-text">Your wishlist item <strong>iPhone 14 Pro Max</strong> drops in price!</p>
-                      <span className="notif-time">Yesterday</span>
-                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">No notifications yet</div>
+                    ) : (
+                      notifications.slice(0, 5).map(n => (
+                        <div key={n.notificationId} className={`notif-item ${!n.isRead ? 'unread' : ''}`} onClick={() => handleNotificationClick(n)}>
+                          <div className="notif-content-wrap">
+                            <h5 className="notif-title">{n.title}</h5>
+                            <p className="notif-text">{n.message}</p>
+                            <span className="notif-time">{timeAgo(n.createdAt)}</span>
+                          </div>
+                          <button 
+                            className="notif-delete-btn" 
+                            onClick={(e) => { e.stopPropagation(); deleteNotification(n.notificationId); }}
+                            title="Delete"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="notif-footer">
+                    <Link to="/notifications" className="notif-view-all" onClick={() => setNotifOpen(false)}>View All Notifications</Link>
                   </div>
                 </div>
               )}

@@ -59,7 +59,7 @@
   position: relative;
   padding: 18px 20px;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(252, 247, 247, 0.95));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(252, 247, 247, 0.95));
   border: 1px solid rgba(153, 27, 27, 0.14);
   box-shadow: 0 16px 32px rgba(99, 21, 21, 0.05);
   overflow: hidden;
@@ -144,11 +144,36 @@
   font-size: 13px;
 }
 
+.admin-user-detail-card .admin-panel-actions,
 .admin-panel-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 18px;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-top: 16px !important;
+}
+
+.admin-panel-actions .admin-action-btn {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 8px;
+  gap: 3px;
+}
+
+.admin-panel-actions .admin-action-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-panel-actions .admin-action-btn .material-symbols-outlined {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .admin-pill-group {
@@ -218,7 +243,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #7c2d12;
-  background: linear-gradient(180deg, rgba(153, 27, 27, 0.03), rgba(255,255,255,0));
+  background: linear-gradient(180deg, rgba(153, 27, 27, 0.03), rgba(255, 255, 255, 0));
 }
 
 .admin-user-table tbody tr {
@@ -299,15 +324,45 @@
   font-weight: 800;
 }
 
-.role-admin { background: rgba(153, 27, 27, 0.1); color: #991B1B; }
-.role-seller { background: rgba(245, 158, 11, 0.12); color: #b45309; }
-.role-buyer { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
-.role-unknown { background: rgba(148, 163, 184, 0.18); color: #475569; }
+.role-admin {
+  background: rgba(153, 27, 27, 0.1);
+  color: #991B1B;
+}
 
-.admin-status-badge.success { background: rgba(16, 185, 129, 0.12); color: #059669; }
-.admin-status-badge.warning { background: rgba(245, 158, 11, 0.14); color: #b45309; }
-.admin-status-badge.danger { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
-.admin-status-badge.neutral { background: rgba(148, 163, 184, 0.18); color: #475569; }
+.role-seller {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.role-buyer {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.role-unknown {
+  background: rgba(148, 163, 184, 0.18);
+  color: #475569;
+}
+
+.admin-status-badge.success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.admin-status-badge.warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.admin-status-badge.danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.admin-status-badge.neutral {
+  background: rgba(148, 163, 184, 0.18);
+  color: #475569;
+}
 
 .admin-action-group,
 .admin-detail-actions {
@@ -320,15 +375,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-weight: 800;
-  font-size: 13px;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  gap: 5px;
+  height: 36px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.18s ease;
 }
 
-.admin-action-btn:hover {
+.admin-action-btn:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
@@ -338,18 +396,31 @@
 }
 
 .admin-action-btn.outline {
-  border: 1px solid rgba(153, 27, 27, 0.18);
+  border: 1px solid #cbd5e1;
   background: #ffffff;
-  color: #7f1d1d;
+  color: #334155;
+}
+
+.admin-action-btn.outline:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .admin-action-btn.danger {
-  background: #dc2626;
+  border: 1px solid #ef4444;
+  background: #ef4444;
   color: #ffffff;
 }
 
+.admin-action-btn.danger:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
 .admin-action-btn .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .admin-table-footer {
@@ -409,16 +480,18 @@
 
 .admin-detail-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .admin-detail-grid div,
 .admin-activity-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250, 248, 247, 0.96));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 248, 247, 0.96));
   border: 1px solid rgba(153, 27, 27, 0.08);
   border-radius: 16px;
-  padding: 14px;
+  padding: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .admin-detail-grid span,
@@ -433,8 +506,12 @@
 }
 
 .admin-detail-grid strong {
-  font-size: 14px;
-  line-height: 1.4;
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  color: #1f2937;
 }
 
 .admin-activity-card {
@@ -555,7 +632,7 @@
 .admin-confirm-target-card {
   border-radius: 16px;
   border: 1px solid rgba(153, 27, 27, 0.1);
-  background: linear-gradient(180deg, rgba(153, 27, 27, 0.03), rgba(255,255,255,0.96));
+  background: linear-gradient(180deg, rgba(153, 27, 27, 0.03), rgba(255, 255, 255, 0.96));
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -692,7 +769,7 @@
   gap: 18px;
   padding: 18px;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(153, 27, 27, 0.03), rgba(255,255,255,0.98));
+  background: linear-gradient(180deg, rgba(153, 27, 27, 0.03), rgba(255, 255, 255, 0.98));
   border: 1px solid rgba(153, 27, 27, 0.08);
 }
 
@@ -855,7 +932,7 @@
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid rgba(153, 27, 27, 0.06);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,250,250,0.96));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 250, 250, 0.96));
 }
 
 .admin-detail-modal-footer {
@@ -895,6 +972,7 @@
 }
 
 @media (max-width: 720px) {
+
   .admin-stat-grid,
   .admin-detail-grid,
   .admin-search-row {

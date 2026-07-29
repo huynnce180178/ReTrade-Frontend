@@ -6,6 +6,7 @@ const post = (url, payload) => api.post(url, payload).then((response) => respons
 const adminRefundService = {
   getAll: () => get('/Admin/refunds'),
   markDone: (id) => post(`/Admin/refunds/${id}/done`),
+  rejectRefund: (id, payload) => post(`/Admin/refunds/${id}/reject`, payload),
 };
 
 export default adminRefundService;
