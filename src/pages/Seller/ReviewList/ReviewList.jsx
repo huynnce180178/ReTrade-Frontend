@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import reviewService from '../../../services/reviewService';
+import reportService from '../../../services/reportService';
 import { useToast } from '../../../context/ToastContext';
 import './ReviewList.css';
 
@@ -227,7 +228,7 @@ export default function ReviewList() {
 
     setReportSubmitting(true);
     try {
-      await reviewService.report(reportingReview.reviewId, {
+      await reportService.reportReview(reportingReview.reviewId, {
         reason: reportReason.trim(),
         description: reportDescription.trim() || null,
       });
