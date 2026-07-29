@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { NotificationProvider } from './context/NotificationContext';
 
 const GOOGLE_CLIENT_ID = '743075993817-g2um0aknujbhp10vtfjmtg12gq6iaoid.apps.googleusercontent.com';
 import MainLayout from './layouts/MainLayout/MainLayout';
@@ -32,6 +33,7 @@ import Checkout from './pages/Buyer/Checkout/Checkout';
 import Chat from './pages/Buyer/Chat/Chat';
 import AssistantChat from './pages/Buyer/AssistantChat/AssistantChat';
 import ReportHistory from './pages/Buyer/ReportHistory/ReportHistory';
+import Notifications from './pages/Buyer/Notifications/Notifications';
 
 import Support from './pages/Buyer/Support/Support';
 import Category from './pages/Buyer/Category/Category';
@@ -80,22 +82,24 @@ function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <AuthProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <ScrollToTop />
-            <Routes>
-              <Route path="/" element={<MainLayout />}>
-                <Route index element={<Home />} />
-                <Route path="product" element={<Product />} />
-                <Route path="product/:productId" element={<ProductDetail />} />
-                <Route path="auction" element={<Auction />} />
-                <Route path="auction/:auctionId" element={<AuctionDetail />} />
-                <Route path="wishlist" element={<Wishlist />} />
-                <Route path="assistant-chat" element={<AssistantChat />} />
-                <Route path="chat" element={<Chat />} />
-                <Route path="chat/:roomId" element={<Chat />} />
-                <Route path="checkout" element={<Checkout />} />
-                <Route path="checkout/:productId" element={<Checkout />} />
+        <NotificationProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <ScrollToTop />
+              <Routes>
+                <Route path="/" element={<MainLayout />}>
+                  <Route index element={<Home />} />
+                  <Route path="product" element={<Product />} />
+                  <Route path="product/:productId" element={<ProductDetail />} />
+                  <Route path="auction" element={<Auction />} />
+                  <Route path="auction/:auctionId" element={<AuctionDetail />} />
+                  <Route path="wishlist" element={<Wishlist />} />
+                  <Route path="assistant-chat" element={<AssistantChat />} />
+                  <Route path="chat" element={<Chat />} />
+                  <Route path="chat/:roomId" element={<Chat />} />
+                  <Route path="checkout" element={<Checkout />} />
+                  <Route path="checkout/:productId" element={<Checkout />} />
+                  <Route path="notifications" element={<Notifications />} />
 
                 <Route path="support" element={<Support />} />
                 <Route path="users/:userId" element={<UserProfile />} />
@@ -158,6 +162,7 @@ function App() {
             </Routes>
           </BrowserRouter>
         </ToastProvider>
+        </NotificationProvider>
       </AuthProvider>
     </GoogleOAuthProvider>
   );
