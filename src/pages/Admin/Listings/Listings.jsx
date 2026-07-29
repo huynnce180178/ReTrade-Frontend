@@ -3,6 +3,7 @@ import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 import { useToast } from '../../../context/ToastContext';
 import { formatDateTimeGmt7 } from '../../../utils/dateTime';
+import { createNotificationHubConnection } from '../../../services/notificationRealtimeService';
 import './Listings.css';
 
 const moneyFormatter = new Intl.NumberFormat('vi-VN', {
@@ -21,6 +22,7 @@ export default function Listings() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const pageSize = 5;
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Modal Detail states
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -36,10 +38,33 @@ export default function Listings() {
     fetchCategories();
   }, []);
 
-  // Fetch products automatically when filters or search terms change
+  useEffect(() => {
+    let disposed = false;
+    const connection = createNotificationHubConnection();
+
+    connection.on('ReceiveNotification', (notification) => {
+      // You could filter by notification.type here if needed, 
+      // but for admin dashboard, auto-refreshing on any new notification is acceptable.
+      if (!disposed) {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    });
+
+    connection.start()
+      .then(() => connection.invoke('JoinUserNotifications').catch(() => {}))
+      .catch((err) => console.error('SignalR Hub Connection Error:', err));
+
+    return () => {
+      disposed = true;
+      connection.off('ReceiveNotification');
+      connection.stop().catch(() => {});
+    };
+  }, []);
+
+  // Fetch products automatically when filters, search terms, page, or real-time trigger change
   useEffect(() => {
     fetchProducts();
-  }, [statusFilter, categoryFilter, searchTerm, page]);
+  }, [statusFilter, categoryFilter, searchTerm, page, refreshTrigger]);
 
   const fetchProducts = async () => {
     try {

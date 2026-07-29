@@ -5,6 +5,7 @@ import productService from '../../../services/productService';
 import addressService from '../../../services/addressService';
 import AddressPopup from '../../../components/AddressPopup/AddressPopup';
 import { formatDateGmt7 } from '../../../utils/dateTime';
+import { createNotificationHubConnection } from '../../../services/notificationRealtimeService';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 
@@ -22,6 +23,7 @@ export default function MyProducts() {
   const [sellerSearch, setSellerSearch] = useState('');
   const [sellerStatus, setSellerStatus] = useState('');
   const [sellerSort, setSellerSort] = useState('newest');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const [isAddressPopupOpen, setIsAddressPopupOpen] = useState(false);
 
@@ -47,10 +49,32 @@ export default function MyProducts() {
   };
 
   useEffect(() => {
+    let disposed = false;
+    const connection = createNotificationHubConnection();
+
+    connection.on('ReceiveNotification', (notification) => {
+      // Refresh seller product list whenever they receive a notification (e.g. approval, rejection)
+      if (!disposed) {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    });
+
+    connection.start()
+      .then(() => connection.invoke('JoinUserNotifications').catch(() => {}))
+      .catch((err) => console.error('SignalR Hub Connection Error:', err));
+
+    return () => {
+      disposed = true;
+      connection.off('ReceiveNotification');
+      connection.stop().catch(() => {});
+    };
+  }, []);
+
+  useEffect(() => {
     if (user) {
       fetchMyProducts();
     }
-  }, [user, sellerStatus, sellerSort]);
+  }, [user, sellerStatus, sellerSort, refreshTrigger]);
 
   const handleSellerSearchSubmit = (e) => {
     e.preventDefault();

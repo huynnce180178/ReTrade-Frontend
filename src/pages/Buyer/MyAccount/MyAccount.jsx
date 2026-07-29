@@ -224,6 +224,12 @@ export default function MyAccount() {
   };
 
   const handleDeactivateAccount = async () => {
+    const isAdmin = user?.roles?.some((r) => String(r).toLowerCase() === 'admin') || user?.primaryRole?.toLowerCase() === 'admin';
+    if (isAdmin) {
+      showToast('Administrators cannot deactivate their own accounts.', 'error');
+      setShowDeactivateModal(false);
+      return;
+    }
     try {
       setDeactivateLoading(true);
       await accountService.deactivateMe();
@@ -368,18 +374,20 @@ export default function MyAccount() {
                 </p>
               </div>
 
-              <div className="ma-danger-card" style={{ flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="material-symbols-outlined ma-danger-icon">cancel</span>
-                  <h4 className="ma-danger-title" style={{ margin: 0 }}>Deactivate Account</h4>
+              {!(user?.roles?.some((r) => String(r).toLowerCase() === 'admin') || user?.primaryRole?.toLowerCase() === 'admin') && (
+                <div className="ma-danger-card" style={{ flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="material-symbols-outlined ma-danger-icon">cancel</span>
+                    <h4 className="ma-danger-title" style={{ margin: 0 }}>Deactivate Account</h4>
+                  </div>
+                  <p className="ma-danger-text" style={{ fontSize: '14px' }}>
+                    If you no longer want to use ReTrade, you can deactivate your account. You will be logged out immediately and receive a confirmation email.
+                  </p>
+                  <button type="button" className="ma-danger-btn" onClick={() => setShowDeactivateModal(true)}>
+                    Deactivate Account
+                  </button>
                 </div>
-                <p className="ma-danger-text" style={{ fontSize: '14px' }}>
-                  If you no longer want to use ReTrade, you can deactivate your account. You will be logged out immediately and receive a confirmation email.
-                </p>
-                <button type="button" className="ma-danger-btn" onClick={() => setShowDeactivateModal(true)}>
-                  Deactivate Account
-                </button>
-              </div>
+              )}
 
             </div>
           </div>

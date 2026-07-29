@@ -3,6 +3,7 @@ import accountService from '../../../services/accountService';
 import accountRoleService from '../../../services/accountRoleService';
 import profileService from '../../../services/profileService';
 import { useToast } from '../../../context/ToastContext';
+import { useAuth } from '../../../context/AuthContext';
 import { formatDateTimeGmt7 } from '../../../utils/dateTime';
 import './UserAccounts.css';
 
@@ -37,6 +38,7 @@ const extractErrorMessage = (error) => {
 
 export default function UserAccounts() {
   const { showToast } = useToast();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -153,9 +155,7 @@ export default function UserAccounts() {
     URL.revokeObjectURL(url);
   };
 
-  const handleActionStub = (label) => {
-    showToast(`${label} will be connected after the backend action is ready.`, 'info');
-  };
+
 
   const openRoleModal = async (user) => {
     if (!user?.accountId) {
@@ -231,6 +231,11 @@ export default function UserAccounts() {
     if (!selectedUserId) return;
     // prevent double actions
     if (role.loading) return;
+
+    if (currentUser?.accountId === selectedUserId && role.isAssigned) {
+      showToast('You cannot remove roles from your own account.', 'error');
+      return;
+    }
 
     setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, loading: true } : r)));
 
@@ -436,7 +441,6 @@ export default function UserAccounts() {
                     <th>Provider</th>
                     <th>Status</th>
                     <th>Last Login</th>
-                    <th>Administrative Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -475,31 +479,6 @@ export default function UserAccounts() {
                           </span>
                         </td>
                         <td>{user.lastLoginAt ? formatDateTimeGmt7(user.lastLoginAt) : 'Never'}</td>
-                        <td>
-                          <div className="admin-action-group">
-                            <button type="button" className="admin-action-btn ghost" onClick={(e) => { e.stopPropagation(); handleActionStub('Audit logs'); }}>
-                              Audit Logs
-                            </button>
-                            <button type="button" className="admin-action-btn outline" onClick={(e) => { e.stopPropagation(); openUserDetail(user); }}>
-                              Detail
-                            </button>
-                            <button type="button" className="admin-action-btn outline" onClick={(e) => { e.stopPropagation(); handleActionStub('Edit account'); }}>
-                              <span className="material-symbols-outlined">edit</span>
-                            </button>
-                            <button type="button" className="admin-action-btn outline" onClick={(e) => { e.stopPropagation(); openRoleModal(user); }}>
-                              <span className="material-symbols-outlined">manage_accounts</span>
-                              Manage Roles
-                            </button>
-                            <button
-                              type="button"
-                              className={`admin-action-btn ${isInactiveStatus(user.status) ? 'outline' : 'danger'}`}
-                              onClick={(e) => { e.stopPropagation(); openStatusActionModal(user); }}
-                            >
-                              <span className="material-symbols-outlined">block</span>
-                              {isInactiveStatus(user.status) ? 'Unban' : 'Ban'}
-                            </button>
-                          </div>
-                        </td>
                       </tr>
                     );
                   })}
@@ -518,20 +497,22 @@ export default function UserAccounts() {
             </div>
           </footer>
         </div>
-
         <aside className="admin-user-detail-card">
           {selectedUser ? (
-            <>
+            <div className="admin-detail-inner">
               <div className="admin-detail-top">
                 <div className="admin-detail-avatar">
-                  {selectedUser.avatarUrl ? <img src={selectedUser.avatarUrl} alt="Avatar" /> : <span>{`${selectedUser.firstName || selectedUser.username || 'U'}`.slice(0, 2).toUpperCase()}</span>}
+                  {selectedUser.avatarUrl ? (
+                    <img src={selectedUser.avatarUrl} alt={selectedUser.username} />
+                  ) : (
+                    (selectedUser.username || 'U').slice(0, 2).toUpperCase()
+                  )}
                 </div>
-                <div>
+                <div className="admin-detail-title">
+                  <h3>{selectedUser.username || 'No Username'}</h3>
                   <span className={`admin-status-badge ${statusTone(selectedUser.status)}`}>
                     {selectedUser.status || 'Unknown'}
                   </span>
-                  <h3>{`${selectedUser.firstName || ''} ${selectedUser.lastName || ''}`.trim() || selectedUser.username}</h3>
-                  <p>{selectedUser.email || 'No email available'}</p>
                 </div>
               </div>
 
@@ -550,7 +531,7 @@ export default function UserAccounts() {
                 </div>
                 <div>
                   <span>Primary Role</span>
-                  <strong>{selectedUser.primaryRole || '-'}</strong>
+                  <strong>{selectedUser.roles?.[0] || 'User'}</strong>
                 </div>
                 <div>
                   <span>Provider</span>
@@ -558,40 +539,34 @@ export default function UserAccounts() {
                 </div>
                 <div>
                   <span>Last Login</span>
-                  <strong>{selectedUser.lastLoginAt ? formatDateTimeGmt7(selectedUser.lastLoginAt) : 'Never'}</strong>
+                  <strong>{(selectedUser.lastLoginAt || selectedUser.lastLogin) ? formatDateTimeGmt7(selectedUser.lastLoginAt || selectedUser.lastLogin) : 'Never'}</strong>
                 </div>
               </div>
 
-              <div className="admin-activity-card">
-                <h4>Administrative Notes</h4>
-                <p>
-                  This panel is ready for ban, restore, profile review, and audit log actions after the backend behavior is connected.
-                </p>
-              </div>
-
-              <div className="admin-detail-actions">
-                <button type="button" className="admin-action-btn ghost" onClick={() => handleActionStub('Open profile')}>
-                  Open Profile
-                </button>
+              <div className="admin-panel-actions">
                 <button type="button" className="admin-action-btn outline" onClick={() => openUserDetail(selectedUser)}>
-                  View Detail
+                  <span className="material-symbols-outlined">visibility</span>
+                  <span>Detail</span>
                 </button>
                 <button type="button" className="admin-action-btn outline" onClick={() => openRoleModal(selectedUser)}>
-                  Manage Roles
+                  <span className="material-symbols-outlined">manage_accounts</span>
+                  <span>Roles</span>
                 </button>
-                <button type="button" className="admin-action-btn outline" onClick={() => handleActionStub('Open audit log')}>
-                  Audit Log
-                </button>
-                <button type="button" className={`admin-action-btn ${isInactiveStatus(selectedUser.status) ? 'outline' : 'danger'}`} onClick={() => openStatusActionModal(selectedUser)}>
-                  {isInactiveStatus(selectedUser.status) ? 'Unban User' : 'Ban'}
+                <button 
+                  type="button" 
+                  className={`admin-action-btn ${isInactiveStatus(selectedUser.status) ? 'outline' : 'danger'}`}
+                  onClick={() => openStatusActionModal(selectedUser)}
+                  disabled={currentUser?.accountId === selectedUser.accountId}
+                >
+                  <span className="material-symbols-outlined">{isInactiveStatus(selectedUser.status) ? 'check_circle' : 'block'}</span>
+                  <span>{isInactiveStatus(selectedUser.status) ? 'Unban' : 'Ban'}</span>
                 </button>
               </div>
-            </>
+            </div>
           ) : (
-            <div className="admin-empty-detail">
-              <span className="material-symbols-outlined">manage_accounts</span>
-              <h3>No User Selected</h3>
-              <p>Pick a row from the table to inspect account details and available actions.</p>
+            <div className="admin-empty-selection">
+              <span className="material-symbols-outlined">person_search</span>
+              <p>Select a user from the list to view quick details</p>
             </div>
           )}
         </aside>
@@ -671,23 +646,28 @@ export default function UserAccounts() {
                   {roleItems.length === 0 ? (
                     <p className="admin-detail-muted">No roles available for this account.</p>
                   ) : (
-                    roleItems.map((role) => (
-                      <div key={role.roleId} className="role-item">
-                        <div>
-                          <strong>{role.name || `Role ${role.roleId}`}</strong>
+                    roleItems.map((role) => {
+                      const isSelf = currentUser?.accountId === selectedUserId;
+                      const isRemovingSelfRole = isSelf && role.isAssigned;
+                      return (
+                        <div key={role.roleId} className="role-item">
+                          <div>
+                            <strong>{role.name || `Role ${role.roleId}`}</strong>
+                          </div>
+                          <div>
+                            <button
+                              type="button"
+                              className={`admin-action-btn ${role.isAssigned ? 'danger' : 'ghost'}`}
+                              onClick={() => toggleRoleAssignment(role)}
+                              disabled={role.loading || isRemovingSelfRole}
+                              title={isRemovingSelfRole ? 'Cannot remove roles from your own account' : ''}
+                            >
+                              {role.loading ? 'Processing...' : role.isAssigned ? 'Remove' : 'Assign'}
+                            </button>
+                          </div>
                         </div>
-                        <div>
-                          <button
-                            type="button"
-                            className={`admin-action-btn ${role.isAssigned ? 'danger' : 'ghost'}`}
-                            onClick={() => toggleRoleAssignment(role)}
-                            disabled={role.loading}
-                          >
-                            {role.loading ? 'Processing...' : role.isAssigned ? 'Remove' : 'Assign'}
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
@@ -786,6 +766,8 @@ export default function UserAccounts() {
                       </div>
                     </div>
                   )}
+
+
                 </>
               ) : null}
             </div>

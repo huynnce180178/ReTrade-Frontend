@@ -59,6 +59,8 @@ import AuctionControl from './pages/Admin/Auctions/AuctionControl';
 import ManageRefunds from './pages/Admin/Refunds/ManageRefunds';
 import ReportManagement from './pages/Admin/Reports/ReportManagement';
 import FlaggedUsers from './pages/Admin/Reports/FlaggedUsers';
+import AdminDashboard from './pages/Admin/Dashboard/AdminDashboard';
+import AdminStatistics from './pages/Admin/Statistics/AdminStatistics';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -143,7 +145,9 @@ function App() {
 
               {/* Admin Panel Routes */}
               <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<Navigate to="/admin/category" replace />} />
+                <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="statistics" element={<AdminStatistics />} />
                 <Route path="category" element={<Category />} />
                 <Route path="users" element={<UserAccounts />} />
                 <Route path="listings" element={<Listings />} />

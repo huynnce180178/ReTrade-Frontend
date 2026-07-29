@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import '../../layouts/AdminLayout/AdminLayout.css';
 import './AdminReportNav.css';
 
 export default function AdminLayout() {
   const { user, loading, logout } = useAuth();
+  const { unreadCount, notifications, markAsRead, markAllAsRead, deleteNotification } = useNotification();
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     setAvatarError(false);
@@ -42,6 +46,9 @@ export default function AdminLayout() {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setNotifOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -83,6 +90,24 @@ export default function AdminLayout() {
     return user.username;
   };
 
+  const timeAgo = (dateStr) => {
+    if (!dateStr) return '';
+    const now = new Date();
+    const then = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} mins ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    return `${Math.floor(diff / 86400)} days ago`;
+  };
+
+  const handleNotificationClick = (n) => {
+    if (!n.isRead) {
+      markAsRead(n.notificationId);
+    }
+    setNotifOpen(false);
+  };
+
   return (
     <div className="admin-layout animate-fade-in">
       {/* Admin Header Bar */}
@@ -91,17 +116,7 @@ export default function AdminLayout() {
           <Link to="/" className="admin-logo-text">RETRADE</Link>
         </div>
 
-        <div className="admin-header-center">
-          <div className="admin-search-wrapper">
-            <span className="material-symbols-outlined admin-search-icon">search</span>
-            <input 
-              type="text" 
-              className="admin-search-input" 
-              placeholder="Search platform..." 
-              disabled
-            />
-          </div>
-        </div>
+
 
         <div className="admin-header-right">
           <Link to="/" className="btn-view-live">
@@ -109,9 +124,46 @@ export default function AdminLayout() {
             View Live Site
           </Link>
 
-          <button className="admin-icon-btn">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
+          <div className="notification-wrapper" ref={notifRef} style={{ position: 'relative' }}>
+            <button className="admin-icon-btn" onClick={() => setNotifOpen(!notifOpen)} style={{ position: 'relative' }}>
+              <span className="material-symbols-outlined">notifications</span>
+              {unreadCount > 0 && <span className="notif-badge" style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#ef4444', color: 'white', fontSize: '10px', padding: '2px 5px', borderRadius: '10px', fontWeight: 'bold' }}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+            </button>
+
+            {notifOpen && (
+              <div className="notif-dropdown animate-fade-in" style={{ position: 'absolute', top: '100%', right: '0', width: '320px', background: 'white', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb', zIndex: 1000, marginTop: '8px' }}>
+                <div className="notif-header" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Notifications</h4>
+                  {unreadCount > 0 && (
+                    <button className="text-btn" onClick={() => markAllAsRead()} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Mark all read</button>
+                  )}
+                </div>
+                <div className="notif-list" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                  {notifications.length === 0 ? (
+                    <div className="notif-empty" style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>No notifications yet</div>
+                  ) : (
+                    notifications.slice(0, 5).map(n => (
+                      <div key={n.notificationId} className={`notif-item ${!n.isRead ? 'unread' : ''}`} onClick={() => handleNotificationClick(n)} style={{ padding: '16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: '12px', background: !n.isRead ? '#f0fdf4' : 'transparent', transition: 'background 0.2s' }}>
+                        <div className="notif-content-wrap" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <h5 className="notif-title" style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#111827' }}>{n.title}</h5>
+                          <p className="notif-text" style={{ margin: 0, fontSize: '13px', color: '#4b5563', lineHeight: 1.4 }}>{n.message}</p>
+                          <span className="notif-time" style={{ fontSize: '12px', color: '#9ca3af' }}>{timeAgo(n.createdAt)}</span>
+                        </div>
+                        <button 
+                          className="notif-delete-btn" 
+                          onClick={(e) => { e.stopPropagation(); deleteNotification(n.notificationId); }}
+                          title="Delete"
+                          style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', height: 'fit-content' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <button className="admin-icon-btn">
             <span className="material-symbols-outlined">settings</span>
@@ -198,8 +250,16 @@ export default function AdminLayout() {
                 to="/admin/dashboard" 
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
-                <span className="material-symbols-outlined admin-menu-item-icon">dashboard</span>
-                Dashboard
+                <span className="material-symbols-outlined admin-menu-item-icon">grid_view</span>
+                Overview
+              </NavLink>
+
+              <NavLink 
+                to="/admin/statistics" 
+                className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
+              >
+                <span className="material-symbols-outlined admin-menu-item-icon">monitoring</span>
+                Statistics
               </NavLink>
 
               <NavLink 
@@ -255,30 +315,6 @@ export default function AdminLayout() {
                   Flagged Users
                 </NavLink>
               </div>
-
-              <NavLink 
-                to="/admin/promos" 
-                className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
-              >
-                <span className="material-symbols-outlined admin-menu-item-icon">campaign</span>
-                Banners & Promos
-              </NavLink>
-
-              <NavLink 
-                to="/admin/settings" 
-                className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
-              >
-                <span className="material-symbols-outlined admin-menu-item-icon">settings_applications</span>
-                System Settings
-              </NavLink>
-
-              <NavLink 
-                to="/admin/audit" 
-                className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
-              >
-                <span className="material-symbols-outlined admin-menu-item-icon">receipt_long</span>
-                Audit Logs
-              </NavLink>
             </nav>
           </div>
 
