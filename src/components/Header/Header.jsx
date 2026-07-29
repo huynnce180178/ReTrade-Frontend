@@ -59,8 +59,21 @@ export default function Header() {
         setShowHistory(false);
       }
     };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setDropdownOpen(false);
+        setNotifOpen(false);
+        setShowHistory(false);
+        setSubscriptionModalOpen(false);
+        setMobileMenuOpen(false);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   // Fetch search history (Local Storage)
@@ -367,7 +380,12 @@ export default function Header() {
               <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-primary, #02241B)', letterSpacing: '1px' }}>RETRADE</span>
             </Link>
 
-            <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <button
+              className="mobile-menu-toggle"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={mobileMenuOpen}
+            >
               <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
             </button>
 
@@ -395,18 +413,27 @@ export default function Header() {
               )}
 
               <div className="mobile-only-menu-items">
-                <div className="search-input-wrapper mobile-search-wrapper">
+                <form
+                  className="search-input-wrapper mobile-search-wrapper"
+                  onSubmit={(e) => {
+                    handleSearchSubmit(e);
+                    setMobileMenuOpen(false);
+                  }}
+                >
                   <input
                     type="text"
                     className="search-input"
-                    placeholder="Search..."
+                    placeholder="Search products..."
+                    aria-label="Search products"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
-                  <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
+                  <button type="submit" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Submit search">
+                    <svg className="search-icon" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                </form>
 
                 <button className="btn-subscription mobile-sub-btn" onClick={() => { setSubscriptionModalOpen(true); setMobileMenuOpen(false); }}>
                   Subscription
@@ -616,12 +643,12 @@ export default function Header() {
       </header>
       {subscriptionModalOpen && (
         <div className="sub-modal-overlay animate-fade-in" onClick={() => setSubscriptionModalOpen(false)}>
-          <div className="sub-modal-container" onClick={(e) => e.stopPropagation()}>
-            <button className="sub-modal-close" onClick={() => setSubscriptionModalOpen(false)}>
+          <div className="sub-modal-container" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="sub-modal-title">
+            <button className="sub-modal-close" onClick={() => setSubscriptionModalOpen(false)} aria-label="Close modal">
               <span className="material-symbols-outlined">close</span>
             </button>
             <div className="sub-modal-header">
-              <h2>Elevate your experience</h2>
+              <h2 id="sub-modal-title">Elevate your experience</h2>
               <p>Choose a subscription package suitable for your role and pay immediately with VNPAY.</p>
             </div>
             <div className="sub-modal-grid">

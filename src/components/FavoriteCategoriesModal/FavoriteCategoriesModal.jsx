@@ -77,14 +77,30 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return createPortal(
     <div className="modal-overlay animate-fade-in" onClick={onClose}>
-      <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
+      <div
+        className="modal-container"
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '550px' }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fav-cat-modal-title"
+      >
         <div className="modal-header">
-          <h3>Choose Favorite Categories</h3>
-          <button className="modal-close-btn" onClick={onClose}>
+          <h3 id="fav-cat-modal-title">Choose Favorite Categories</h3>
+          <button className="modal-close-btn" onClick={onClose} aria-label="Close modal">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>

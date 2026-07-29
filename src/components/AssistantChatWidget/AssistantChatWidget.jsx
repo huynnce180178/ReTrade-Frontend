@@ -276,10 +276,10 @@ export default function AssistantChatWidget() {
                   {message.products?.length > 0 && (
                     <div className="assistant-widget-product-list">
                       <div className="assistant-widget-product-header">
-                        <span className="material-symbols-outlined">local_offer</span>
-                        RECOMMENDED PRODUCTS
+                        <span className="material-symbols-outlined">shopping_bag</span>
+                        RELATED PRODUCTS & ITEMS
                       </div>
-                      {message.products.slice(0, 3).map((product) => (
+                      {message.products.slice(0, 5).map((product) => (
                         <div key={product.productId} className="assistant-widget-product-card-container">
                           <Link to={`/product/${product.productId}`} className="assistant-widget-product-card">
                             <div className="assistant-widget-product-img">
@@ -287,13 +287,16 @@ export default function AssistantChatWidget() {
                                 <img src={product.mainImageUrl} alt={product.name || 'Product'} />
                               ) : (
                                 <div className="assistant-widget-img-placeholder">
-                                  <span className="material-symbols-outlined">image</span>
+                                  <span className="material-symbols-outlined">inventory_2</span>
                                 </div>
                               )}
                             </div>
                             <div className="assistant-widget-product-meta">
                               <span className="product-title">{product.name || 'ReTrade Product'}</span>
                               <span className="product-price">{formatCurrency(product.price)}</span>
+                              <small style={{ color: '#059669', fontWeight: 600, fontSize: '11px', marginTop: '2px' }}>
+                                Xem chi tiết &rarr;
+                              </small>
                             </div>
                           </Link>
                           <div className="assistant-widget-product-card-actions">

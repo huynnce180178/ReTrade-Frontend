@@ -235,7 +235,7 @@ export default function Home() {
           </div>
 
           <div className="hero-visual">
-            <div className="visual-card main-visual-card">
+            <div className="visual-card main-visual-card" onClick={() => navigate('/auction')} style={{ cursor: 'pointer' }}>
               <div className="card-header">
                 <span className="card-badge">LIVE AUCTION</span>
                 <span className="card-timer">02h 41m left</span>
@@ -249,16 +249,16 @@ export default function Home() {
                 <div className="price-row">
                   <div>
                     <span className="price-label">Current Bid</span>
-                    <p className="price-value">$2,450</p>
+                    <p className="price-value">65.000.000 ₫</p>
                   </div>
-                  <button className="btn btn-primary bid-btn">Place Bid</button>
+                  <button className="btn btn-primary bid-btn" onClick={(e) => { e.stopPropagation(); navigate('/auction'); }}>Place Bid</button>
                 </div>
               </div>
             </div>
 
-            <div className="visual-card floating-card-1">
+            <div className="visual-card floating-card-1" onClick={() => navigate('/product')} style={{ cursor: 'pointer' }}>
               <div className="float-badge">🚀 Fast Deal</div>
-              <p>MacBook Pro M2 - $1,100</p>
+              <p>MacBook Pro M2 — 26.500.000 ₫</p>
             </div>
             <div className="visual-card floating-card-2">
               <div className="float-badge">⭐ Top Seller</div>
@@ -581,8 +581,11 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
           >
             {toggling
               ? <span className="home-wl-spinner" />
-              : <span className="material-symbols-outlined home-wishlist-heart">
-                {isWishlisted ? 'favorite' : 'favorite'}
+              : <span
+                  className="material-symbols-outlined home-wishlist-heart"
+                  style={{ fontVariationSettings: isWishlisted ? "'FILL' 1" : "'FILL' 0" }}
+                >
+                favorite
               </span>
             }
           </button>

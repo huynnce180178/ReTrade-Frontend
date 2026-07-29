@@ -94,7 +94,17 @@ function CountdownUnit({ value, label }) {
   );
 }
 
-function AuctionCountdown({ auction, now }) {
+function AuctionCountdown({ auction, now: externalNow }) {
+  const [localNow, setLocalNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLocalNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const now = externalNow || localNow;
   const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
   const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
   const effectiveStatus = getEffectiveAuctionStatus(auction, now);
@@ -149,14 +159,7 @@ export default function Auction() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [realtimeTick, setRealtimeTick] = useState(0);
-  const [currentTime, setCurrentTime] = useState(Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const currentTime = Date.now();
 
   const page = Number(searchParams.get('page') || 1);
   const searchTerm = searchParams.get('search') || '';

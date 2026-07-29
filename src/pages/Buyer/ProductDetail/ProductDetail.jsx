@@ -667,7 +667,7 @@ export default function ProductDetail() {
                   </button>
                   <button
                     className="pd-offer-btn pd-offer-btn-history-alt"
-                    onClick={() => setShowOfferHistory(true)}
+                    onClick={() => navigate('/offer-history')}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>history</span>
                     View History

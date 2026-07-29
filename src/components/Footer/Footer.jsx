@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../context/ToastContext';
 
 import './Footer.css';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
+  const { showToast } = useToast();
 
   const handleSubscribeSubmit = (e) => {
     e.preventDefault();
     if (email.trim()) {
-      alert(`Thank you for subscribing with ${email}!`);
+      showToast(`Thank you for subscribing with ${email}!`, 'success');
       setEmail('');
     }
   };
@@ -79,6 +81,8 @@ export default function Footer() {
             <input
               type="email"
               className="form-input newsletter-input"
+              placeholder="Enter your email address..."
+              aria-label="Email address for newsletter subscription"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}

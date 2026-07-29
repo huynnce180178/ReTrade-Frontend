@@ -297,6 +297,24 @@ export default function Product() {
       </div>
 
       <div className="product-layout">
+          {/* Mobile Backdrop Overlay */}
+          {showMobileFilter && (
+            <div
+              className="filter-mobile-backdrop"
+              onClick={() => setShowMobileFilter(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                backdropFilter: 'blur(4px)',
+                zIndex: 99,
+              }}
+            />
+          )}
+
           {/* Filter Sidebar */}
           <aside className={`filter-sidebar ${showMobileFilter ? 'show-mobile' : ''}`}>
             <div className="filter-sidebar-title">
@@ -445,8 +463,11 @@ export default function Product() {
                           >
                             {togglingId === product.productId
                               ? <span className="product-wl-spinner" />
-                              : <span className="material-symbols-outlined product-wishlist-heart">
-                                {wishlistIds.has(product.productId) ? 'favorite' : 'favorite'}
+                              : <span
+                                  className="material-symbols-outlined product-wishlist-heart"
+                                  style={{ fontVariationSettings: wishlistIds.has(product.productId) ? "'FILL' 1" : "'FILL' 0" }}
+                                >
+                                favorite
                               </span>
                             }
                           </button>

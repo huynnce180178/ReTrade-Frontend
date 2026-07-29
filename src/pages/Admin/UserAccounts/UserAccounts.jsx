@@ -433,57 +433,59 @@ export default function UserAccounts() {
                 <p>Try a different keyword or filter combination.</p>
               </div>
             ) : (
-              <table className="admin-user-table">
-                <thead>
-                  <tr>
-                    <th>User Information</th>
-                    <th>Role</th>
-                    <th>Provider</th>
-                    <th>Status</th>
-                    <th>Last Login</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((user) => {
-                    const isSelected = selectedUser?.accountId === user.accountId;
-                    const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Unknown User';
-                    const statusClass = statusTone(user.status);
+              <div className="table-responsive" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table className="admin-user-table">
+                  <thead>
+                    <tr>
+                      <th>User Information</th>
+                      <th>Role</th>
+                      <th>Provider</th>
+                      <th>Status</th>
+                      <th>Last Login</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => {
+                      const isSelected = selectedUser?.accountId === user.accountId;
+                      const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Unknown User';
+                      const statusClass = statusTone(user.status);
 
-                    return (
-                      <tr
-                        key={user.accountId}
-                        className={isSelected ? 'selected' : ''}
-                        onClick={() => setSelectedUserId(user.accountId)}
-                      >
-                        <td>
-                          <div className="admin-user-identity">
-                            <div className="admin-user-avatar">
-                              {user.avatarUrl ? <img src={user.avatarUrl} alt={displayName} /> : <span>{displayName.slice(0, 2).toUpperCase()}</span>}
+                      return (
+                        <tr
+                          key={user.accountId}
+                          className={isSelected ? 'selected' : ''}
+                          onClick={() => setSelectedUserId(user.accountId)}
+                        >
+                          <td>
+                            <div className="admin-user-identity">
+                              <div className="admin-user-avatar">
+                                {user.avatarUrl ? <img src={user.avatarUrl} alt={displayName} /> : <span>{displayName.slice(0, 2).toUpperCase()}</span>}
+                              </div>
+                              <div>
+                                <strong>{displayName}</strong>
+                                <p>{user.email || 'No email available'}</p>
+                                <span className="admin-subtle-id">{user.accountId}</span>
+                              </div>
                             </div>
-                            <div>
-                              <strong>{displayName}</strong>
-                              <p>{user.email || 'No email available'}</p>
-                              <span className="admin-subtle-id">{user.accountId}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`admin-role-badge role-${(user.primaryRole || 'unknown').toLowerCase()}`}>
-                            {user.primaryRole || 'Unassigned'}
-                          </span>
-                        </td>
-                        <td>{user.provider || 'Local'}</td>
-                        <td>
-                          <span className={`admin-status-badge ${statusClass}`}>
-                            {user.status || 'Unknown'}
-                          </span>
-                        </td>
-                        <td>{user.lastLoginAt ? formatDateTimeGmt7(user.lastLoginAt) : 'Never'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td>
+                            <span className={`admin-role-badge role-${(user.primaryRole || 'unknown').toLowerCase()}`}>
+                              {user.primaryRole || 'Unassigned'}
+                            </span>
+                          </td>
+                          <td>{user.provider || 'Local'}</td>
+                          <td>
+                            <span className={`admin-status-badge ${statusClass}`}>
+                              {user.status || 'Unknown'}
+                            </span>
+                          </td>
+                          <td>{user.lastLoginAt ? formatDateTimeGmt7(user.lastLoginAt) : 'Never'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
