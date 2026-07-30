@@ -50,3 +50,33 @@
   border-radius: 10px;
   line-height: 1;
 }
+
+.report-action-panel .report-action-confirm {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.report-action-panel .report-action-confirm p {
+  margin: 0;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.report-action-panel .report-action-confirm .secondary {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
+
+@media(max-width:767px) {
+  .report-action-panel .report-action-confirm {
+    grid-template-columns: 1fr;
+  }
+}

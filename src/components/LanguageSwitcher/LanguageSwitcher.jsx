@@ -1,4 +1,4 @@
-import React from 'react';
+import PropTypes from 'prop-types';
 import { useLanguage } from '../../context/LanguageContext';
 import './LanguageSwitcher.css';
 
@@ -14,8 +14,8 @@ export default function LanguageSwitcher({ className = '' }) {
       type="button"
       className={`lang-toggle-btn ${language} ${className}`}
       onClick={toggleLanguage}
-      title={language === 'vi' ? 'Chuyển sang English' : 'Switch to Tiếng Việt'}
-      aria-label="Toggle language"
+      title={language === 'vi' ? 'Chuyen sang English' : 'Switch to Tieng Viet'}
+      aria-label={language === 'vi' ? 'Chuyen sang English' : 'Switch to Tieng Viet'}
     >
       <span className="lang-option lang-vi">VI</span>
       <span className="lang-slider"></span>
@@ -23,3 +23,7 @@ export default function LanguageSwitcher({ className = '' }) {
     </button>
   );
 }
+
+LanguageSwitcher.propTypes = {
+  className: PropTypes.string,
+};

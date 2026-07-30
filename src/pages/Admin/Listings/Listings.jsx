@@ -257,6 +257,24 @@ export default function Listings() {
     }
   };
 
+  const getConditionLabel = (condition) => {
+    if (!condition) return t('common.na');
+
+    const conditionKeyMap = {
+      New: 'admin.listings.condition_new',
+      LikeNew: 'admin.listings.condition_like_new',
+      Excellent: 'admin.listings.condition_excellent',
+      Good: 'admin.listings.condition_good',
+      Fair: 'admin.listings.condition_fair',
+      Used: 'admin.listings.condition_used',
+      Damaged: 'admin.listings.condition_damaged',
+      ForParts: 'admin.listings.condition_for_parts'
+    };
+
+    const key = conditionKeyMap[condition];
+    return key ? t(key) : condition;
+  };
+
   const isCategoryApproved = selectedProduct 
     ? categories.find(c => c.categoryId === selectedProduct.categoryId)?.status === 'Active'
     : true;
@@ -574,7 +592,7 @@ export default function Listings() {
                         </tr>
                         <tr>
                           <td>{t('admin.listings.condition')}:</td>
-                          <td>{selectedProduct.condition || 'N/A'}</td>
+                          <td>{getConditionLabel(selectedProduct.condition)}</td>
                         </tr>
                         <tr>
                           <td>{t('admin.listings.status')}:</td>

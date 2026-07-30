@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import adminRefundService from '../../../services/adminRefundService';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -15,8 +15,9 @@ export default function ManageRefunds() {
   const [actionLoading, setActionLoading] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
 
-  const fetchRefunds = async () => {
+  const fetchRefunds = useCallback(async () => {
     try {
       setLoading(true);
       const data = await adminRefundService.getAll();
@@ -26,11 +27,11 @@ export default function ManageRefunds() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast, t]);
 
   useEffect(() => {
     fetchRefunds();
-  }, []);
+  }, [fetchRefunds]);
 
   const handleMarkDone = async () => {
     if (!processingRefund) return;
@@ -39,6 +40,7 @@ export default function ManageRefunds() {
       await adminRefundService.markDone(processingRefund.refundRequestId);
       showToast(t('common.saved_success'), 'success');
       setProcessingRefund(null);
+      setConfirmAction(null);
       await fetchRefunds();
     } catch (error) {
       showToast(error?.response?.data || t('common.save_error'), 'error');
@@ -60,6 +62,7 @@ export default function ManageRefunds() {
       setProcessingRefund(null);
       setIsRejecting(false);
       setRejectReason('');
+      setConfirmAction(null);
       await fetchRefunds();
     } catch (error) {
       showToast(error?.response?.data || t('common.save_error'), 'error');
@@ -72,6 +75,16 @@ export default function ManageRefunds() {
     setProcessingRefund(null);
     setIsRejecting(false);
     setRejectReason('');
+    setConfirmAction(null);
+  };
+
+  const getRefundStatusLabel = (status) => {
+    if (status === 'NotReady') return t('admin.refunds.stat_not_ready');
+    if (status === 'Pending') return t('admin.refunds.stat_pending');
+    if (status === 'Processed') return t('admin.refunds.stat_processed');
+    if (status === 'Completed') return t('admin.refunds.stat_completed');
+    if (status === 'Rejected') return t('admin.refunds.stat_rejected');
+    return t('common.unknown');
   };
 
   const stats = useMemo(() => {
@@ -80,7 +93,8 @@ export default function ManageRefunds() {
     const pending = refunds.filter(r => r.status === 'Pending').length;
     const processed = refunds.filter(r => r.status === 'Processed').length;
     const completed = refunds.filter(r => r.status === 'Completed').length;
-    return { total, notReady, pending, processed, completed };
+    const rejected = refunds.filter(r => r.status === 'Rejected').length;
+    return { total, notReady, pending, processed, completed, rejected };
   }, [refunds]);
 
   const filteredRefunds = useMemo(() => {
@@ -106,7 +120,7 @@ export default function ManageRefunds() {
       <div className="admin-refund-page animate-fade-in">
       <header className="admin-refund-hero">
         <div>
-          <p className="admin-eyebrow" style={{ textTransform: 'uppercase', fontSize: '11px', color: '#0f766e', fontWeight: 800, letterSpacing: '0.08em' }}>{t('admin.eyebrow')}</p>
+          <p className="admin-eyebrow" style={{ textTransform: 'uppercase', fontSize: '11px', color: '#0f766e', fontWeight: 800, letterSpacing: 0 }}>{t('admin.eyebrow')}</p>
           <h1>{t('admin.refunds.hero_title')}</h1>
           <p>{t('admin.refunds.hero_sub')}</p>
         </div>
@@ -133,12 +147,16 @@ export default function ManageRefunds() {
           <span>{t('admin.refunds.stat_completed')}</span>
           <strong>{stats.completed}</strong>
         </article>
+        <article className="admin-refund-stat-card" style={{ borderLeft: '4px solid #dc2626' }}>
+          <span>{t('admin.refunds.stat_rejected')}</span>
+          <strong>{stats.rejected}</strong>
+        </article>
       </section>
 
       <section className="admin-refund-panel">
         <div className="admin-refund-toolbar">
           <div className="admin-refund-tabs">
-            {['All', 'NotReady', 'Pending', 'Processed', 'Completed'].map((tab) => (
+            {['All', 'NotReady', 'Pending', 'Processed', 'Completed', 'Rejected'].map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -149,7 +167,8 @@ export default function ManageRefunds() {
                  tab === 'NotReady' ? `${t('admin.refunds.stat_not_ready')} (${stats.notReady})` :
                  tab === 'Pending' ? `${t('admin.refunds.stat_pending')} (${stats.pending})` :
                  tab === 'Processed' ? `${t('admin.refunds.stat_processed')} (${stats.processed})` :
-                 `${t('admin.refunds.stat_completed')} (${stats.completed})`}
+                 tab === 'Completed' ? `${t('admin.refunds.stat_completed')} (${stats.completed})` :
+                 `${t('admin.refunds.stat_rejected')} (${stats.rejected})`}
               </button>
             ))}
           </div>
@@ -205,8 +224,8 @@ export default function ManageRefunds() {
                             <span>{initials}</span>
                           </div>
                           <div className="admin-user-info">
-                            <strong>{refund.userName || 'No Name'}</strong>
-                            <span>{refund.userEmail || 'No Email'}</span>
+                            <strong>{refund.userName || t('admin.refunds.no_name')}</strong>
+                            <span>{refund.userEmail || t('admin.refunds.no_email')}</span>
                           </div>
                         </div>
                       </td>
@@ -218,9 +237,7 @@ export default function ManageRefunds() {
                       </td>
                       <td>
                         <span className={`refund-status-badge ${refund.status ? refund.status.toLowerCase() : ''}`}>
-                          {refund.status === 'NotReady' ? t('admin.refunds.stat_not_ready') :
-                           refund.status === 'Pending' ? t('admin.refunds.stat_pending') :
-                           refund.status === 'Processed' ? t('admin.refunds.stat_processed') : t('admin.refunds.stat_completed')}
+                          {getRefundStatusLabel(refund.status)}
                         </span>
                       </td>
                       <td>
@@ -251,6 +268,11 @@ export default function ManageRefunds() {
                             {t('admin.refunds.stat_completed')}
                           </span>
                         )}
+                        {refund.status === 'Rejected' && (
+                          <span style={{ fontSize: '13px', color: '#dc2626', fontWeight: 600 }}>
+                            {t('admin.refunds.stat_rejected')}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -274,19 +296,17 @@ export default function ManageRefunds() {
 
             <div className="admin-refund-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Status</span>
-                <span className={`refund-status-badge ${processingRefund.status.toLowerCase()}`}>
-                  {processingRefund.status === 'NotReady' ? t('admin.refunds.stat_not_ready') :
-                   processingRefund.status === 'Pending' ? t('admin.refunds.stat_pending') :
-                   processingRefund.status === 'Processed' ? t('admin.refunds.stat_processed') : t('admin.refunds.stat_completed')}
+                <span style={{ fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>{t('admin.refunds.status_label')}</span>
+                <span className={`refund-status-badge ${processingRefund.status ? processingRefund.status.toLowerCase() : ''}`}>
+                  {getRefundStatusLabel(processingRefund.status)}
                 </span>
               </div>
 
               <div className="admin-refund-modal-target" style={{ margin: 0, padding: '16px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div>
-                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>User Profile</span>
-                  <strong style={{ fontSize: '14px', color: '#111827' }}>{processingRefund.userName}</strong>
-                  <span style={{ fontSize: '12px', color: '#4b5563', display: 'block' }}>{processingRefund.userEmail}</span>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>{t('admin.refunds.user_profile')}</span>
+                  <strong style={{ fontSize: '14px', color: '#111827' }}>{processingRefund.userName || t('admin.refunds.no_name')}</strong>
+                  <span style={{ fontSize: '12px', color: '#4b5563', display: 'block' }}>{processingRefund.userEmail || t('admin.refunds.no_email')}</span>
                 </div>
 
                 <div>
@@ -295,8 +315,8 @@ export default function ManageRefunds() {
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Note / Reason</span>
-                  <span style={{ fontSize: '13px', color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{processingRefund.note || 'No notes provided.'}</span>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>{t('admin.refunds.note_reason')}</span>
+                  <span style={{ fontSize: '13px', color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{processingRefund.note || t('admin.refunds.no_notes')}</span>
                 </div>
 
                 {processingRefund.status === 'Rejected' && processingRefund.rejectReason && (
@@ -310,13 +330,13 @@ export default function ManageRefunds() {
                   <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>{t('admin.refunds.bank_account')}</span>
                   {processingRefund.bankName ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px', color: '#111827', marginTop: '4px' }}>
-                      <span>Bank: <strong>{processingRefund.bankName}</strong></span>
-                      <span>Account No: <strong>{processingRefund.bankAccountNumber}</strong></span>
-                      <span>Holder: <strong>{processingRefund.bankAccountHolder}</strong></span>
+                      <span>{t('admin.refunds.bank_name')}: <strong>{processingRefund.bankName}</strong></span>
+                      <span>{t('admin.refunds.account_no')}: <strong>{processingRefund.bankAccountNumber}</strong></span>
+                      <span>{t('admin.refunds.account_holder')}: <strong>{processingRefund.bankAccountHolder}</strong></span>
                     </div>
                   ) : (
                     <em style={{ color: '#ef4444', fontSize: '13px', fontWeight: 600 }}>
-                      Account information not updated yet.
+                      {t('admin.refunds.bank_missing')}
                     </em>
                   )}
                 </div>
@@ -353,7 +373,7 @@ export default function ManageRefunds() {
                       <button
                         type="button"
                         className="admin-refund-action-btn"
-                        onClick={handleMarkDone}
+                        onClick={() => setConfirmAction({ type: 'markDone' })}
                         disabled={actionLoading}
                       >
                         {actionLoading ? <span className="page-btn-spinner"></span> : t('admin.refunds.confirm_sent')}
@@ -387,7 +407,7 @@ export default function ManageRefunds() {
                       type="button"
                       className="admin-refund-action-btn"
                       style={{ backgroundColor: '#ef4444', color: 'white' }}
-                      onClick={handleReject}
+                      onClick={() => setConfirmAction({ type: 'reject' })}
                       disabled={actionLoading || !rejectReason.trim()}
                     >
                       {actionLoading ? <span className="page-btn-spinner"></span> : t('admin.reject')}
@@ -396,6 +416,41 @@ export default function ManageRefunds() {
                 </div>
               )}
             </footer>
+
+            {confirmAction && (
+              <div className="admin-refund-confirm-panel">
+                <div>
+                  <strong>
+                    {confirmAction.type === 'markDone'
+                      ? t('admin.refunds.confirm_mark_title')
+                      : t('admin.refunds.confirm_reject_title')}
+                  </strong>
+                  <p>
+                    {confirmAction.type === 'markDone'
+                      ? t('admin.refunds.confirm_mark_text', { name: processingRefund.userName || t('admin.refunds.no_name'), amount: formatCurrency(processingRefund.amount) })
+                      : t('admin.refunds.confirm_reject_text', { name: processingRefund.userName || t('admin.refunds.no_name'), reason: rejectReason.trim() })}
+                  </p>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    className="admin-refund-action-btn outline"
+                    onClick={() => setConfirmAction(null)}
+                    disabled={actionLoading}
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-refund-action-btn ${confirmAction.type === 'reject' ? 'danger' : ''}`}
+                    onClick={confirmAction.type === 'markDone' ? handleMarkDone : handleReject}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? <span className="page-btn-spinner"></span> : t('common.confirm')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

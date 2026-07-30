@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { useLocation, NavLink } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useToast } from '../../../context/ToastContext';
@@ -85,14 +86,16 @@ export default function ReportManagement() {
         if (statusValue === 'rejected') result.rejected += 1;
         return result;
       }, { total: 0, pending: 0, accepted: 0, rejected: 0 }));
-    } catch (_) {}
+    } catch (_) {
+      // Dashboard stats are non-blocking.
+    }
   }, []);
 
   useEffect(() => { loadReports(); }, [loadReports]);
   useEffect(() => { loadFlagged(); }, [loadFlagged]);
   useEffect(() => { loadStats(); }, [loadStats]);
 
-  const view = async (id) => {
+  const view = useCallback(async (id) => {
     try {
       setDetailLoading(true);
       const report = await reportService.getReportDetail(id);
@@ -102,7 +105,9 @@ export default function ReportManagement() {
           const order = await orderService.getById(orderId);
           setSelected({ ...report, orderDetail: order });
           return;
-        } catch (_) {}
+        } catch (_) {
+          // Fall back to the report payload when order detail cannot be loaded.
+        }
       }
       setSelected(report);
     } catch (error) {
@@ -110,18 +115,18 @@ export default function ReportManagement() {
     } finally {
       setDetailLoading(false);
     }
-  };
+  }, [showToast, t]);
 
   useEffect(() => {
     if (location.state?.reportId) view(location.state.reportId);
-  }, [location.state]);
+  }, [location.state, view]);
 
   const update = async (id, statusValue, note = '') => {
     if (!selected) return;
     try {
       setActionLoading(true);
       await reportService.updateReportStatus(id, statusValue, note);
-      showToast(t('common.report_submitted'), 'success');
+      showToast(t('admin.reports.update_success'), 'success');
       await Promise.all([loadReports(), loadFlagged(), loadStats()]);
       await view(selected.reportId || selected.id);
     } catch (error) {
@@ -229,7 +234,7 @@ export default function ReportManagement() {
                 </div>
                 <div>
                   <strong>{user.userName || user.username || t('admin.users.unknown_user')}</strong>
-                  <span>{user.flagCount ?? user.reportCount ?? 0} {t('admin.reports.total_reports').toLowerCase()} · {user.status || 'Active'}</span>
+                  <span>{user.flagCount ?? user.reportCount ?? 0} {t('admin.reports.total_reports').toLowerCase()} - {user.status || t('admin.reports.active_status')}</span>
                 </div>
                 <div className="flagged-links">
                   {(user.reports || []).map((report) => (
@@ -271,6 +276,12 @@ function Stat({ label, value, tone = '' }) {
   );
 }
 
+Stat.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.number.isRequired,
+  tone: PropTypes.string,
+};
+
 function ReportDetailModal({ report, loading, actionLoading, onClose, onAction, t, formatCurrency, formatDateTime }) {
   return createPortal(
     <div className="report-detail-overlay" onClick={() => !actionLoading && onClose()}>
@@ -302,7 +313,12 @@ function ReportDetailModal({ report, loading, actionLoading, onClose, onAction, 
 
             {isOrderReport(report.targetType) && <OrderInformation report={report} t={t} formatCurrency={formatCurrency} />}
 
-            <ReportActionPanel status={report.status} targetType={report.targetType} loading={actionLoading} onAction={onAction} />
+            <ReportActionPanel
+              status={report.status}
+              targetType={report.targetType}
+              loading={actionLoading}
+              onAction={(nextStatus, note) => onAction(report.reportId || report.id, nextStatus, note)}
+            />
           </>
         )}
       </section>
@@ -310,6 +326,17 @@ function ReportDetailModal({ report, loading, actionLoading, onClose, onAction, 
     document.body
   );
 }
+
+ReportDetailModal.propTypes = {
+  report: PropTypes.object,
+  loading: PropTypes.bool.isRequired,
+  actionLoading: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onAction: PropTypes.func.isRequired,
+  t: PropTypes.func.isRequired,
+  formatCurrency: PropTypes.func.isRequired,
+  formatDateTime: PropTypes.func.isRequired,
+};
 
 function Row({ label, value }) {
   return (
@@ -319,6 +346,11 @@ function Row({ label, value }) {
     </div>
   );
 }
+
+Row.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.node,
+};
 
 function isOrderReport(targetType) {
   const type = String(targetType || '').toLowerCase();
@@ -346,11 +378,17 @@ function OrderInformation({ report, t, formatCurrency }) {
         <Info label={t('admin.reports.order_code')} value={order.orderCode || order.OrderCode || order.orderId || report.orderId} />
         <Info label={isBuyer ? t('admin.reports.buyer') : t('admin.reports.seller')} value={name} />
         <Info label={t('admin.reports.total_amount')} value={formatCurrency(order.finalAmount || order.FinalAmount || order.totalAmount || order.TotalAmount)} />
-        <Info label={t('admin.reports.order_status')} value={order.status || order.Status || '-'} />
+        <Info label={t('admin.reports.order_status')} value={getOrderStatusLabel(order.status || order.Status, t)} />
       </div>
     </section>
   );
 }
+
+OrderInformation.propTypes = {
+  report: PropTypes.object.isRequired,
+  t: PropTypes.func.isRequired,
+  formatCurrency: PropTypes.func.isRequired,
+};
 
 function Info({ label, value }) {
   return (
@@ -359,5 +397,28 @@ function Info({ label, value }) {
       <strong>{value || '-'}</strong>
     </div>
   );
+}
+
+Info.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.node,
+};
+
+function getOrderStatusLabel(status, t) {
+  const labels = {
+    AwaitingPayment: t('sales_stats.awaiting_payment'),
+    Pending: t('sales_stats.pending'),
+    Confirmed: t('sales_stats.confirmed'),
+    Shipping: t('sales_stats.shipping'),
+    Delivered: t('sales_stats.delivered'),
+    Completed: t('sales_stats.completed'),
+    DeliveryFailed: t('sales_stats.delivery_failed'),
+    Returned: t('sales_stats.returned'),
+    ReturnRequested: t('history.refund_reason'),
+    ReturnRejected: t('admin.reject'),
+    Cancelled: t('sales_stats.cancelled'),
+  };
+
+  return labels[status] || status || '-';
 }
 

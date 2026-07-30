@@ -75,7 +75,7 @@ export default function FlaggedUsers() {
                   <div>
                     <strong>{user.userName || user.username || t('admin.users.unknown_user')}</strong>
                     <span>
-                      {user.flagCount ?? 0} {t('admin.reports.total_reports').toLowerCase()} · {user.status || 'Active'}
+                      {user.flagCount ?? 0} {t('admin.reports.total_reports').toLowerCase()} - {user.status || t('admin.reports.active_status')}
                     </span>
                   </div>
                   <div className="flagged-links">
