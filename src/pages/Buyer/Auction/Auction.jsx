@@ -5,10 +5,10 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
-import { formatAuctionDateTime, parseAuctionDateTime } from '../../../utils/auctionTime';
+import { parseAuctionDateTime } from '../../../utils/auctionTime';
 import './Auction.css';
 
-function formatDuration(ms, language) {
+function formatDuration(ms, t, language) {
   if (ms <= 0) return '00:00:00';
   const totalSecs = Math.floor(ms / 1000);
   const days = Math.floor(totalSecs / 86400);
@@ -19,7 +19,7 @@ function formatDuration(ms, language) {
   const pad = (num) => String(num).padStart(2, '0');
 
   if (days > 0) {
-    return language === 'vi' 
+    return language === 'vi'
       ? `${days} ngày ${pad(hours)}g ${pad(minutes)}p ${pad(seconds)}s`
       : `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
   }
@@ -40,18 +40,23 @@ function getEffectiveAuctionStatus(auction, now = Date.now()) {
   return 'Ongoing';
 }
 
-function getTimeLabel(auction, now, language) {
+function getTimeLabel(auction, now, t, language) {
   const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
   const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
   const effectiveStatus = getEffectiveAuctionStatus(auction, now);
 
   if (effectiveStatus === 'Upcoming' && start > now) {
     const diff = start - now;
-    return language === 'vi' ? `Bắt đầu sau ${formatDuration(diff, language)}` : `Starts in ${formatDuration(diff, language)}`;
+    const duration = formatDuration(diff, t, language);
+    return t('auction.starts_in', { duration });
   }
   if (effectiveStatus === 'Ongoing' && end > now) {
     const diff = end - now;
-    return language === 'vi' ? `Kết thúc sau ${formatDuration(diff, language)}` : `Ends in ${formatDuration(diff, language)}`;
+    const duration = formatDuration(diff, t, language);
+    return t('auction.ends_in', { duration });
+  }
+  if (effectiveStatus === 'Ended') {
+    return t('auction.auction_ended');
   }
   return effectiveStatus || auction.status || 'Auction';
 }
@@ -75,7 +80,8 @@ function CountdownUnit({ value, label }) {
   );
 }
 
-function AuctionCountdown({ auction, now: externalNow, language }) {
+function AuctionCountdown({ auction, now: externalNow }) {
+  const { t, language } = useLanguage();
   const [localNow, setLocalNow] = useState(Date.now());
 
   useEffect(() => {
@@ -95,13 +101,13 @@ function AuctionCountdown({ auction, now: externalNow, language }) {
       <div className="auction-countdown-panel">
         <div className="auction-countdown-label">
           <span className="material-symbols-outlined">schedule</span>
-          {language === 'vi' ? 'Sắp diễn ra' : 'Opening countdown'}
+          {t('auction.opening_countdown')}
         </div>
         <div className="auction-countdown-grid">
-          {parts.days > 0 && <CountdownUnit value={parts.days} label={language === 'vi' ? 'Ngày' : 'Days'} />}
-          <CountdownUnit value={parts.hours} label={language === 'vi' ? 'Giờ' : 'Hours'} />
-          <CountdownUnit value={parts.minutes} label={language === 'vi' ? 'Phút' : 'Mins'} />
-          <CountdownUnit value={parts.seconds} label={language === 'vi' ? 'Giây' : 'Secs'} />
+          {parts.days > 0 && <CountdownUnit value={parts.days} label={t('auction.days_short', { count: '' }).trim() || 'Days'} />}
+          <CountdownUnit value={parts.hours} label={t('auction.hours_short', { count: '' }).trim() || 'Hours'} />
+          <CountdownUnit value={parts.minutes} label={t('auction.minutes_short', { count: '' }).trim() || 'Mins'} />
+          <CountdownUnit value={parts.seconds} label={t('auction.seconds_short', { count: '' }).trim() || 'Secs'} />
         </div>
       </div>
     );
@@ -114,13 +120,13 @@ function AuctionCountdown({ auction, now: externalNow, language }) {
       <div className="auction-countdown-panel live">
         <div className="auction-countdown-label">
           <span className="material-symbols-outlined">bolt</span>
-          {language === 'vi' ? 'Đang diễn ra' : 'Live now'}
+          {t('auction.status_active')}
         </div>
         <div className="auction-countdown-grid compact">
-          {parts.days > 0 && <CountdownUnit value={parts.days} label={language === 'vi' ? 'Ngày' : 'Days'} />}
-          <CountdownUnit value={parts.hours} label={language === 'vi' ? 'Giờ' : 'Hours'} />
-          <CountdownUnit value={parts.minutes} label={language === 'vi' ? 'Phút' : 'Mins'} />
-          <CountdownUnit value={parts.seconds} label={language === 'vi' ? 'Giây' : 'Secs'} />
+          {parts.days > 0 && <CountdownUnit value={parts.days} label={t('auction.days_short', { count: '' }).trim() || 'Days'} />}
+          <CountdownUnit value={parts.hours} label={t('auction.hours_short', { count: '' }).trim() || 'Hours'} />
+          <CountdownUnit value={parts.minutes} label={t('auction.minutes_short', { count: '' }).trim() || 'Mins'} />
+          <CountdownUnit value={parts.seconds} label={t('auction.seconds_short', { count: '' }).trim() || 'Secs'} />
         </div>
       </div>
     );
@@ -136,11 +142,11 @@ export default function Auction() {
   const { t, language, formatCurrency, formatDate } = useLanguage();
 
   const sortOptions = [
-    { value: 'ending_soon', label: language === 'vi' ? 'Sắp kết thúc' : 'Ending Soon' },
-    { value: 'starting_soon', label: language === 'vi' ? 'Sắp diễn ra' : 'Starting Soon' },
-    { value: 'newest', label: language === 'vi' ? 'Mới nhất' : 'Newest' },
-    { value: 'price_asc', label: language === 'vi' ? 'Giá: Thấp đến Cao' : 'Current Bid: Low to High' },
-    { value: 'price_desc', label: language === 'vi' ? 'Giá: Cao đến Thấp' : 'Current Bid: High to Low' },
+    { value: 'ending_soon', label: t('product.sort_newest') },
+    { value: 'starting_soon', label: t('auction.status_upcoming') },
+    { value: 'newest', label: t('product.sort_newest') },
+    { value: 'price_asc', label: t('product.sort_price_asc') },
+    { value: 'price_desc', label: t('product.sort_price_desc') },
   ];
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -355,7 +361,7 @@ export default function Auction() {
                   <span className="auction-card-category">{auction.categoryName || t('common.none')}</span>
                   <h2>{auction.productName || 'Auction'}</h2>
                   <p>{auction.sellerName || auction.sellerId || 'Seller'}</p>
-                  <AuctionCountdown auction={auction} now={currentTime} language={language} />
+                  <AuctionCountdown auction={auction} now={currentTime} />
                   <div className="auction-bid-panel">
                     <div>
                       <small>{t('auction.current_bid')}</small>
@@ -367,7 +373,7 @@ export default function Auction() {
                     </div>
                   </div>
                   <div className="auction-card-footer">
-                    <span>{getTimeLabel(auction, currentTime, language)}</span>
+                    <span>{getTimeLabel(auction, currentTime, t, language)}</span>
                     <span>{auction.bidCount || 0} {t('auction.bid_count')}</span>
                   </div>
                   <div className="auction-card-dates">

@@ -10,17 +10,13 @@ import ReportModal from '../../../components/ReportModal/ReportModal';
 import reportService from '../../../services/reportService';
 
 const pageSize = 5;
-const SHIPPING_PROVIDER = 'GHN';
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const awaitingPaymentCancelDelayMs = 15 * 60 * 1000;
-const defaultShippingDelayMs = 30 * 1000;
 
 export default function OrderManagement() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const { t, language } = useLanguage();
-  const isVi = language === 'vi';
+  const { t } = useLanguage();
 
   const skipNextFilterAutoApply = useRef(false);
 
@@ -30,7 +26,6 @@ export default function OrderManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [filterForm, setFilterForm] = useState({ sortBy: 'newest' });
   const [appliedFilters, setAppliedFilters] = useState(null);
@@ -38,65 +33,66 @@ export default function OrderManagement() {
   const [reportTarget, setReportTarget] = useState(null);
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
-  const tabs = useMemo(() => [
-    { key: '', label: isVi ? 'Tất cả' : 'All' },
-    { key: 'AwaitingPayment', label: isVi ? 'Chờ thanh toán' : 'Awaiting Payment' },
-    { key: 'Pending', label: isVi ? 'Chờ xử lý' : 'Pending' },
-    { key: 'Confirmed', label: isVi ? 'Đã xác nhận' : 'Confirmed' },
-    { key: 'Shipping', label: isVi ? 'Đang giao' : 'Shipping' },
-    { key: 'Delivered', label: isVi ? 'Đã giao' : 'Delivered' },
-    { key: 'Completed', label: isVi ? 'Hoàn thành' : 'Completed' },
-    { key: 'DeliveryFailed', label: isVi ? 'Giao thất bại' : 'Delivery Failed' },
-    { key: 'Returned', label: isVi ? 'Đã trả hàng' : 'Returned' },
-    { key: 'Cancelled', label: isVi ? 'Đã hủy' : 'Cancelled' },
-  ], [isVi]);
-
-  const statusMeta = useMemo(() => ({
-    AwaitingPayment: { label: isVi ? 'Chờ thanh toán' : 'Awaiting Payment', className: 'awaiting' },
-    Pending: { label: isVi ? 'Chờ xử lý' : 'Pending', className: 'pending' },
-    Confirmed: { label: isVi ? 'Đã xác nhận' : 'Confirmed', className: 'confirmed' },
-    Shipping: { label: isVi ? 'Đang giao' : 'Shipping', className: 'shipping' },
-    Delivered: { label: isVi ? 'Đã giao' : 'Delivered', className: 'delivered' },
-    Completed: { label: isVi ? 'Hoàn thành' : 'Completed', className: 'completed' },
-    DeliveryFailed: { label: isVi ? 'Giao thất bại' : 'Delivery Failed', className: 'delivery-failed' },
-    Returned: { label: isVi ? 'Đã trả hàng' : 'Returned', className: 'returned' },
-    ReturnRequested: { label: isVi ? 'Yêu cầu trả hàng' : 'Return Requested', className: 'return-requested' },
-    ReturnRejected: { label: isVi ? 'Từ chối trả hàng' : 'Return Rejected', className: 'return-rejected' },
-    Cancelled: { label: isVi ? 'Đã hủy' : 'Cancelled', className: 'cancelled' },
-  }), [isVi]);
-
-  const sortOptions = useMemo(() => [
-    { value: 'newest', label: isVi ? 'Mới nhất trước' : 'Newest first' },
-    { value: 'oldest', label: isVi ? 'Cũ nhất trước' : 'Oldest first' },
-    { value: 'total_desc', label: 'Tổng tiền cao nhất' },
-    { value: 'total_asc', label: 'Tổng tiền thấp nhất' },
-  ], [isVi]);
-
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
-  const sellerId = user?.userId || user?.id;
-  const hasActiveControls = Boolean(activeStatus || appliedSearchTerm || appliedFilters);
+  const sellerId = user?.userId;
+
+  const statusMeta = useMemo(() => ({
+    AwaitingPayment: { label: t('sales_stats.awaiting_payment'), className: 'awaiting' },
+    Pending: { label: t('sales_stats.pending'), className: 'pending' },
+    Confirmed: { label: t('sales_stats.confirmed'), className: 'confirmed' },
+    Shipping: { label: t('sales_stats.shipping'), className: 'shipping' },
+    Delivered: { label: t('sales_stats.delivered'), className: 'delivered' },
+    Completed: { label: t('sales_stats.completed'), className: 'completed' },
+    DeliveryFailed: { label: t('sales_stats.delivery_failed'), className: 'delivery-failed' },
+    Returned: { label: t('sales_stats.returned'), className: 'returned' },
+    ReturnRequested: { label: t('history.refund_reason'), className: 'return-requested' },
+    ReturnRejected: { label: t('admin.reject'), className: 'return-rejected' },
+    Cancelled: { label: t('sales_stats.cancelled'), className: 'cancelled' },
+  }), [t]);
+
+  const tabs = useMemo(() => [
+    { key: '', label: t('common.all') },
+    { key: 'Pending', label: t('sales_stats.pending') },
+    { key: 'Confirmed', label: t('sales_stats.confirmed') },
+    { key: 'Shipping', label: t('sales_stats.shipping') },
+    { key: 'Delivered', label: t('sales_stats.delivered') },
+    { key: 'Completed', label: t('sales_stats.completed') },
+    { key: 'Cancelled', label: t('sales_stats.cancelled') },
+  ], [t]);
+
+  const sortOptions = useMemo(() => [
+    { value: 'newest', label: t('product.sort_newest') },
+    { value: 'price_desc', label: t('product.sort_price_desc') },
+    { value: 'price_asc', label: t('product.sort_price_asc') },
+  ], [t]);
+
+  const hasActiveControls = Boolean(
+    activeStatus || appliedSearchTerm || (appliedFilters && appliedFilters.sortBy !== 'newest')
+  );
 
   useEffect(() => {
     if (skipNextFilterAutoApply.current) {
       skipNextFilterAutoApply.current = false;
-      return undefined;
+      return;
     }
 
-    const timer = setTimeout(() => {
-      const nextFilters = normalizeFilterForm(filterForm);
-      setAppliedFilters(nextFilters);
-      setPage(1);
-    }, 350);
+    const nextNormalized = normalizeFilterForm(filterForm);
+    setAppliedFilters((current) => {
+      if (JSON.stringify(current) === JSON.stringify(nextNormalized)) {
+        return current;
+      }
+      return nextNormalized;
+    });
 
-    return () => clearTimeout(timer);
+    setPage(1);
   }, [filterForm]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setAppliedSearchTerm(searchTerm.trim());
       setPage(1);
-    }, 350);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -119,14 +115,13 @@ export default function OrderManagement() {
 
       const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
       setOrders(items);
-      setTotalItems(data?.totalCount ?? items.length);
       setTotalPages(data?.totalPages ?? Math.max(1, Math.ceil((data?.totalCount ?? items.length) / pageSize)));
     } catch (error) {
-      showToast(error?.response?.data || (isVi ? 'Không thể tải danh sách đơn hàng.' : 'Failed to load seller orders.'), 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, appliedFilters, appliedSearchTerm, filterForm.sortBy, page, sellerId, showToast, isVi]);
+  }, [activeStatus, appliedFilters, appliedSearchTerm, filterForm.sortBy, page, sellerId, showToast, t]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -196,41 +191,41 @@ export default function OrderManagement() {
     return [
       {
         icon: 'hourglass_top',
-        label: isVi ? 'Chờ Xử Lý' : 'Pending',
+        label: t('sales_stats.pending'),
         value: pendingCount,
-        note: isVi ? 'Cần xác nhận ngay' : 'Requires seller confirmation',
+        note: t('my_products.subtitle'),
         hot: pendingCount > 0,
       },
       {
         icon: 'package_2',
-        label: isVi ? 'Chờ Giao Hang' : 'To Ship',
+        label: t('sales_stats.confirmed'),
         value: confirmedCount,
-        note: isVi ? 'Đang chuẩn bị gói hàng' : 'Ready for shipping provider',
+        note: t('my_products.subtitle'),
         hot: confirmedCount > 0,
       },
       {
         icon: 'local_shipping',
-        label: isVi ? 'Đang Giao' : 'In Transit',
+        label: t('sales_stats.shipping'),
         value: shippingCount,
-        note: isVi ? 'Đang vận chuyển' : 'Currently with courier',
+        note: t('sales_stats.shipping'),
       },
       {
         icon: 'payments',
-        label: isVi ? 'Doanh Thu Đơn' : 'Settled Revenue',
+        label: t('seller.total_revenue'),
         value: formatVnd(totalRevenue),
-        note: isVi ? 'Đơn hàng đã giao / hoàn thành' : 'Delivered and completed orders',
+        note: t('sales_stats.desc'),
       },
     ];
-  }, [orders, isVi]);
+  }, [orders, t]);
 
   const handleUpdateStatus = async (order, targetStatus) => {
     try {
       setUpdatingOrderId(order.orderId);
       await orderService.updateSellerOrderStatus(order.orderId, { status: targetStatus });
-      showToast(isVi ? `Đã cập nhật trạng thái đơn hàng sang ${statusMeta[targetStatus]?.label || targetStatus}.` : `Order status updated to ${statusMeta[targetStatus]?.label || targetStatus}.`, 'success');
+      showToast(t('order_status_update.update_success'), 'success');
       await fetchOrders();
     } catch (error) {
-      showToast(error?.response?.data || (isVi ? 'Không thể cập nhật trạng thái đơn hàng.' : 'Failed to update order status.'), 'error');
+      showToast(error?.response?.data || t('order_status_update.update_error'), 'error');
     } finally {
       setUpdatingOrderId(null);
     }
@@ -238,10 +233,10 @@ export default function OrderManagement() {
 
   const getNextAction = (order) => {
     if (order.status === 'Pending') {
-      return { label: isVi ? 'Xác Nhận' : 'Confirm', status: 'Confirmed', tone: 'primary' };
+      return { label: t('common.confirm'), status: 'Confirmed', tone: 'primary' };
     }
     if (order.status === 'Confirmed') {
-      return { label: isVi ? 'Giao Hàng' : 'Ship', status: 'Shipping', tone: 'info' };
+      return { label: t('sales_stats.shipping'), status: 'Shipping', tone: 'info' };
     }
     return null;
   };
@@ -253,17 +248,17 @@ export default function OrderManagement() {
     try {
       setReportSubmitting(true);
       await reportService.reportBuyer(reportTarget.orderId, payload);
-      showToast(isVi ? 'Gửi báo cáo người mua thành công.' : 'Report submitted successfully.', 'success');
+      showToast(t('reports.report_success'), 'success');
       setReportTarget(null);
     } catch (error) {
-      showToast(error?.response?.data || (isVi ? 'Không thể gửi báo cáo.' : 'Failed to submit report.'), 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setReportSubmitting(false);
     }
   };
 
   if (authLoading) {
-    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>{isVi ? 'Đang tải đơn hàng...' : 'Loading orders...'}</p></div>;
+    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>{t('common.loading')}</p></div>;
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -273,9 +268,9 @@ export default function OrderManagement() {
     <div className="om-page animate-fade-in">
       <header className="om-header">
         <div className="om-header-copy">
-          <span className="om-eyebrow">{isVi ? 'Quản Lý Đơn Hàng' : 'Seller Orders'}</span>
-          <h1>{isVi ? 'Danh Sách Đơn Hàng' : 'Order Management'}</h1>
-          <p>{isVi ? 'Kiểm tra đơn hàng của người mua, xác nhận xử lý và đóng gói giao hàng.' : 'Review buyer orders, confirm processing, and keep fulfillment status current.'}</p>
+          <span className="om-eyebrow">{t('seller.orders_management')}</span>
+          <h1>{t('order_management.title')}</h1>
+          <p>{t('order_management.subtitle')}</p>
         </div>
       </header>
 
@@ -299,11 +294,11 @@ export default function OrderManagement() {
             <input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder={isVi ? 'Tìm kiếm đơn hàng, sản phẩm, người mua...' : 'Search orders, products, buyers...'}
+              placeholder={t('common.search_placeholder')}
             />
           </form>
           <label className="om-sort-control">
-            <span>{isVi ? 'Sắp xếp' : 'Sort'}</span>
+            <span>{t('common.sort')}</span>
             <select value={filterForm.sortBy} onChange={(event) => handleFilterChange('sortBy', event.target.value)}>
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -315,8 +310,8 @@ export default function OrderManagement() {
             className="om-reset-button"
             disabled={!hasActiveControls}
             onClick={handleResetFilters}
-            aria-label={isVi ? 'Đặt lại bộ lọc' : 'Reset filters'}
-            title={isVi ? 'Đặt lại bộ lọc' : 'Reset filters'}
+            aria-label={t('common.reset')}
+            title={t('common.reset')}
           >
             <span className="material-symbols-outlined">restart_alt</span>
           </button>
@@ -345,22 +340,22 @@ export default function OrderManagement() {
           <table className="om-table">
             <thead>
               <tr>
-                <th>{isVi ? 'STT' : 'STT'}</th>
-                <th>{isVi ? 'Khách Hàng' : 'Customer'}</th>
-                <th>{isVi ? 'Chi Tiết Sản Phẩm' : 'Product Details'}</th>
-                <th>{isVi ? 'Tổng Tiền' : 'Total Amount'}</th>
-                <th>{isVi ? 'Trạng Thái' : 'Status'}</th>
-                <th>{isVi ? 'Thao Tác' : 'Actions'}</th>
+                <th>STT</th>
+                <th>{t('order_management.th_buyer')}</th>
+                <th>{t('my_products.th_product')}</th>
+                <th>{t('order_management.th_total')}</th>
+                <th>{t('order_management.th_status')}</th>
+                <th>{t('order_management.th_action')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6"><div className="om-empty">{isVi ? 'Đang tải đơn hàng...' : 'Loading orders...'}</div></td>
+                  <td colSpan="6"><div className="om-empty">{t('common.loading')}</div></td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan="6"><div className="om-empty">{isVi ? 'Không tìm thấy đơn hàng nào.' : 'No seller orders found.'}</div></td>
+                  <td colSpan="6"><div className="om-empty">{t('common.no_data')}</div></td>
                 </tr>
               ) : (
                 orders.map((order, index) => {
@@ -375,16 +370,16 @@ export default function OrderManagement() {
                         <strong>{orderNumber}</strong>
                       </td>
                       <td>
-                        <strong>{order.buyerName || (isVi ? 'Khách hàng' : 'Unknown Buyer')}</strong>
+                        <strong>{order.buyerName || 'Buyer'}</strong>
                       </td>
                       <td>
                         <div className="om-product">
                           <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
                           <div>
-                            <strong>{order.productName || (isVi ? 'Sản phẩm chưa đặt tên' : 'Untitled product')}</strong>
-                            <span>{isVi ? 'Số lượng' : 'Qty'} {order.quantity || 0}</span>
+                            <strong>{order.productName || t('nav.product')}</strong>
+                            <span>{t('common.quantity')} {order.quantity || 0}</span>
                             {order.returnReason ? (
-                              <div className="om-return-reason">{isVi ? 'Lý do trả hàng:' : 'Return reason:'} {order.returnReason}</div>
+                              <div className="om-return-reason">{t('history.refund_reason')}: {order.returnReason}</div>
                             ) : null}
                           </div>
                         </div>
@@ -400,7 +395,7 @@ export default function OrderManagement() {
                             className="om-detail-btn"
                             onClick={() => openDetail(order.orderId)}
                           >
-                            {isVi ? 'Chi Tiết' : 'Details'}
+                            {t('common.detail')}
                           </button>
                           {action ? (
                             <button
@@ -418,7 +413,7 @@ export default function OrderManagement() {
                               className="om-action-btn primary"
                               onClick={() => openDetail(order.orderId)}
                             >
-                              {isVi ? 'Xem Yêu Cầu Trả Hàng' : 'Review Return Request'}
+                              {t('common.view_detail')}
                             </button>
                           ) : null}
                           <button
@@ -426,7 +421,7 @@ export default function OrderManagement() {
                             className="om-report-btn"
                             onClick={() => setReportTarget(order)}
                           >
-                            {isVi ? 'Báo Cáo' : 'Report'}
+                            {t('reports.report_button')}
                           </button>
                         </div>
                       </td>
@@ -445,17 +440,17 @@ export default function OrderManagement() {
               disabled={page === 1 || loading}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
             >
-              {isVi ? 'Trước' : 'Previous'}
+              {t('common.previous')}
             </button>
             <span>
-              {isVi ? 'Trang' : 'Page'} {page} / {totalPages}
+              {t('common.page')} {page} / {totalPages}
             </span>
             <button
               type="button"
               disabled={page >= totalPages || loading}
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             >
-              {isVi ? 'Sau' : 'Next'}
+              {t('common.next')}
             </button>
           </div>
         )}
@@ -466,7 +461,7 @@ export default function OrderManagement() {
           isOpen={Boolean(reportTarget)}
           onClose={() => setReportTarget(null)}
           onSubmit={submitBuyerReport}
-          targetName={reportTarget.buyerName || (isVi ? 'Người mua' : 'Buyer')}
+          targetName={reportTarget.buyerName || 'Buyer'}
           targetType="User"
           reportType="Buyer"
           submitting={reportSubmitting}

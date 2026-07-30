@@ -16,19 +16,18 @@ const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
 export default function SalesStatistics() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const { t, language } = useLanguage();
-  const isVi = language === 'vi';
+  const { t } = useLanguage();
 
   const [periodDays, setPeriodDays] = useState(30);
   const [salesStats, setSalesStats] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const salesPeriodOptions = useMemo(() => [
-    { value: 7, label: isVi ? '7 Ngày Qua' : 'Last 7 Days' },
-    { value: 30, label: isVi ? '30 Ngày Qua' : 'Last 30 Days' },
-    { value: 90, label: isVi ? '90 Ngày Qua' : 'Last 90 Days' },
-    { value: 365, label: isVi ? '365 Ngày Qua' : 'Last 365 Days' },
-  ], [isVi]);
+    { value: 7, label: t('sales_stats.days_7') },
+    { value: 30, label: t('sales_stats.days_30') },
+    { value: 90, label: t('sales_stats.days_90') },
+    { value: 365, label: t('sales_stats.days_365') },
+  ], [t]);
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
@@ -42,11 +41,11 @@ export default function SalesStatistics() {
       const data = await orderService.getSellerSalesStatistics({ sellerId, periodDays });
       setSalesStats(data);
     } catch (error) {
-      showToast(error?.response?.data || (isVi ? 'Không thể tải thống kê doanh số.' : 'Failed to load seller sales statistics.'), 'error');
+      showToast(error?.response?.data || t('sales_stats.load_error'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [periodDays, sellerId, showToast, isVi]);
+  }, [periodDays, sellerId, showToast, t]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -77,37 +76,37 @@ export default function SalesStatistics() {
   const animatedAverageOrderValue = useAnimatedNumber(averageOrderValue);
 
   if (authLoading) {
-    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>{isVi ? 'Đang tải thống kê doanh số...' : 'Loading sales statistics...'}</p></div>;
+    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>{t('sales_stats.loading')}</p></div>;
   }
 
   if (!user) return <Navigate to="/login" replace />;
   if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
   const breakdownGridItems = [
-    [isVi ? 'Phí vận chuyển thu được' : 'Shipping Collected', formatVnd(salesStats?.shippingCollected || 0)],
-    [isVi ? 'Tổng giảm giá đã cấp' : 'Discount Given', formatVnd(salesStats?.discountGiven || 0)],
-    [isVi ? 'Chờ thanh toán' : 'Awaiting Payment', salesStats?.awaitingPaymentOrders ?? 0],
-    [isVi ? 'Đang xử lý' : 'Pending', salesStats?.pendingOrders ?? 0],
-    [isVi ? 'Đã xác nhận' : 'Confirmed', salesStats?.confirmedOrders ?? 0],
-    [isVi ? 'Đang giao hàng' : 'Shipping', salesStats?.shippingOrders ?? 0],
-    [isVi ? 'Đã giao hàng' : 'Delivered', salesStats?.deliveredOrders ?? 0],
-    [isVi ? 'Đã hoàn thành' : 'Completed', salesStats?.completedOrders ?? 0],
-    [isVi ? 'Giao thất bại' : 'Delivery Failed', salesStats?.deliveryFailedOrders ?? 0],
-    [isVi ? 'Đã hủy' : 'Cancelled', salesStats?.cancelledOrders ?? 0],
-    [isVi ? 'Đã trả hàng' : 'Returned', salesStats?.returnedOrders ?? 0],
+    [t('sales_stats.shipping_collected'), formatVnd(salesStats?.shippingCollected || 0)],
+    [t('sales_stats.discount_given'), formatVnd(salesStats?.discountGiven || 0)],
+    [t('sales_stats.awaiting_payment'), salesStats?.awaitingPaymentOrders ?? 0],
+    [t('sales_stats.pending'), salesStats?.pendingOrders ?? 0],
+    [t('sales_stats.confirmed'), salesStats?.confirmedOrders ?? 0],
+    [t('sales_stats.shipping'), salesStats?.shippingOrders ?? 0],
+    [t('sales_stats.delivered'), salesStats?.deliveredOrders ?? 0],
+    [t('sales_stats.completed'), salesStats?.completedOrders ?? 0],
+    [t('sales_stats.delivery_failed'), salesStats?.deliveryFailedOrders ?? 0],
+    [t('sales_stats.cancelled'), salesStats?.cancelledOrders ?? 0],
+    [t('sales_stats.returned'), salesStats?.returnedOrders ?? 0],
   ];
 
   return (
     <div className="ss-page animate-fade-in">
       <header className="ss-header">
         <div>
-          <span className="ss-eyebrow">{isVi ? 'Phân Tích Kinh Doanh' : 'Business Analytics'}</span>
-          <h1>{isVi ? 'Thống Kê Doanh Số' : 'Shop Manager'}</h1>
-          <p>{isVi ? 'Xem xét hiệu suất bán hàng, doanh thu đã giao và biến động đơn hàng theo thời gian chọn.' : 'Review sales performance, delivered revenue, and order movement over a selected period.'}</p>
+          <span className="ss-eyebrow">{t('sales_stats.eyebrow')}</span>
+          <h1>{t('sales_stats.title')}</h1>
+          <p>{t('sales_stats.desc')}</p>
           {periodRange && <strong className="ss-period-window">{periodRange}</strong>}
         </div>
         <label className="ss-period-select">
-          <span>{isVi ? 'Khoảng thời gian' : 'Period'}</span>
+          <span>{t('sales_stats.period_label')}</span>
           <select value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))}>
             {salesPeriodOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -119,54 +118,54 @@ export default function SalesStatistics() {
       {loading ? (
         <section className="ss-loading-panel">
           <span className="btn-spinner"></span>
-          <p>{isVi ? 'Đang tải dữ liệu phân tích...' : 'Loading analytics...'}</p>
+          <p>{t('sales_stats.loading')}</p>
         </section>
       ) : (
         <>
           <section className="ss-metric-grid">
             <article className="ss-metric-card ss-metric-card--revenue" style={{ '--delay': '0ms' }}>
               <div>
-                <span>{isVi ? 'Doanh Thu Thực Nhận' : 'Successful Revenue'}</span>
+                <span>{t('sales_stats.net_revenue')}</span>
                 <span className="material-symbols-outlined">payments</span>
               </div>
               <strong>{formatVnd(animatedNetSales)}</strong>
-              <p>{formatVnd(animatedGrossSales)} {isVi ? 'tổng trước giảm giá' : 'gross before discounts'}</p>
+              <p>{t('sales_stats.gross_sub', { amount: formatVnd(animatedGrossSales) })}</p>
             </article>
             <article className="ss-metric-card" style={{ '--delay': '70ms' }}>
               <div>
-                <span>{isVi ? 'Tổng Đơn Hàng' : 'Orders In Period'}</span>
+                <span>{t('sales_stats.total_orders')}</span>
                 <span className="material-symbols-outlined">receipt_long</span>
               </div>
               <strong>{Math.round(animatedTotalOrders)}</strong>
-              <p>{Math.round(animatedSuccessfulOrders)} {isVi ? 'đơn hàng thành công' : 'successful orders'}</p>
+              <p>{t('sales_stats.success_orders_sub', { count: Math.round(animatedSuccessfulOrders) })}</p>
             </article>
             <article className="ss-metric-card ss-metric-card--rate" style={{ '--delay': '140ms' }}>
               <div>
-                <span>{isVi ? 'Tỷ Lệ Thành Công' : 'Success Rate'}</span>
+                <span>{t('sales_stats.success_rate')}</span>
                 <span className="material-symbols-outlined">task_alt</span>
               </div>
               <div className="ss-progress-ring" style={{ '--progress': `${Math.min(100, Math.max(0, animatedFulfillmentRate)) * 3.6}deg` }}>
                 <strong>{Math.round(animatedFulfillmentRate)}%</strong>
               </div>
-              <p>{Math.round(animatedSoldItems)} {isVi ? 'sản phẩm đã bán' : 'sold items'}</p>
+              <p>{t('sales_stats.sold_items_sub', { count: Math.round(animatedSoldItems) })}</p>
             </article>
             <article className="ss-metric-card" style={{ '--delay': '210ms' }}>
               <div>
-                <span>{isVi ? 'Giá Trị Đơn Trung Bình' : 'Average Order'}</span>
+                <span>{t('sales_stats.average_order')}</span>
                 <span className="material-symbols-outlined">monitoring</span>
               </div>
               <strong>{formatVnd(animatedAverageOrderValue)}</strong>
-              <p>{isVi ? 'Dựa trên các đơn đã giao & hoàn thành' : 'Based on delivered and completed orders'}</p>
+              <p>{t('sales_stats.average_order_sub')}</p>
             </article>
           </section>
 
           <section className="ss-chart-panel">
             <div className="ss-chart-head">
               <div>
-                <span>{isVi ? 'Xu Hướng Doanh Thu' : 'Revenue Trend'}</span>
+                <span>{t('sales_stats.revenue_trend')}</span>
                 <strong>{formatCompactVnd(animatedNetSales)}</strong>
               </div>
-              <em><i /> {isVi ? 'Doanh Thu' : 'Revenue'} <b /> {isVi ? 'Đơn Hàng' : 'Orders'}</em>
+              <em><i /> {t('sales_stats.revenue_legend')} <b /> {t('sales_stats.orders_legend')}</em>
             </div>
             {hasTrendData ? (
               <div className="ss-chart-bars" style={{ '--bar-count': salesTrend.length || 1 }}>
@@ -177,7 +176,7 @@ export default function SalesStatistics() {
 
                   return (
                     <div key={`${point.label || point.Label}-${index}`} className="ss-chart-bar">
-                      <span title={`${formatVnd(revenue)} - ${orderCount} ${isVi ? 'đơn' : 'orders'}`}>
+                      <span title={`${formatVnd(revenue)} - ${t('sales_stats.orders_count', { count: orderCount })}`}>
                         <i style={{ '--bar-height': `${height}%`, '--bar-delay': `${index * 70}ms` }} />
                       </span>
                       <b>{orderCount}</b>
@@ -189,8 +188,8 @@ export default function SalesStatistics() {
             ) : (
               <div className="ss-empty-chart">
                 <span className="material-symbols-outlined">bar_chart</span>
-                <strong>{isVi ? 'Chưa có doanh số thành công trong khoảng thời gian này' : 'No successful sales in this period'}</strong>
-                <p>{isVi ? 'Doanh thu sẽ hiển thị sau khi đơn hàng chuyển sang Đã giao hoặc Hoàn thành.' : 'Revenue appears after an order reaches Delivered or Completed.'}</p>
+                <strong>{t('sales_stats.empty_title')}</strong>
+                <p>{t('sales_stats.empty_sub')}</p>
               </div>
             )}
           </section>

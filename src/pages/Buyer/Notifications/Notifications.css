@@ -180,6 +180,18 @@
   background: var(--primary);
 }
 
+.notification-card.unread::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
 .notif-card-icon {
   width: 48px;
   height: 48px;
@@ -264,26 +276,26 @@
     align-items: flex-start;
     gap: 16px;
   }
-
+  
   .notifications-filters {
     padding: 16px;
     gap: 20px;
   }
-
+  
   .notification-card {
     padding: 16px;
     gap: 12px;
   }
-
+  
   .notif-card-icon {
     width: 40px;
     height: 40px;
   }
-
+  
   .notif-card-icon .material-symbols-outlined {
     font-size: 20px;
   }
-
+  
   .notif-card-header {
     flex-direction: column;
     gap: 4px;

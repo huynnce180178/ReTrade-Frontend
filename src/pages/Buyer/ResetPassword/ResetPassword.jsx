@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import accountService from '../../../services/accountService';
 
 import '../../../styles/ResetPassword.css';
@@ -8,6 +9,7 @@ import '../../../styles/ResetPassword.css';
 export default function ResetPassword() {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +18,7 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim()) {
-      showToast('Please enter your email address.', 'error');
+      showToast(t('forgot_password_page.enter_email_err'), 'error');
       return;
     }
 
@@ -24,10 +26,10 @@ export default function ResetPassword() {
     try {
       await accountService.passwordRecovery(email);
       setSent(true);
-      showToast('A new password has been sent to your email.', 'success');
+      showToast(t('forgot_password_page.code_sent'), 'success');
     } catch (err) {
-      const errorMsg = err.response?.data || err.response?.data?.message || 'Email not found in the system.';
-      showToast(typeof errorMsg === 'string' ? errorMsg : 'Email not found in the system.', 'error');
+      const errorMsg = err.response?.data || err.response?.data?.message || t('forgot_password_page.email_not_found');
+      showToast(typeof errorMsg === 'string' ? errorMsg : t('forgot_password_page.email_not_found'), 'error');
     } finally {
       setLoading(false);
     }
@@ -49,9 +51,9 @@ export default function ResetPassword() {
                 <span className="material-symbols-outlined rp-icon">mail</span>
               </div>
 
-              <h1 className="rp-title">Password Recovery</h1>
+              <h1 className="rp-title">{t('reset_password_page.recovery_title')}</h1>
               <p className="rp-subtitle">
-                Enter your registered email. We'll generate a new secure password and send it directly to your inbox.
+                {t('reset_password_page.recovery_subtitle')}
               </p>
 
               <form className="rp-form" onSubmit={handleSubmit}>
@@ -67,7 +69,7 @@ export default function ResetPassword() {
                     disabled={loading}
                     autoComplete="email"
                   />
-                  <label htmlFor="rp-email" className="rp-float-label">Email Address</label>
+                  <label htmlFor="rp-email" className="rp-float-label">{t('forgot_password_page.email_label')}</label>
                   <div className="rp-input-line"></div>
                 </div>
 
@@ -75,20 +77,20 @@ export default function ResetPassword() {
                   {loading ? (
                     <span className="rp-spinner"></span>
                   ) : (
-                    'Send New Password'
+                    t('reset_password_page.send_new_password_btn')
                   )}
                 </button>
               </form>
 
               <div className="rp-info-strip">
                 <span className="material-symbols-outlined rp-info-icon">info</span>
-                <span>A random secure password will be generated and sent to your email. You can change it later in account settings.</span>
+                <span>{t('reset_password_page.recovery_info_notice')}</span>
               </div>
 
               <div className="rp-footer-link">
                 <Link to="/login" className="rp-back-link">
                   <span className="material-symbols-outlined rp-back-icon">arrow_back</span>
-                  Back to Login
+                  {t('forgot_password_page.back_to_login')}
                 </Link>
               </div>
             </div>
@@ -99,37 +101,37 @@ export default function ResetPassword() {
                 <span className="material-symbols-outlined rp-icon rp-icon--success">check_circle</span>
               </div>
 
-              <h1 className="rp-title">Check Your Inbox</h1>
+              <h1 className="rp-title">{t('reset_password_page.check_inbox_title')}</h1>
               <p className="rp-subtitle">
-                A new password has been sent to <strong>{email}</strong>. Follow the steps below to regain access.
+                {t('reset_password_page.check_inbox_subtitle', { email })}
               </p>
 
               <div className="rp-steps">
                 <div className="rp-step-item">
                   <div className="rp-step-num">1</div>
                   <div className="rp-step-content">
-                    <strong>Open your email</strong>
-                    <span>Find the message with your new password</span>
+                    <strong>{t('reset_password_page.recovery_step1_title')}</strong>
+                    <span>{t('reset_password_page.recovery_step1_desc')}</span>
                   </div>
                 </div>
                 <div className="rp-step-item">
                   <div className="rp-step-num">2</div>
                   <div className="rp-step-content">
-                    <strong>Sign in</strong>
-                    <span>Use the new password to log in</span>
+                    <strong>{t('reset_password_page.recovery_step2_title')}</strong>
+                    <span>{t('reset_password_page.recovery_step2_desc')}</span>
                   </div>
                 </div>
                 <div className="rp-step-item">
                   <div className="rp-step-num">3</div>
                   <div className="rp-step-content">
-                    <strong>Secure your account</strong>
-                    <span>Change the password in your settings</span>
+                    <strong>{t('reset_password_page.recovery_step3_title')}</strong>
+                    <span>{t('reset_password_page.recovery_step3_desc')}</span>
                   </div>
                 </div>
               </div>
 
               <button type="button" className="rp-btn-primary" onClick={handleBackToLogin}>
-                Return to Login
+                {t('forgot_password_page.return_to_login')}
               </button>
             </div>
           )}

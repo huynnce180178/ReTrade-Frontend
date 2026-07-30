@@ -359,31 +359,15 @@
 }
 
 @keyframes float1 {
-  0% {
-    transform: translateY(0px) rotate(-3deg);
-  }
-
-  50% {
-    transform: translateY(-12px) rotate(-3deg);
-  }
-
-  100% {
-    transform: translateY(0px) rotate(-3deg);
-  }
+  0% { transform: translateY(0px) rotate(-3deg); }
+  50% { transform: translateY(-12px) rotate(-3deg); }
+  100% { transform: translateY(0px) rotate(-3deg); }
 }
 
 @keyframes float2 {
-  0% {
-    transform: translateY(0px) rotate(2deg);
-  }
-
-  50% {
-    transform: translateY(-10px) rotate(2deg);
-  }
-
-  100% {
-    transform: translateY(0px) rotate(2deg);
-  }
+  0% { transform: translateY(0px) rotate(2deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+  100% { transform: translateY(0px) rotate(2deg); }
 }
 
 /* Stats Section */
@@ -635,8 +619,7 @@
   gap: 16px;
   overflow-x: auto;
   padding-bottom: 12px;
-  scrollbar-width: none;
-  /* Hide scrollbar for cleaner look */
+  scrollbar-width: none; /* Hide scrollbar for cleaner look */
 }
 
 .home-categories-list::-webkit-scrollbar {
@@ -706,7 +689,7 @@
   flex-wrap: wrap;
 }
 
-.home-section-header>div {
+.home-section-header > div {
   flex: 1;
   min-width: 200px;
 }
@@ -781,19 +764,12 @@
 }
 
 @keyframes wl-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
-  }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .home-products-empty {
@@ -869,16 +845,20 @@
 
 .home-product-condition {
   position: absolute;
-  bottom: 10px;
+  top: 10px;
   left: 10px;
-  background: rgba(2, 36, 27, 0.72);
-  color: #fff;
+  background: rgba(1, 24, 18, 0.75);
+  color: #ffffff;
   font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
+  font-weight: 800;
+  padding: 4px 10px;
   border-radius: 999px;
   letter-spacing: 0.4px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 2;
 }
 
 /* Wishlist toggle button */
@@ -965,17 +945,9 @@
 }
 
 @keyframes heart-pop {
-  0% {
-    transform: scale(0.7);
-  }
-
-  50% {
-    transform: scale(1.25);
-  }
-
-  100% {
-    transform: scale(1);
-  }
+  0% { transform: scale(0.7); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
 }
 
 .home-wl-spinner {
@@ -1082,20 +1054,9 @@
 }
 
 @keyframes premium-pulse {
-  0% {
-    box-shadow: 0 0 10px rgba(234, 179, 8, 0.1);
-    transform: scale(1);
-  }
-
-  50% {
-    box-shadow: 0 0 25px rgba(234, 179, 8, 0.25);
-    transform: scale(1.03);
-  }
-
-  100% {
-    box-shadow: 0 0 10px rgba(234, 179, 8, 0.1);
-    transform: scale(1);
-  }
+  0% { box-shadow: 0 0 10px rgba(234, 179, 8, 0.1); transform: scale(1); }
+  50% { box-shadow: 0 0 25px rgba(234, 179, 8, 0.25); transform: scale(1.03); }
+  100% { box-shadow: 0 0 10px rgba(234, 179, 8, 0.1); transform: scale(1); }
 }
 
 .star-spin {
@@ -1104,13 +1065,8 @@
 }
 
 @keyframes rotation {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .priority-recommendations-section .section-title {
@@ -1394,9 +1350,7 @@
 }
 
 @keyframes premium-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 /* Home Product Carousel Slider Navigation */
@@ -1458,8 +1412,8 @@
   .home-scroll-btn.left {
     left: 4px;
   }
-
   .home-scroll-btn.right {
     right: 4px;
   }
 }
+

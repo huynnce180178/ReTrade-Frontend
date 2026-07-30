@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -18,8 +18,7 @@ export default function MyProducts() {
   const { user } = useOutletContext();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { t, language } = useLanguage();
-  const isVi = language === 'vi';
+  const { t } = useLanguage();
 
   const [myProducts, setMyProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -38,13 +37,14 @@ export default function MyProducts() {
   const openDetailModal = async (productSummary) => {
     setDetailModalProduct(productSummary);
     setSelectedModalImg(productSummary.mainImageUrl || '');
-    setDetailLoading(true);
     try {
-      const fullData = await productService.getById(productSummary.productId);
-      if (fullData) {
-        setDetailModalProduct(fullData);
-        const imagesList = Array.isArray(fullData.imageUrls) ? fullData.imageUrls : (Array.isArray(fullData.images) ? fullData.images.map(i => i.imageUrl || i) : []);
-        setSelectedModalImg(fullData.mainImageUrl || imagesList[0] || productSummary.mainImageUrl || '');
+      setDetailLoading(true);
+      const fullDetail = await productService.getById(productSummary.productId);
+      if (fullDetail) {
+        setDetailModalProduct(fullDetail);
+        if (fullDetail.mainImageUrl) {
+          setSelectedModalImg(fullDetail.mainImageUrl);
+        }
       }
     } catch {
       // Keep summary data if getById fails
@@ -53,7 +53,7 @@ export default function MyProducts() {
     }
   };
 
-  const fetchMyProducts = async () => {
+  const fetchMyProducts = useCallback(async () => {
     if (!user?.userId) return;
     try {
       setProductsLoading(true);
@@ -67,18 +67,18 @@ export default function MyProducts() {
 
       const res = await productService.getAll(params);
       setMyProducts(res?.items || []);
-    } catch (e) {
-      showToast(isVi ? 'Không thể tải danh sách sản phẩm.' : 'Failed to load your product list.', 'error');
+    } catch {
+      showToast(t('my_products.fetch_error'), 'error');
     } finally {
       setProductsLoading(false);
     }
-  };
+  }, [user, sellerSort, sellerSearch, sellerStatus, showToast, t]);
 
   useEffect(() => {
     let disposed = false;
     const connection = createNotificationHubConnection();
 
-    connection.on('ReceiveNotification', (notification) => {
+    connection.on('ReceiveNotification', () => {
       if (!disposed) {
         setRefreshTrigger(prev => prev + 1);
       }
@@ -99,7 +99,7 @@ export default function MyProducts() {
     if (user) {
       fetchMyProducts();
     }
-  }, [user, sellerStatus, sellerSort, refreshTrigger]);
+  }, [user, sellerStatus, sellerSort, refreshTrigger, fetchMyProducts]);
 
   const handleSellerSearchSubmit = (e) => {
     e.preventDefault();
@@ -107,14 +107,14 @@ export default function MyProducts() {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!window.confirm(isVi ? 'Bạn có chắc chắn muốn xóa tin đăng sản phẩm này?' : 'Are you sure you want to delete this product listing?')) return;
+    if (!window.confirm(t('my_products.confirm_delete_msg', { name: productId }))) return;
     try {
       setProductsLoading(true);
       await productService.delete(productId);
-      showToast(isVi ? 'Xóa sản phẩm thành công.' : 'Product deleted successfully.', 'success');
+      showToast(t('my_products.delete_success'), 'success');
       fetchMyProducts();
     } catch (e) {
-      showToast(e?.response?.data || (isVi ? 'Không thể xóa sản phẩm.' : 'Failed to delete product.'), 'error');
+      showToast(e?.response?.data || t('my_products.delete_error'), 'error');
     } finally {
       setProductsLoading(false);
     }
@@ -123,16 +123,14 @@ export default function MyProducts() {
   const initNewProductForm = async () => {
     try {
       setProductsLoading(true);
-      const data = await addressService.getMyAddresses();
-      const addrList = Array.isArray(data) ? data : (data?.data || []);
-      if (addrList.length === 0) {
-        showToast(isVi ? 'Bạn cần thêm địa chỉ trước khi tạo sản phẩm!' : 'You need to add an address before creating a product!', 'warning');
+      const addresses = await addressService.getAddresses();
+      if (!addresses || addresses.length === 0) {
         setIsAddressPopupOpen(true);
-        return;
+      } else {
+        navigate('/seller-dashboard/products/new');
       }
-      navigate('/seller-dashboard/products/new');
-    } catch (error) {
-      showToast(isVi ? 'Không thể xác thực thông tin địa chỉ giao hàng.' : 'Failed to verify shipping address information.', 'error');
+    } catch {
+      setIsAddressPopupOpen(true);
     } finally {
       setProductsLoading(false);
     }
@@ -140,14 +138,14 @@ export default function MyProducts() {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'Pending': return { text: isVi ? 'Chờ phê duyệt' : 'Pending Approval', cls: 'status-pending' };
-      case 'Accepted': return { text: isVi ? 'Được duyệt bán' : 'Approved for Sale', cls: 'status-accepted' };
-      case 'SaleRejected': return { text: isVi ? 'Bị từ chối bán' : 'Sale Rejected', cls: 'status-rejected' };
-      case 'Waiting': return { text: isVi ? 'Chờ đấu giá' : 'Pending Auction', cls: 'status-waiting' };
-      case 'Ready': return { text: isVi ? 'Sẵn sàng đấu giá' : 'Ready for Auction', cls: 'status-ready' };
-      case 'AuctionRejected': return { text: isVi ? 'Bị từ chối đấu giá' : 'Auction Rejected', cls: 'status-rejected' };
-      case 'Sold': return { text: isVi ? 'Đã bán' : 'Sold', cls: 'status-sold' };
-      case 'Inactive': return { text: isVi ? 'Đã ẩn' : 'Inactive', cls: 'status-inactive' };
+      case 'Pending': return { text: t('seller_dashboard.status_pending'), cls: 'status-pending' };
+      case 'Accepted': return { text: t('seller_dashboard.status_accepted'), cls: 'status-accepted' };
+      case 'SaleRejected': return { text: t('seller_dashboard.status_rejected'), cls: 'status-rejected' };
+      case 'Waiting': return { text: t('seller_dashboard.status_waiting'), cls: 'status-waiting' };
+      case 'Ready': return { text: t('seller_dashboard.status_ready'), cls: 'status-ready' };
+      case 'AuctionRejected': return { text: t('seller_dashboard.status_auction_rejected'), cls: 'status-rejected' };
+      case 'Sold': return { text: t('seller_dashboard.status_sold'), cls: 'status-sold' };
+      case 'Inactive': return { text: t('seller_dashboard.status_inactive'), cls: 'status-inactive' };
       default: return { text: status, cls: 'status-unknown' };
     }
   };
@@ -163,11 +161,11 @@ export default function MyProducts() {
       <div className="tab-products animate-fade-in">
         <header className="seller-dash-header">
           <div>
-            <h1>{isVi ? 'Sản Phẩm Của Tôi' : 'My Products'}</h1>
-            <p>{isVi ? 'Xem chi tiết, chỉnh sửa hoặc xóa các sản phẩm bạn đang bán hoặc đấu giá.' : 'View, edit, or delete the products you are selling or auctioning.'}</p>
+            <h1>{t('my_products.title')}</h1>
+            <p>{t('my_products.subtitle')}</p>
           </div>
           <button className="seller-list-btn" onClick={initNewProductForm}>
-            <span className="material-symbols-outlined">add</span>{isVi ? 'Đăng Sản Phẩm Mới' : 'Add New Product'}
+            <span className="material-symbols-outlined">add</span>{t('my_products.add_product_btn')}
           </button>
         </header>
 
@@ -176,7 +174,7 @@ export default function MyProducts() {
             <form onSubmit={handleSellerSearchSubmit} style={{ display: 'flex', flex: 1, minWidth: '250px', position: 'relative' }}>
               <input 
                 type="text" 
-                placeholder={isVi ? 'Tìm theo tên sản phẩm...' : 'Search by product name...'} 
+                placeholder={t('my_products.search_placeholder')} 
                 value={sellerSearch}
                 onChange={(e) => setSellerSearch(e.target.value)}
                 style={{ width: '100%', padding: '10px 40px 10px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)' }}
@@ -192,15 +190,15 @@ export default function MyProducts() {
                 onChange={(e) => setSellerStatus(e.target.value)}
                 style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
               >
-                <option value="">{isVi ? 'Tất cả trạng thái' : 'All Statuses'}</option>
-                <option value="Pending">{isVi ? 'Chờ phê duyệt' : 'Pending Approval'}</option>
-                <option value="Accepted">{isVi ? 'Được duyệt (Bán)' : 'Approved (Sale)'}</option>
-                <option value="Waiting">{isVi ? 'Chờ đấu giá' : 'Pending Auction'}</option>
-                <option value="Ready">{isVi ? 'Sẵn sàng đấu giá' : 'Ready for Auction'}</option>
-                <option value="SaleRejected">{isVi ? 'Từ chối bán' : 'Sale Rejected'}</option>
-                <option value="AuctionRejected">{isVi ? 'Từ chối đấu giá' : 'Auction Rejected'}</option>
-                <option value="Sold">{isVi ? 'Đã bán' : 'Sold'}</option>
-                <option value="Inactive">{isVi ? 'Đã ẩn' : 'Inactive'}</option>
+                <option value="">{t('common.all')}</option>
+                <option value="Pending">{t('seller_dashboard.status_pending')}</option>
+                <option value="Accepted">{t('seller_dashboard.status_accepted')}</option>
+                <option value="Waiting">{t('seller_dashboard.status_waiting')}</option>
+                <option value="Ready">{t('seller_dashboard.status_ready')}</option>
+                <option value="SaleRejected">{t('seller_dashboard.status_rejected')}</option>
+                <option value="AuctionRejected">{t('seller_dashboard.status_auction_rejected')}</option>
+                <option value="Sold">{t('seller_dashboard.status_sold')}</option>
+                <option value="Inactive">{t('seller_dashboard.status_inactive')}</option>
               </select>
 
               <select 
@@ -208,10 +206,9 @@ export default function MyProducts() {
                 onChange={(e) => setSellerSort(e.target.value)}
                 style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
               >
-                <option value="newest">{isVi ? 'Mới nhất' : 'Newest First'}</option>
-                <option value="oldest">{isVi ? 'Cũ nhất' : 'Oldest First'}</option>
-                <option value="price_asc">{isVi ? 'Giá: Thấp đến Cao' : 'Price: Low to High'}</option>
-                <option value="price_desc">{isVi ? 'Giá: Cao đến Thấp' : 'Price: High to Low'}</option>
+                <option value="newest">{t('product.sort_newest')}</option>
+                <option value="price_asc">{t('product.sort_price_asc')}</option>
+                <option value="price_desc">{t('product.sort_price_desc')}</option>
               </select>
             </div>
           </div>
@@ -220,20 +217,20 @@ export default function MyProducts() {
             {myProducts.length === 0 ? (
               <div className="seller-empty-products">
                 <span className="material-symbols-outlined">inventory</span>
-                <h3>{isVi ? 'Không tìm thấy sản phẩm nào' : 'No products found'}</h3>
-                <p>{isVi ? 'Thử điều chỉnh bộ lọc hoặc đăng một sản phẩm mới.' : 'Try adjusting your filters or post a new product.'}</p>
-                <button className="seller-list-btn" style={{ marginTop: '16px' }} onClick={initNewProductForm}>{isVi ? 'Đăng Ngay' : 'Post Now'}</button>
+                <h3>{t('common.no_data')}</h3>
+                <p>{t('my_products.subtitle')}</p>
+                <button className="seller-list-btn" style={{ marginTop: '16px' }} onClick={initNewProductForm}>{t('my_products.add_product_btn')}</button>
               </div>
             ) : (
               <table className="seller-products-table">
                 <thead>
                   <tr>
-                    <th>{isVi ? 'Sản phẩm' : 'Product'}</th>
-                    <th>{isVi ? 'Danh mục' : 'Category'}</th>
-                    <th>{isVi ? 'Giá' : 'Price'}</th>
-                    <th>{isVi ? 'Tồn kho' : 'Stock'}</th>
-                    <th>{isVi ? 'Trạng thái' : 'Status'}</th>
-                    <th>{isVi ? 'Thao tác' : 'Actions'}</th>
+                    <th>{t('my_products.th_product')}</th>
+                    <th>{t('my_products.th_category')}</th>
+                    <th>{t('my_products.th_price')}</th>
+                    <th>{t('my_products.th_stock')}</th>
+                    <th>{t('my_products.th_status')}</th>
+                    <th>{t('my_products.th_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -254,9 +251,9 @@ export default function MyProducts() {
                         <td>{p.categoryName}</td>
                         <td>
                           {isAuction ? (
-                            <span className="badge-auct">{isVi ? 'Đấu giá' : 'Auction'}</span>
+                            <span className="badge-auct">{t('nav.auction')}</span>
                           ) : (
-                            <strong>{p.price ? formatVnd(p.price) : (isVi ? 'Thương lượng' : 'Contact')}</strong>
+                            <strong>{p.price ? formatVnd(p.price) : t('seller_dashboard.contact')}</strong>
                           )}
                         </td>
                         <td>{p.stockQuantity}</td>
@@ -268,7 +265,7 @@ export default function MyProducts() {
                             <button
                               type="button"
                               className="seller-icon-action"
-                              title={isVi ? 'Xem chi tiết sản phẩm' : 'View Product Details'}
+                              title={t('common.view_detail')}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openDetailModal(p);
@@ -279,7 +276,7 @@ export default function MyProducts() {
                             <button
                               type="button"
                               className="seller-icon-action"
-                              title={isVi ? 'Chỉnh sửa' : 'Edit'}
+                              title={t('common.edit')}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/seller-dashboard/products/edit/${p.productId}`);
@@ -290,7 +287,7 @@ export default function MyProducts() {
                             <button
                               type="button"
                               className="seller-icon-action danger"
-                              title={isVi ? 'Xóa' : 'Delete'}
+                              title={t('common.delete')}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteProduct(p.productId);
@@ -314,9 +311,9 @@ export default function MyProducts() {
       {isAddressPopupOpen && (
         <AddressPopup 
           onClose={() => setIsAddressPopupOpen(false)} 
-          onSelect={(selectedAddr) => {
+          onSelect={() => {
             setIsAddressPopupOpen(false);
-            showToast(isVi ? 'Đã thêm địa chỉ thành công! Giờ bạn có thể tạo sản phẩm.' : 'Address added successfully! You can now post a product.', 'success');
+            showToast(t('address.add_success'), 'success');
             navigate('/seller-dashboard/products/new');
           }} 
         />
@@ -328,7 +325,7 @@ export default function MyProducts() {
           <div className="seller-modal-card seller-product-detail-modal" onClick={(e) => e.stopPropagation()}>
             <div className="seller-modal-header">
               <div>
-                <span className="seller-modal-eyebrow">{isVi ? 'Chi Tiết Sản Phẩm' : 'Product Details'}</span>
+                <span className="seller-modal-eyebrow">{t('common.detail')}</span>
                 <h2>{detailModalProduct.name}</h2>
                 <small>ID: {detailModalProduct.productId}</small>
               </div>
@@ -340,7 +337,7 @@ export default function MyProducts() {
             {detailLoading ? (
               <div className="seller-modal-body" style={{ textAlign: 'center', padding: '40px' }}>
                 <span className="btn-spinner"></span>
-                <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>{isVi ? 'Đang tải thông tin chi tiết...' : 'Loading product details...'}</p>
+                <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>{t('common.loading')}</p>
               </div>
             ) : (
               <div className="seller-modal-body seller-product-detail-body">
@@ -374,36 +371,36 @@ export default function MyProducts() {
                     </span>
                     <span className="seller-detail-format-badge">
                       {detailModalProduct.isForAuction || detailModalProduct.status === 'Ready' || detailModalProduct.status === 'Waiting'
-                        ? (isVi ? '🔨 Đấu giá' : '🔨 Auction')
-                        : (isVi ? '🏷️ Bán thẳng' : '🏷️ Direct Sale')}
+                        ? `🔨 ${t('nav.auction')}`
+                        : `🏷️ ${t('home.fast_deal')}`}
                     </span>
                   </div>
 
                   <div className="seller-detail-price-box">
-                    <span>{isVi ? 'Giá Niêm Yết' : 'Price'}</span>
-                    <strong>{detailModalProduct.price ? formatVnd(detailModalProduct.price) : (isVi ? 'Thương lượng' : 'Contact')}</strong>
+                    <span>{t('common.price')}</span>
+                    <strong>{detailModalProduct.price ? formatVnd(detailModalProduct.price) : t('seller_dashboard.contact')}</strong>
                   </div>
 
                   <div className="seller-detail-grid">
                     <div>
-                      <span>{isVi ? 'Danh Mục' : 'Category'}</span>
-                      <strong>{detailModalProduct.categoryName || (isVi ? 'Chưa phân loại' : 'Uncategorized')}</strong>
+                      <span>{t('common.category')}</span>
+                      <strong>{detailModalProduct.categoryName || t('common.none')}</strong>
                     </div>
                     <div>
-                      <span>{isVi ? 'Số Lượng Tồn Kho' : 'Stock Quantity'}</span>
+                      <span>{t('common.quantity')}</span>
                       <strong>{detailModalProduct.stockQuantity ?? 0}</strong>
                     </div>
                     <div>
-                      <span>{isVi ? 'Tình Trạng' : 'Condition'}</span>
-                      <strong>{detailModalProduct.condition || (isVi ? 'Khác' : 'N/A')}</strong>
+                      <span>{t('product.condition')}</span>
+                      <strong>{detailModalProduct.condition || t('common.none')}</strong>
                     </div>
                     <div>
-                      <span>{isVi ? 'Ngày Đăng' : 'Date Posted'}</span>
+                      <span>{t('common.created_at')}</span>
                       <strong>{formatDateGmt7(detailModalProduct.createdAt)}</strong>
                     </div>
                     {(detailModalProduct.weightGram || detailModalProduct.lengthCm) && (
                       <div style={{ gridColumn: '1 / -1' }}>
-                        <span>{isVi ? 'Đóng Gói & Trọng Lượng' : 'Package Specs'}</span>
+                        <span>{t('common.description')}</span>
                         <strong>
                           {detailModalProduct.weightGram ? `${detailModalProduct.weightGram}g` : ''} 
                           {detailModalProduct.lengthCm ? ` • ${detailModalProduct.lengthCm}x${detailModalProduct.widthCm}x${detailModalProduct.heightCm} cm` : ''}
@@ -414,14 +411,14 @@ export default function MyProducts() {
 
                   {detailModalProduct.description && (
                     <div className="seller-detail-description">
-                      <h3>{isVi ? 'Mô Tả Sản Phẩm' : 'Description'}</h3>
+                      <h3>{t('common.description')}</h3>
                       <p>{detailModalProduct.description}</p>
                     </div>
                   )}
 
                   {Array.isArray(detailModalProduct.attributes) && detailModalProduct.attributes.length > 0 && (
                     <div className="seller-detail-attributes">
-                      <h3>{isVi ? 'Thông Số Kỹ Thuật' : 'Specifications'}</h3>
+                      <h3>{t('product.title')}</h3>
                       <ul>
                         {detailModalProduct.attributes.map((attr, idx) => (
                           <li key={idx}>
@@ -444,7 +441,7 @@ export default function MyProducts() {
                 className="seller-modal-btn outline"
               >
                 <span className="material-symbols-outlined">open_in_new</span>
-                {isVi ? 'Xem Trang Công Khai' : 'View Public Listing'}
+                {t('common.view_detail')}
               </a>
               <button
                 type="button"
@@ -456,7 +453,7 @@ export default function MyProducts() {
                 }}
               >
                 <span className="material-symbols-outlined">edit</span>
-                {isVi ? 'Chỉnh Sửa Sản Phẩm' : 'Edit Product'}
+                {t('seller.edit_product')}
               </button>
             </div>
           </div>

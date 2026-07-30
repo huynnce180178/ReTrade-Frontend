@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import accountService from '../../../services/accountService';
 import '../../../styles/ForgotPassword.css';
 
@@ -15,6 +16,7 @@ function getErrorMsg(err, fallback) {
 export default function ForgotPassword() {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const inputRefs = useRef([]);
 
   const [step, setStep] = useState('email');
@@ -40,16 +42,16 @@ export default function ForgotPassword() {
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim()) return showToast('Please enter your email address.', 'error');
+    if (!email.trim()) return showToast(t('forgot_password_page.enter_email_err'), 'error');
 
     setLoading(true);
     try {
       await accountService.forgotPassword(email);
-      showToast('A verification code has been sent to your email.', 'success');
+      showToast(t('forgot_password_page.code_sent'), 'success');
       setStep('otp');
       setCountdown(60);
     } catch (err) {
-      showToast(getErrorMsg(err, 'Email not found in the system.'), 'error');
+      showToast(getErrorMsg(err, t('forgot_password_page.email_not_found')), 'error');
     } finally {
       setLoading(false);
     }
@@ -82,11 +84,11 @@ export default function ForgotPassword() {
     setResending(true);
     try {
       await accountService.forgotPassword(email);
-      showToast('A new verification code has been sent.', 'success');
+      showToast(t('forgot_password_page.new_code_sent'), 'success');
       setCountdown(60);
       setOtp([...INITIAL_OTP]);
     } catch {
-      showToast('Failed to resend code. Please try again.', 'error');
+      showToast(t('forgot_password_page.resend_failed'), 'error');
     } finally {
       setResending(false);
     }
@@ -94,25 +96,25 @@ export default function ForgotPassword() {
 
   const handleOtpSubmit = (e) => {
     e.preventDefault();
-    if (otp.join('').length !== 6) return showToast('Please enter all 6 digits of the OTP.', 'error');
+    if (otp.join('').length !== 6) return showToast(t('forgot_password_page.enter_6_digits'), 'error');
     setStep('newPassword');
   };
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    if (!newPassword.trim() || !confirmPassword.trim()) return showToast('Please fill in both password fields.', 'error');
-    if (newPassword.length < 8) return showToast('Password must be at least 8 characters long.', 'error');
-    if (!/[A-Z]/.test(newPassword)) return showToast('Password must contain at least one uppercase letter.', 'error');
-    if (!SPECIAL_CHAR_REGEX.test(newPassword)) return showToast('Password must contain at least one special character.', 'error');
-    if (newPassword !== confirmPassword) return showToast('Passwords do not match.', 'error');
+    if (!newPassword.trim() || !confirmPassword.trim()) return showToast(t('forgot_password_page.fill_both_fields'), 'error');
+    if (newPassword.length < 8) return showToast(t('forgot_password_page.min_8_chars'), 'error');
+    if (!/[A-Z]/.test(newPassword)) return showToast(t('forgot_password_page.one_upper_err'), 'error');
+    if (!SPECIAL_CHAR_REGEX.test(newPassword)) return showToast(t('forgot_password_page.one_special_err'), 'error');
+    if (newPassword !== confirmPassword) return showToast(t('forgot_password_page.match_err'), 'error');
 
     setLoading(true);
     try {
       await accountService.resetPassword({ email, otp: otp.join(''), newPassword });
-      showToast('Password reset successfully! Please log in with your new password.', 'success');
+      showToast(t('forgot_password_page.reset_success_msg'), 'success');
       navigate('/login');
     } catch (err) {
-      showToast(getErrorMsg(err, 'Password reset failed.'), 'error');
+      showToast(getErrorMsg(err, t('forgot_password_page.reset_failed_msg')), 'error');
     } finally {
       setLoading(false);
     }
@@ -148,10 +150,10 @@ export default function ForgotPassword() {
   );
 
   const requirements = [
-    { key: 'length', label: 'At least 8 characters' },
-    { key: 'upper', label: 'One uppercase letter' },
-    { key: 'special', label: 'One special character' },
-    { key: 'match', label: 'Passwords must match' },
+    { key: 'length', label: t('forgot_password_page.req_at_least_8') },
+    { key: 'upper', label: t('forgot_password_page.req_one_upper') },
+    { key: 'special', label: t('forgot_password_page.req_one_special') },
+    { key: 'match', label: t('forgot_password_page.req_match') },
   ];
 
   return (
@@ -164,24 +166,24 @@ export default function ForgotPassword() {
               <div className="fp-icon-wrap">
                 <span className="material-symbols-outlined fp-icon">lock_reset</span>
               </div>
-              <h1 className="fp-title">Reset Your Password</h1>
-              <p className="fp-subtitle">Enter your registered email address and we'll send you a secure verification code.</p>
+              <h1 className="fp-title">{t('forgot_password_page.title')}</h1>
+              <p className="fp-subtitle">{t('forgot_password_page.subtitle')}</p>
 
               <form className="fp-form" onSubmit={handleEmailSubmit}>
                 <div className="fp-floating-group">
                   <input type="email" id="fp-email" className="fp-input" placeholder=" " value={email} onChange={(e) => setEmail(e.target.value)} required disabled={loading} autoComplete="email" />
-                  <label htmlFor="fp-email" className="fp-float-label">Email Address</label>
+                  <label htmlFor="fp-email" className="fp-float-label">{t('forgot_password_page.email_label')}</label>
                   <div className="fp-input-line" />
                 </div>
                 <button type="submit" className="fp-btn-primary" disabled={loading}>
-                  {loading ? <span className="fp-spinner" /> : 'Send Reset Code'}
+                  {loading ? <span className="fp-spinner" /> : t('forgot_password_page.send_code_btn')}
                 </button>
               </form>
 
               <div className="fp-footer-link">
                 <Link to="/login" className="fp-back-link">
                   <span className="material-symbols-outlined fp-back-icon">arrow_back</span>
-                  Back to Login
+                  {t('forgot_password_page.back_to_login')}
                 </Link>
               </div>
             </div>
@@ -192,8 +194,8 @@ export default function ForgotPassword() {
               <div className="fp-icon-wrap fp-icon-wrap--otp">
                 <span className="material-symbols-outlined fp-icon">mark_email_read</span>
               </div>
-              <h1 className="fp-title">Verify Your Identity</h1>
-              <p className="fp-subtitle">We've sent a 6-digit verification code to <strong>{email}</strong>. Enter it below.</p>
+              <h1 className="fp-title">{t('forgot_password_page.verify_title')}</h1>
+              <p className="fp-subtitle">{t('forgot_password_page.verify_subtitle', { email })}</p>
 
               <form className="fp-form" onSubmit={handleOtpSubmit}>
                 <div className="fp-otp-row">
@@ -202,21 +204,21 @@ export default function ForgotPassword() {
                   ))}
                 </div>
                 <button type="submit" className="fp-btn-primary" disabled={loading}>
-                  {loading ? <span className="fp-spinner" /> : 'Verify Code'}
+                  {loading ? <span className="fp-spinner" /> : t('forgot_password_page.verify_code_btn')}
                 </button>
               </form>
 
               <div className="fp-resend-area">
-                <span>Didn't receive the code?</span>
+                <span>{t('forgot_password_page.didnt_receive')}</span>
                 <button type="button" className="fp-resend-btn" onClick={handleResendOtp} disabled={countdown > 0 || resending || loading}>
-                  {resending ? 'Sending...' : countdown > 0 ? `Resend in ${countdown}s` : 'Click to resend'}
+                  {resending ? t('forgot_password_page.resending') : countdown > 0 ? t('forgot_password_page.resend_in', { seconds: countdown }) : t('forgot_password_page.click_resend')}
                 </button>
               </div>
 
               <div className="fp-footer-link">
                 <button type="button" className="fp-back-link" onClick={() => { setStep('email'); setOtp([...INITIAL_OTP]); }}>
                   <span className="material-symbols-outlined fp-back-icon">arrow_back</span>
-                  Change email address
+                  {t('forgot_password_page.change_email')}
                 </button>
               </div>
             </div>
@@ -225,16 +227,16 @@ export default function ForgotPassword() {
           {step === 'newPassword' && (
             <div className="fp-glass-card fp-glass-card--wide fp-animate-in" key="password">
               <div className="fp-header-center">
-                <h1 className="fp-title">Establish New Password</h1>
-                <p className="fp-subtitle">Your new password must be different from previously used passwords to ensure account security.</p>
+                <h1 className="fp-title">{t('forgot_password_page.establish_new_title')}</h1>
+                <p className="fp-subtitle">{t('forgot_password_page.establish_new_subtitle')}</p>
               </div>
 
               <form className="fp-form" onSubmit={handleResetPassword}>
-                {renderPasswordField('New Password', 'fp-new-password', newPassword, setNewPassword, showPassword, () => setShowPassword(v => !v))}
-                {renderPasswordField('Confirm New Password', 'fp-confirm-password', confirmPassword, setConfirmPassword, showConfirmPassword, () => setShowConfirmPassword(v => !v))}
+                {renderPasswordField(t('forgot_password_page.new_password_label'), 'fp-new-password', newPassword, setNewPassword, showPassword, () => setShowPassword(v => !v))}
+                {renderPasswordField(t('forgot_password_page.confirm_new_password'), 'fp-confirm-password', confirmPassword, setConfirmPassword, showConfirmPassword, () => setShowConfirmPassword(v => !v))}
 
                 <div className="fp-req-box">
-                  <p className="fp-req-title">Security Requirements</p>
+                  <p className="fp-req-title">{t('forgot_password_page.sec_requirements')}</p>
                   <ul className="fp-req-list">
                     {requirements.map(({ key, label }) => (
                       <li key={key} className={`fp-req-item ${checks[key] ? 'fp-req-valid' : ''}`}>
@@ -246,14 +248,14 @@ export default function ForgotPassword() {
                 </div>
 
                 <button type="submit" className="fp-btn-primary" disabled={loading}>
-                  {loading ? <span className="fp-spinner" /> : 'Reset Password'}
+                  {loading ? <span className="fp-spinner" /> : t('forgot_password_page.reset_password_btn')}
                 </button>
               </form>
 
               <div className="fp-footer-link">
                 <Link to="/login" className="fp-back-link">
                   <span className="material-symbols-outlined fp-back-icon">arrow_back</span>
-                  Return to Login
+                  {t('forgot_password_page.return_to_login')}
                 </Link>
               </div>
             </div>

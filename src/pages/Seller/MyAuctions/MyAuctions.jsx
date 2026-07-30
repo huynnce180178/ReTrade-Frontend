@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
 import { useAuth } from '../../../context/AuthContext';
@@ -59,19 +59,19 @@ function getProgress(auction) {
   return Math.round(((now - start) / (end - start)) * 100);
 }
 
-function getAuctionEditBlockReason(auction, isVi) {
-  if (!auction) return isVi ? 'Dữ liệu đấu giá không có sẵn.' : 'Auction data is not available.';
-  if (auction.status !== 'Upcoming') return isVi ? 'Chỉ có thể cập nhật các phiên đấu giá sắp diễn ra.' : 'Only upcoming auctions can be updated.';
-  if (Number(auction.bidCount || 0) > 0) return isVi ? 'Phiên đấu giá đã có lượt ra giá không thể cập nhật.' : 'Auctions with existing bids cannot be updated.';
+function getAuctionEditBlockReason(auction, t) {
+  if (!auction) return t('common.no_data');
+  if (auction.status !== 'Upcoming') return t('my_auctions.cancel_error');
+  if (Number(auction.bidCount || 0) > 0) return t('auction.err_limit_exceeded');
 
   const startTime = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
-  if (!startTime || startTime <= Date.now()) return isVi ? 'Thời gian bắt đầu đấu giá đã trôi qua.' : 'Auction start time has passed.';
+  if (!startTime || startTime <= Date.now()) return t('auction.auction_ended');
 
   return '';
 }
 
-function validateAuctionForm(form, { requireProduct = false, requireFutureStart = false }, isVi) {
-  if (requireProduct && !form.productId) return isVi ? 'Vui lòng chọn sản phẩm đã được duyệt để đấu giá.' : 'Please select a ready auction product.';
+function validateAuctionForm(form, { requireProduct = false, requireFutureStart = false }, t) {
+  if (requireProduct && !form.productId) return t('validation.required');
 
   const startingPrice = Number(form.startingPrice);
   const minIncrement = Number(form.minIncrement);
@@ -79,24 +79,22 @@ function validateAuctionForm(form, { requireProduct = false, requireFutureStart 
   const start = parseAuctionDateTime(form.startTime);
   const end = parseAuctionDateTime(form.endTime);
 
-  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return isVi ? 'Giá khởi điểm phải lớn hơn 0.' : 'Starting bid must be greater than 0.';
-  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return isVi ? 'Bước giá phải lớn hơn 0.' : 'Bid step must be greater than 0.';
-  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return isVi ? 'Giá mua ngay là bắt buộc.' : 'Buy now price is required.';
-  if (buyNowPrice <= startingPrice) return isVi ? 'Giá mua ngay phải lớn hơn giá khởi điểm.' : 'Buy now price must be greater than the starting bid.';
-  if (!form.startTime || !start || Number.isNaN(start.getTime())) return isVi ? 'Vui lòng chọn thời gian bắt đầu hợp lệ.' : 'Please choose a valid start time.';
-  if (!form.endTime || !end || Number.isNaN(end.getTime())) return isVi ? 'Vui lòng chọn thời gian kết thúc hợp lệ.' : 'Please choose a valid end time.';
-  if (requireFutureStart && start <= new Date()) return isVi ? 'Thời gian bắt đầu phải ở trong tương lai.' : 'Start time must remain in the future.';
-  if (end <= start) return isVi ? 'Thời gian kết thúc phải sau thời gian bắt đầu.' : 'End time must be after start time.';
+  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return t('auction.err_greater_than_zero');
+  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return t('auction.err_greater_than_zero');
+  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return t('validation.required');
+  if (buyNowPrice <= startingPrice) return t('auction.err_buy_now_exceeded');
+  if (!form.startTime || !start || Number.isNaN(start.getTime())) return t('validation.required');
+  if (!form.endTime || !end || Number.isNaN(end.getTime())) return t('validation.required');
+  if (requireFutureStart && start <= new Date()) return t('auction.err_active_only');
+  if (end <= start) return t('validation.required');
 
   return '';
 }
 
 export default function MyAuctions() {
-  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const { t, language } = useLanguage();
-  const isVi = language === 'vi';
+  const { t } = useLanguage();
 
   const [auctions, setAuctions] = useState([]);
   const [eligibleProducts, setEligibleProducts] = useState([]);
@@ -111,15 +109,11 @@ export default function MyAuctions() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const statusOptions = useMemo(() => [
-    { value: 'All', label: isVi ? 'Tất cả' : 'All' },
-    { value: 'Upcoming', label: isVi ? 'Sắp diễn ra' : 'Upcoming' },
-    { value: 'Ongoing', label: isVi ? 'Đang diễn ra' : 'Ongoing' },
-    { value: 'Ended', label: isVi ? 'Đã kết thúc' : 'Ended' },
-  ], [isVi]);
-
-  const selectedProduct = useMemo(() => {
-    return eligibleProducts.find(p => p.productId === createForm.productId);
-  }, [eligibleProducts, createForm.productId]);
+    { value: 'All', label: t('common.all') },
+    { value: 'Upcoming', label: t('my_auctions.tab_upcoming') },
+    { value: 'Ongoing', label: t('my_auctions.tab_active') },
+    { value: 'Ended', label: t('my_auctions.tab_ended') },
+  ], [t]);
 
   const stats = useMemo(() => {
     return {
@@ -139,7 +133,7 @@ export default function MyAuctions() {
       const data = await auctionService.getMyAuctions(params);
       setAuctions(data?.items || []);
     } catch (error) {
-      showToast(error?.response?.data || (isVi ? 'Không thể tải danh sách đấu giá.' : 'Failed to load your auctions.'), 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setLoading(false);
     }
@@ -205,7 +199,7 @@ export default function MyAuctions() {
 
   const handleCreate = async (event) => {
     event.preventDefault();
-    const validationError = validateAuctionForm(createForm, { requireProduct: true }, isVi);
+    const validationError = validateAuctionForm(createForm, { requireProduct: true }, t);
     if (validationError) {
       showToast(validationError, 'warning');
       return;
@@ -217,19 +211,19 @@ export default function MyAuctions() {
         productId: createForm.productId,
         ...toAuctionPayload(createForm),
       });
-      showToast(isVi ? 'Tạo phiên đấu giá thành công.' : 'Auction created successfully.', 'success');
+      showToast(t('toast.saved_success'), 'success');
       setCreateForm(getDefaultCreateForm());
       setIsCreateModalOpen(false);
       await Promise.all([loadEligibleProducts(), loadAuctions()]);
     } catch (error) {
-      showToast(error?.response?.data || (isVi ? 'Không thể tạo phiên đấu giá.' : 'Failed to create auction.'), 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const openEditModal = (auction) => {
-    const blockReason = getAuctionEditBlockReason(auction, isVi);
+    const blockReason = getAuctionEditBlockReason(auction, t);
     if (blockReason) {
       showToast(blockReason, 'warning');
       return;
@@ -253,7 +247,7 @@ export default function MyAuctions() {
   const handleUpdate = async (event) => {
     event.preventDefault();
     if (!editingAuction || !editForm) return;
-    const validationError = validateAuctionForm(editForm, { requireFutureStart: true }, isVi);
+    const validationError = validateAuctionForm(editForm, { requireFutureStart: true }, t);
     if (validationError) {
       showToast(validationError, 'warning');
       return;
@@ -262,11 +256,11 @@ export default function MyAuctions() {
     try {
       setSaving(true);
       await auctionService.update(editingAuction.auctionId, toAuctionPayload(editForm));
-      showToast(isVi ? 'Cập nhật phiên đấu giá thành công.' : 'Auction updated successfully.', 'success');
+      showToast(t('toast.saved_success'), 'success');
       closeEditModal();
       await loadAuctions();
     } catch (error) {
-      showToast(error?.response?.data || (isVi ? 'Không thể cập nhật phiên đấu giá.' : 'Failed to update auction.'), 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setSaving(false);
     }
@@ -279,10 +273,10 @@ export default function MyAuctions() {
 
   const getAuctionStatusText = (status) => {
     switch (status) {
-      case 'Upcoming': return isVi ? 'Sắp diễn ra' : 'Upcoming';
-      case 'Ongoing': return isVi ? 'Đang diễn ra' : 'Ongoing';
+      case 'Upcoming': return t('my_auctions.tab_upcoming');
+      case 'Ongoing': return t('my_auctions.tab_active');
       case 'Ended': case 'EndedByBuyNow': case 'EndedByTime': case 'EndedNoBid':
-        return isVi ? 'Đã kết thúc' : 'Ended';
+        return t('my_auctions.tab_ended');
       default: return status;
     }
   };
@@ -298,31 +292,31 @@ export default function MyAuctions() {
 
         <header className="seller-dash-header">
           <div>
-            <h1>{isVi ? 'Đấu Giá Của Tôi' : 'My Auctions'}</h1>
-            <p>{isVi ? 'Tạo phòng đấu giá cho các sản phẩm đã duyệt và quản lý thông tin các phiên đấu giá sắp diễn ra.' : 'Create auction rooms from approved auction products and update upcoming auctions before they become active.'}</p>
+            <h1>{t('my_auctions.title')}</h1>
+            <p>{t('my_auctions.subtitle')}</p>
           </div>
           <button
             type="button"
             className="seller-list-btn"
             onClick={() => setIsCreateModalOpen(true)}
           >
-            <span className="material-symbols-outlined">add</span>{isVi ? 'Tạo Phiên Đấu Giá' : 'Create Auction'}
+            <span className="material-symbols-outlined">add</span>{t('my_auctions.create_auction_btn')}
           </button>
         </header>
 
         <section className="seller-auctions-stat-grid">
-          <article><small>{isVi ? 'Tổng số' : 'Total'}</small><strong>{stats.total}</strong></article>
-          <article><small>{isVi ? 'Sắp diễn ra' : 'Upcoming'}</small><strong>{stats.upcoming}</strong></article>
-          <article><small>{isVi ? 'Đang diễn ra' : 'Ongoing'}</small><strong>{stats.ongoing}</strong></article>
-          <article><small>{isVi ? 'Đã kết thúc' : 'Ended'}</small><strong>{stats.ended}</strong></article>
+          <article><small>{t('common.all')}</small><strong>{stats.total}</strong></article>
+          <article><small>{t('my_auctions.tab_upcoming')}</small><strong>{stats.upcoming}</strong></article>
+          <article><small>{t('my_auctions.tab_active')}</small><strong>{stats.ongoing}</strong></article>
+          <article><small>{t('my_auctions.tab_ended')}</small><strong>{stats.ended}</strong></article>
         </section>
 
         <div className="seller-auctions-layout" style={{ gridTemplateColumns: '1fr' }}>
           <section className="seller-auctions-list-panel">
           <div className="seller-auctions-section-head split">
             <div>
-              <h2>{isVi ? 'Danh Sách Phiên Đấu Giá' : 'My Auction List'}</h2>
-              <p>{isVi ? 'Theo dõi tiến trình và cập nhật thông tin trước khi phòng đấu giá lên sóng.' : 'Track progress and update details before a room goes live.'}</p>
+              <h2>{t('my_auctions.title')}</h2>
+              <p>{t('my_auctions.subtitle')}</p>
             </div>
           </div>
 
@@ -362,7 +356,7 @@ export default function MyAuctions() {
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder={isVi ? 'Tìm kiếm phiên đấu giá...' : 'Search auction...'}
+                placeholder={t('common.search_placeholder')}
                 style={{
                   width: '100%',
                   padding: '10px 16px 10px 40px',
@@ -382,8 +376,8 @@ export default function MyAuctions() {
           {auctions.length === 0 ? (
             <div className="seller-auctions-empty">
               <span className="material-symbols-outlined">gavel</span>
-              <h3>{isVi ? 'Không tìm thấy phiên đấu giá nào' : 'No auctions found'}</h3>
-              <p>{isVi ? 'Tạo đấu giá mới hoặc điều chỉnh bộ lọc của bạn.' : 'Create a new auction or adjust your filter.'}</p>
+              <h3>{t('common.no_data')}</h3>
+              <p>{t('my_auctions.subtitle')}</p>
             </div>
           ) : (
             <div className="seller-auctions-list">
@@ -395,8 +389,8 @@ export default function MyAuctions() {
                     <div className="seller-auctions-row-main">
                       <div className="seller-auctions-row-top">
                         <div>
-                          <strong>{auction.productName || (isVi ? 'Đấu giá chưa đặt tên' : 'Unnamed auction')}</strong>
-                          <span>{auction.categoryName || (isVi ? 'Chưa phân loại' : 'Uncategorized')} - {auction.auctionId}</span>
+                          <strong>{auction.productName || t('nav.auction')}</strong>
+                          <span>{auction.categoryName || t('common.none')} - {auction.auctionId}</span>
                         </div>
                         <em className={`seller-auctions-status ${String(auction.status || '').toLowerCase()}`}>{getAuctionStatusText(auction.status)}</em>
                       </div>
@@ -405,9 +399,9 @@ export default function MyAuctions() {
                         <small>{progress}%</small>
                       </div>
                       <div className="seller-auctions-meta">
-                        <span>{isVi ? 'Giá hiện tại' : 'Current'} <b>{formatMoney(auction.currentPrice)}</b></span>
-                        <span>{isVi ? 'Bước giá' : 'Step'} <b>{formatMoney(auction.minIncrement)}</b></span>
-                        <span>{isVi ? 'Lượt ra giá' : 'Bids'} <b>{auction.bidCount || 0}</b></span>
+                        <span>{t('auction.current_bid')} <b>{formatMoney(auction.currentPrice)}</b></span>
+                        <span>{t('auction.min_step')} <b>{formatMoney(auction.minIncrement)}</b></span>
+                        <span>{t('auction.bid_count')} <b>{auction.bidCount || 0}</b></span>
                       </div>
                       <div className="seller-auctions-time">
                         <span>{formatDateTime(auction.startTime)}</span>
@@ -415,8 +409,8 @@ export default function MyAuctions() {
                       </div>
                     </div>
                     <div className="seller-auctions-actions">
-                      <Link to={`/auctions/${auction.auctionId}`} className="btn-secondary">
-                        {isVi ? 'Phòng Đấu Giá' : 'Auction Room'}
+                      <Link to={`/auction/${auction.auctionId}`} className="btn-secondary">
+                        {t('auction.title')}
                       </Link>
                       {auction.status === 'Upcoming' && Number(auction.bidCount || 0) === 0 && (
                         <button
@@ -424,7 +418,7 @@ export default function MyAuctions() {
                           className="btn-outline"
                           onClick={() => openEditModal(auction)}
                         >
-                          {isVi ? 'Chỉnh Sửa' : 'Edit Details'}
+                          {t('common.edit')}
                         </button>
                       )}
                     </div>
@@ -442,19 +436,19 @@ export default function MyAuctions() {
       <div className="seller-auctions-modal-overlay" onClick={() => !saving && setIsCreateModalOpen(false)}>
         <div className="seller-auctions-modal animate-fade-in" onClick={(e) => e.stopPropagation()}>
           <div className="modal-header">
-            <h3>{isVi ? 'Tạo Phiên Đấu Giá Mới' : 'Create New Auction'}</h3>
+            <h3>{t('my_auctions.create_auction_btn')}</h3>
             <button className="close-btn" onClick={() => !saving && setIsCreateModalOpen(false)}>×</button>
           </div>
           <form onSubmit={handleCreate} className="modal-body">
             <div className="form-group">
-              <label>{isVi ? 'Chọn Sản Phẩm Đã Được Duyệt *' : 'Select Approved Product *'}</label>
+              <label>{t('my_auctions.th_product')} *</label>
               <select
                 name="productId"
                 value={createForm.productId}
                 onChange={handleCreateChange}
                 required
               >
-                <option value="">{isVi ? '-- Chọn Sản Phẩm --' : '-- Select Product --'}</option>
+                <option value="">{t('common.select')}</option>
                 {eligibleProducts.map((p) => (
                   <option key={p.productId} value={p.productId}>
                     {p.name} ({p.productId})
@@ -465,7 +459,7 @@ export default function MyAuctions() {
 
             <div className="form-group-row">
               <div className="form-group">
-                <label>{isVi ? 'Giá Khởi Điểm (VND) *' : 'Starting Price (VND) *'}</label>
+                <label>{t('auction.starting_price')} (VND) *</label>
                 <input
                   type="number"
                   name="startingPrice"
@@ -477,7 +471,7 @@ export default function MyAuctions() {
                 />
               </div>
               <div className="form-group">
-                <label>{isVi ? 'Bước Giá Tối Thiểu (VND) *' : 'Minimum Bid Increment (VND) *'}</label>
+                <label>{t('auction.min_step')} (VND) *</label>
                 <input
                   type="number"
                   name="minIncrement"
@@ -491,7 +485,7 @@ export default function MyAuctions() {
             </div>
 
             <div className="form-group">
-              <label>{isVi ? 'Giá Mua Ngay (VND) *' : 'Buy Now Price (VND) *'}</label>
+              <label>{t('auction.buy_now_price')} (VND) *</label>
               <input
                 type="number"
                 name="buyNowPrice"
@@ -505,7 +499,7 @@ export default function MyAuctions() {
 
             <div className="form-group-row">
               <div className="form-group">
-                <label>{isVi ? 'Thời Gian Bắt Đầu *' : 'Start Time *'}</label>
+                <label>{t('auction.start_time')} *</label>
                 <input
                   type="datetime-local"
                   name="startTime"
@@ -515,7 +509,7 @@ export default function MyAuctions() {
                 />
               </div>
               <div className="form-group">
-                <label>{isVi ? 'Thời Gian Kết Thúc *' : 'End Time *'}</label>
+                <label>{t('auction.end_time')} *</label>
                 <input
                   type="datetime-local"
                   name="endTime"
@@ -527,8 +521,8 @@ export default function MyAuctions() {
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="btn-secondary" onClick={() => setIsCreateModalOpen(false)} disabled={saving}>{isVi ? 'Hủy Bỏ' : 'Cancel'}</button>
-              <button type="submit" className="btn-primary" disabled={saving}>{saving ? (isVi ? 'Đang tạo...' : 'Creating...') : (isVi ? 'Tạo Đấu Giá' : 'Create Auction')}</button>
+              <button type="button" className="btn-secondary" onClick={() => setIsCreateModalOpen(false)} disabled={saving}>{t('common.cancel')}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('common.saving') : t('my_auctions.create_auction_btn')}</button>
             </div>
           </form>
         </div>
@@ -540,13 +534,13 @@ export default function MyAuctions() {
       <div className="seller-auctions-modal-overlay" onClick={closeEditModal}>
         <div className="seller-auctions-modal animate-fade-in" onClick={(e) => e.stopPropagation()}>
           <div className="modal-header">
-            <h3>{isVi ? 'Chỉnh Sửa Đấu Giá' : 'Edit Auction'}</h3>
+            <h3>{t('common.edit')}</h3>
             <button className="close-btn" onClick={closeEditModal}>×</button>
           </div>
           <form onSubmit={handleUpdate} className="modal-body">
             <div className="form-group-row">
               <div className="form-group">
-                <label>{isVi ? 'Giá Khởi Điểm (VND) *' : 'Starting Price (VND) *'}</label>
+                <label>{t('auction.starting_price')} (VND) *</label>
                 <input
                   type="number"
                   name="startingPrice"
@@ -557,7 +551,7 @@ export default function MyAuctions() {
                 />
               </div>
               <div className="form-group">
-                <label>{isVi ? 'Bước Giá Tối Thiểu (VND) *' : 'Minimum Bid Increment (VND) *'}</label>
+                <label>{t('auction.min_step')} (VND) *</label>
                 <input
                   type="number"
                   name="minIncrement"
@@ -570,7 +564,7 @@ export default function MyAuctions() {
             </div>
 
             <div className="form-group">
-              <label>{isVi ? 'Giá Mua Ngay (VND) *' : 'Buy Now Price (VND) *'}</label>
+              <label>{t('auction.buy_now_price')} (VND) *</label>
               <input
                 type="number"
                 name="buyNowPrice"
@@ -583,7 +577,7 @@ export default function MyAuctions() {
 
             <div className="form-group-row">
               <div className="form-group">
-                <label>{isVi ? 'Thời Gian Bắt Đầu *' : 'Start Time *'}</label>
+                <label>{t('auction.start_time')} *</label>
                 <input
                   type="datetime-local"
                   name="startTime"
@@ -593,7 +587,7 @@ export default function MyAuctions() {
                 />
               </div>
               <div className="form-group">
-                <label>{isVi ? 'Thời Gian Kết Thúc *' : 'End Time *'}</label>
+                <label>{t('auction.end_time')} *</label>
                 <input
                   type="datetime-local"
                   name="endTime"
@@ -605,8 +599,8 @@ export default function MyAuctions() {
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="btn-secondary" onClick={closeEditModal} disabled={saving}>{isVi ? 'Hủy Bỏ' : 'Cancel'}</button>
-              <button type="submit" className="btn-primary" disabled={saving}>{saving ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu Thay Đổi' : 'Save Changes')}</button>
+              <button type="button" className="btn-secondary" onClick={closeEditModal} disabled={saving}>{t('common.cancel')}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
             </div>
           </form>
         </div>

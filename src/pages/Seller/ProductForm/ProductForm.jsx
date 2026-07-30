@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useOutletContext, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
@@ -7,12 +7,10 @@ import categoryService from '../../../services/categoryService';
 import { useLanguage } from '../../../context/LanguageContext';
 
 export default function ProductForm() {
-  const { user } = useOutletContext();
   const navigate = useNavigate();
   const { productId } = useParams();
   const { showToast } = useToast();
-  const { t, language } = useLanguage();
-  const isVi = language === 'vi';
+  const { t } = useLanguage();
 
   const isEdit = Boolean(productId);
 
@@ -25,7 +23,7 @@ export default function ProductForm() {
   const [reqDescription, setReqDescription] = useState('');
   const [reqParentId, setReqParentId] = useState('');
   const [reqAttributes, setReqAttributes] = useState([]);
-
+  
   const [formData, setFormData] = useState({
     name: '',
     categoryId: '',
@@ -39,7 +37,7 @@ export default function ProductForm() {
     heightCm: '',
     isForAuction: false,
   });
-
+  
   const [images, setImages] = useState([]);
   const [dynamicAttributes, setDynamicAttributes] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
@@ -144,7 +142,7 @@ export default function ProductForm() {
       showToast('Submitting category request...', 'info');
       const newCategory = await categoryService.create(payload);
       showToast('Category request submitted successfully! Waiting for Admin approval.', 'success');
-
+      
       setCategories(prev => [...prev, newCategory]);
       setFormData(prev => ({ ...prev, categoryId: newCategory.categoryId }));
 
@@ -167,7 +165,7 @@ export default function ProductForm() {
       if (!product) return;
 
       const isAuction = product.status === 'Waiting' || product.status === 'Ready' || product.status === 'AuctionRejected';
-
+      
       setFormData({
         name: product.name || '',
         categoryId: product.categoryId || '',
@@ -188,7 +186,7 @@ export default function ProductForm() {
       });
       setDynamicAttributes(attrs);
       setValidationErrors({});
-
+      
       const imgs = (product.images || []).map((i) => ({
         id: i.imageId,
         imageId: i.imageId,
@@ -262,7 +260,7 @@ export default function ProductForm() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-
+    
     if (name === 'categoryId' && value === 'other_request') {
       setIsCategoryRequestModalOpen(true);
       setFormData((prev) => ({
@@ -319,6 +317,27 @@ export default function ProductForm() {
     }
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+    const fakeEvent = { target: { files, value: '' } };
+    await handleImageUpload(fakeEvent);
+  };
+
   const handleImageUpload = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -341,7 +360,7 @@ export default function ProductForm() {
           isFirst = false;
         }
       }
-
+      
       if (uploadedImages.length > 0) {
         setImages((prev) => [...prev, ...uploadedImages]);
         showToast(`Uploaded ${uploadedImages.length} image(s) successfully.`, 'success');
@@ -376,7 +395,7 @@ export default function ProductForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    
     if (!formData.categoryId) {
       showToast('Please select a product category.', 'warning');
       return;
@@ -487,11 +506,11 @@ export default function ProductForm() {
                 />
                 {validationErrors.name && <span className="input-error-msg">{validationErrors.name}</span>}
               </div>
-
+              
               <div className="form-group-row">
                 <div className="form-group">
                   <label>{isVi ? 'Danh Mục Sản Phẩm *' : 'Product Category *'}</label>
-                  <select name="categoryId" value={formData.categoryId} onChange={handleInputChange} required className={validationErrors.categoryId ? 'has-error' : ''}>
+                   <select name="categoryId" value={formData.categoryId} onChange={handleInputChange} required className={validationErrors.categoryId ? 'has-error' : ''}>
                     <option value="">{isVi ? '-- Chọn Danh Mục --' : '-- Select Category --'}</option>
                     {categories.filter(c => c.status === 'Active' || c.status === 'Pending').map((c) => (
                       <option key={c.categoryId} value={c.categoryId}>
@@ -502,7 +521,7 @@ export default function ProductForm() {
                   </select>
                   {validationErrors.categoryId && <span className="input-error-msg">{validationErrors.categoryId}</span>}
                 </div>
-
+                
                 <div className="form-group">
                   <label>{isVi ? 'Tình Trạng Sản Phẩm' : 'Product Condition'}</label>
                   <select name="condition" value={formData.condition} onChange={handleInputChange}>
@@ -526,7 +545,7 @@ export default function ProductForm() {
 
             <div className="form-card">
               <h2>{isVi ? 'Hình Thức Đăng & Tồn Kho' : 'Listing Format & Stock'}</h2>
-
+              
               {!isEdit ? (
                 <div className="form-toggle-group">
                   <label className="toggle-label">
@@ -581,7 +600,7 @@ export default function ProductForm() {
             <div className="form-card">
               <h2>{isVi ? 'Trọng Lượng & Kích Thước Đóng Gói' : 'Weight & Packaging Dimensions'}</h2>
               <p className="form-section-subtitle">{isVi ? 'Dùng để tính phí vận chuyển tự động' : 'Used for automatic shipping fee calculation'}</p>
-
+              
               <div className="form-group">
                 <label>{isVi ? 'Trọng Lượng (Gram)' : 'Weight (Grams)'}</label>
                 <input
@@ -663,10 +682,15 @@ export default function ProductForm() {
           <div className="form-column-right">
             <div className="form-card">
               <h2>{isVi ? 'Hình Ảnh Sản Phẩm *' : 'Product Images *'}</h2>
-              <div className="image-upload-wrapper">
+              <div
+                className={`image-upload-wrapper ${isDragging ? 'is-dragging' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <label className="image-upload-btn">
                   <span className="material-symbols-outlined">cloud_upload</span>
-                  {isVi ? 'Tải Ảnh Lên' : 'Upload Image'}
+                  {isVi ? 'Tải Ảnh Lên Hoặc Kéo-Thả Vào Đây' : 'Upload Or Drag & Drop Image Here'}
                   <input
                     type="file"
                     accept="image/*"
@@ -681,7 +705,7 @@ export default function ProductForm() {
                 {images.map((img, idx) => (
                   <div className={`uploaded-img-card ${img.isMain ? 'is-main-card' : ''}`} key={img.id}>
                     <img src={img.imageUrl} alt={img.altText} />
-
+                    
                     <div className="img-card-actions">
                       <label className="main-radio-label">
                         <input
@@ -706,7 +730,7 @@ export default function ProductForm() {
                 <span className="material-symbols-outlined">save</span>
                 {!isEdit ? (isVi ? 'Đăng Sản Phẩm' : 'Submit Product') : (isVi ? 'Lưu Thay Đổi' : 'Save Changes')}
               </button>
-
+              
               <button type="button" className="btn-cancel-product" onClick={() => navigate('/seller-dashboard/products')}>
                 {isVi ? 'Hủy Bỏ' : 'Cancel'}
               </button>
@@ -725,44 +749,44 @@ export default function ProductForm() {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-
+            
             <form onSubmit={handleSaveCategoryRequest} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 <div className="form-group">
                   <label className="form-label">Category Name *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={reqName}
-                    onChange={(e) => setReqName(e.target.value)}
-                    required
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={reqName} 
+                    onChange={(e) => setReqName(e.target.value)} 
+                    required 
                     placeholder="e.g. Vintage Books"
                   />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Parent Category</label>
-                  <select
-                    className="form-input"
-                    value={reqParentId}
+                  <select 
+                    className="form-input" 
+                    value={reqParentId} 
                     onChange={(e) => setReqParentId(e.target.value)}
                   >
                     <option value="">None (Root Category)</option>
                     {categories.map(c => (
-                      <option key={c.categoryId} value={c.categoryId}>
-                        {c.name}
-                      </option>
-                    ))
+                        <option key={c.categoryId} value={c.categoryId}>
+                          {c.name}
+                        </option>
+                      ))
                     }
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Description</label>
-                  <textarea
-                    className="form-input"
-                    rows="3"
-                    value={reqDescription}
+                  <textarea 
+                    className="form-input" 
+                    rows="3" 
+                    value={reqDescription} 
                     onChange={(e) => setReqDescription(e.target.value)}
                     placeholder="Provide details about the category..."
                   />
@@ -780,22 +804,22 @@ export default function ProductForm() {
                   <div className="attributes-creator-widget">
                     {reqAttributes.length === 0 ? (
                       <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
-                        No attributes configured. Click "Add Attribute" to add specifications.
+                        No attributes configured. Click &quot;Add Attribute&quot; to add specifications.
                       </p>
                     ) : (
                       reqAttributes.map((attr, idx) => (
                         <div key={idx} className="attribute-card-item">
                           <div className="attribute-card-header">
-                            <input
-                              type="text"
-                              className="form-input attr-name-input"
-                              placeholder="Attribute Name (e.g. Page Count)"
+                            <input 
+                              type="text" 
+                              className="form-input attr-name-input" 
+                              placeholder="Attribute Name (e.g. Page Count)" 
                               value={attr.name}
                               onChange={(e) => handleReqAttributeChange(idx, 'name', e.target.value)}
                               required
                             />
-                            <select
-                              className="form-input attr-type-select"
+                            <select 
+                              className="form-input attr-type-select" 
                               value={attr.dataType}
                               onChange={(e) => handleReqAttributeChange(idx, 'dataType', e.target.value)}
                             >
@@ -808,68 +832,68 @@ export default function ProductForm() {
                               <span className="material-symbols-outlined">delete</span>
                             </button>
                           </div>
-
+                          
                           <div className="attribute-card-settings">
                             <div className="settings-field">
                               <label>Unit</label>
-                              <input
-                                type="text"
-                                className="form-input input-sm"
-                                placeholder="e.g. pages, cm"
+                              <input 
+                                type="text" 
+                                className="form-input input-sm" 
+                                placeholder="e.g. pages, cm" 
                                 value={attr.unit || ''}
                                 onChange={(e) => handleReqAttributeChange(idx, 'unit', e.target.value)}
                               />
                             </div>
-
+                            
                             {attr.dataType === 'Number' && (
                               <>
                                 <div className="settings-field">
                                   <label>Min Value</label>
-                                  <input
-                                    type="number"
+                                  <input 
+                                    type="number" 
                                     step="any"
-                                    className="form-input input-sm"
-                                    placeholder="Min"
+                                    className="form-input input-sm" 
+                                    placeholder="Min" 
                                     value={attr.minValue !== null && attr.minValue !== undefined ? attr.minValue : ''}
                                     onChange={(e) => handleReqAttributeChange(idx, 'minValue', e.target.value === '' ? null : e.target.value)}
                                   />
                                 </div>
                                 <div className="settings-field">
                                   <label>Max Value</label>
-                                  <input
-                                    type="number"
+                                  <input 
+                                    type="number" 
                                     step="any"
-                                    className="form-input input-sm"
-                                    placeholder="Max"
+                                    className="form-input input-sm" 
+                                    placeholder="Max" 
                                     value={attr.maxValue !== null && attr.maxValue !== undefined ? attr.maxValue : ''}
                                     onChange={(e) => handleReqAttributeChange(idx, 'maxValue', e.target.value === '' ? null : e.target.value)}
                                   />
                                 </div>
                               </>
                             )}
-
+                            
                             <div className="checkboxes-group">
                               <label className="checkbox-label">
-                                <input
-                                  type="checkbox"
+                                <input 
+                                  type="checkbox" 
                                   checked={attr.isRequired || false}
                                   onChange={(e) => handleReqAttributeChange(idx, 'isRequired', e.target.checked)}
                                 />
                                 <span>Required</span>
                               </label>
-
+                              
                               <label className="checkbox-label">
-                                <input
-                                  type="checkbox"
+                                <input 
+                                  type="checkbox" 
                                   checked={attr.isFilterable || false}
                                   onChange={(e) => handleReqAttributeChange(idx, 'isFilterable', e.target.checked)}
                                 />
                                 <span>Filterable</span>
                               </label>
-
+                              
                               <label className="checkbox-label">
-                                <input
-                                  type="checkbox"
+                                <input 
+                                  type="checkbox" 
                                   checked={attr.isSearchable || false}
                                   onChange={(e) => handleReqAttributeChange(idx, 'isSearchable', e.target.checked)}
                                 />

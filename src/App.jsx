@@ -97,6 +97,8 @@ function App() {
                   <Route path="product/:productId" element={<ProductDetail />} />
                   <Route path="auction" element={<Auction />} />
                   <Route path="auction/:auctionId" element={<AuctionDetail />} />
+                  <Route path="auctions" element={<Auction />} />
+                  <Route path="auctions/:auctionId" element={<AuctionDetail />} />
                   <Route path="wishlist" element={<Wishlist />} />
                   <Route path="assistant-chat" element={<AssistantChat />} />
                   <Route path="chat" element={<Chat />} />

@@ -196,7 +196,11 @@ export default function AssistantChat() {
                             <strong>{product.name || 'Sản phẩm ReTrade'}</strong>
                             <span>{product.categoryName || 'Chưa có danh mục'}</span>
                             <b>{formatCurrency(product.price)}</b>
-                            <small>{product.condition || 'Chưa xác định'} - Còn {product.stockQuantity ?? 0}</small>
+                            <small>{product.condition || 'Chưa xác định'} • Còn {product.stockQuantity ?? 0}</small>
+                          </div>
+                          <div className="assistant-product-action">
+                            <span>Xem</span>
+                            <span className="material-symbols-outlined">chevron_right</span>
                           </div>
                         </Link>
                       ))}
