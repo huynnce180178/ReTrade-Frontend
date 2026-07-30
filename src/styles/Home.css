@@ -845,16 +845,20 @@
 
 .home-product-condition {
   position: absolute;
-  bottom: 10px;
+  top: 10px;
   left: 10px;
-  background: rgba(2, 36, 27, 0.72);
-  color: #fff;
+  background: rgba(1, 24, 18, 0.75);
+  color: #ffffff;
   font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
+  font-weight: 800;
+  padding: 4px 10px;
   border-radius: 999px;
   letter-spacing: 0.4px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 2;
 }
 
 /* Wishlist toggle button */
@@ -1348,3 +1352,68 @@
 @keyframes premium-spin {
   to { transform: rotate(360deg); }
 }
+
+/* Home Product Carousel Slider Navigation */
+.home-product-slider-container {
+  position: relative;
+  width: 100%;
+}
+
+.home-product-scroll {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 12px 6px;
+}
+
+.home-product-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.home-scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-scroll-btn:hover {
+  background: var(--primary, #0f7b5f);
+  color: #ffffff;
+  border-color: var(--primary, #0f7b5f);
+  box-shadow: 0 6px 18px rgba(15, 123, 95, 0.35);
+  transform: translateY(-50%) scale(1.12);
+}
+
+.home-scroll-btn.left {
+  left: -22px;
+}
+
+.home-scroll-btn.right {
+  right: -22px;
+}
+
+@media (max-width: 768px) {
+  .home-scroll-btn.left {
+    left: 4px;
+  }
+  .home-scroll-btn.right {
+    right: 4px;
+  }
+}
+

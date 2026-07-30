@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import './ReviewModal.css';
 
 const starValues = [1, 2, 3, 4, 5];
-const currencyFormatter = new Intl.NumberFormat('vi-VN');
 
 export default function ReviewModal({
   isOpen,
-  title = 'Write a Review',
+  title,
   subtitle,
   purchase,
   initialRating = 5,
@@ -15,6 +15,7 @@ export default function ReviewModal({
   onClose,
   onSubmit,
 }) {
+  const { t, formatCurrency } = useLanguage();
   const [rating, setRating] = useState(initialRating);
   const [comment, setComment] = useState(initialComment);
   const [proofs, setProofs] = useState([]);
@@ -59,21 +60,21 @@ export default function ReviewModal({
     setRating(nextRating);
   };
 
-  const productName = purchase?.productName || 'Purchased product';
-  const orderCode = purchase?.orderCode || purchase?.orderId || 'Order';
+  const productName = purchase?.productName || t('nav.product');
+  const orderCode = purchase?.orderCode || purchase?.orderId || t('history.order_id');
   const orderAmount = purchase?.finalAmount || purchase?.totalAmount || purchase?.unitPrice || 0;
   const productImage = purchase?.productImageUrl || '/vite.svg';
-  const helperText = subtitle || 'Share your experience with this purchase.';
+  const helperText = subtitle || t('product.reviews');
 
   return (
     <div className="review-modal-overlay" role="presentation" onMouseDown={onClose}>
       <div className="review-modal-card" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-        <button type="button" className="review-modal-close" onClick={onClose} disabled={submitting} aria-label="Close review form">
+        <button type="button" className="review-modal-close" onClick={onClose} disabled={submitting} aria-label={t('common.close')}>
           <span className="material-symbols-outlined">close</span>
         </button>
 
         <header className="review-modal-header">
-          <h2 id="review-modal-title">{title}</h2>
+          <h2 id="review-modal-title">{title || t('product.reviews')}</h2>
         </header>
 
         <form className="review-modal-form" onSubmit={handleSubmit}>
@@ -82,13 +83,13 @@ export default function ReviewModal({
             <div>
               <strong>{productName}</strong>
               <span>
-                Order #{orderCode} - <em>{formatVnd(orderAmount)}</em>
+                {t('history.order_id')} #{orderCode} - <em>{formatCurrency(orderAmount)}</em>
               </span>
             </div>
           </section>
 
           <div className="review-rating-group">
-            <label>Shop Credibility</label>
+            <label>{t('seller.reviews_received')}</label>
             <div className="review-stars" aria-label="Rating selector" onPointerMove={handleStarPointerMove}>
               {starValues.map((value) => (
                 <button
@@ -97,7 +98,7 @@ export default function ReviewModal({
                   className={value <= rating ? 'active' : ''}
                   onPointerEnter={() => setRating(value)}
                   onClick={() => setRating(value)}
-                  aria-label={`${value} star${value > 1 ? 's' : ''}`}
+                  aria-label={`${value} star`}
                 >
                   <span className="material-symbols-outlined">star</span>
                 </button>
@@ -106,7 +107,7 @@ export default function ReviewModal({
           </div>
 
           <label className="review-comment-group">
-            <span>Your Experience</span>
+            <span>{t('product.reviews')}</span>
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
@@ -119,12 +120,12 @@ export default function ReviewModal({
           </label>
 
           <div className="review-proof-group">
-            <span>Attachments</span>
+            <span>{t('common.detail')}</span>
             <div className="review-proof-list">
               <label className="review-proof-add">
                 <input type="file" accept="image/*" multiple onChange={handleProofChange} disabled={submitting} />
                 <span className="material-symbols-outlined">add_a_photo</span>
-                <strong>Add Proof</strong>
+                <strong>{t('common.create')}</strong>
               </label>
               {proofs.map((proof) => (
                 <img key={proof.url} src={proof.url} alt={proof.name} />
@@ -134,18 +135,14 @@ export default function ReviewModal({
 
           <div className="review-modal-actions">
             <button type="button" className="review-secondary-btn" onClick={onClose} disabled={submitting}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button type="submit" className="review-primary-btn" disabled={submitting || !comment.trim()}>
-              {submitting ? 'Submitting...' : 'Submit Review'}
+              {submitting ? t('common.submitting') : t('common.submit')}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
-}
-
-function formatVnd(value) {
-  return `${currencyFormatter.format(Number(value || 0))} VND`;
 }

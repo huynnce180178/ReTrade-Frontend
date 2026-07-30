@@ -3,11 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import wishlistService from '../../../services/wishlistService';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/Wishlist.css';
 
 export default function Wishlist() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { t, formatCurrency } = useLanguage();
   const navigate = useNavigate();
 
   const [wishlist, setWishlist] = useState(null);
@@ -20,14 +22,14 @@ export default function Wishlist() {
     try {
       const data = await wishlistService.getWishlist();
       setWishlist(data);
-      setSelectedItems(new Set()); // Reset selections
+      setSelectedItems(new Set());
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Failed to load wishlist.';
+      const msg = err.response?.data || err.message || t('common.error_occurred');
       showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   useEffect(() => {
     if (user) fetchWishlist();
@@ -47,9 +49,9 @@ export default function Wishlist() {
         next.delete(wishlistItemId);
         return next;
       });
-      showToast('Item removed from wishlist.', 'success');
+      showToast(t('product.remove_from_wishlist'), 'success');
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Failed to remove item.';
+      const msg = err.response?.data || err.message || t('common.error_occurred');
       showToast(msg, 'error');
     } finally {
       setRemoving(null);
@@ -83,7 +85,6 @@ export default function Wishlist() {
     if (selectedItems.size === 0) return;
     setLoading(true);
     try {
-      // Loop sequence or promise.all to delete selected
       await Promise.all(
         Array.from(selectedItems).map(id => wishlistService.removeItem(id))
       );
@@ -92,11 +93,11 @@ export default function Wishlist() {
         items: prev.items.filter(i => !selectedItems.has(i.wishlistItemId)),
       }));
       setSelectedItems(new Set());
-      showToast('Selected items removed.', 'success');
+      showToast(t('toast.deleted_success'), 'success');
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Failed to remove selected items.';
+      const msg = err.response?.data || err.message || t('common.error_occurred');
       showToast(msg, 'error');
-      fetchWishlist(); // reload in case of partial success
+      fetchWishlist();
     } finally {
       setLoading(false);
     }
@@ -106,9 +107,9 @@ export default function Wishlist() {
     return (
       <div className="wl-empty-state animate-fade-in">
         <span className="material-symbols-outlined wl-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>lock</span>
-        <h2 className="wl-empty-title">Sign in to view your Wishlist</h2>
-        <p className="wl-empty-desc">Save items you love and come back to them anytime.</p>
-        <Link to="/login" className="btn btn-primary">Sign In</Link>
+        <h2 className="wl-empty-title">{t('auth.login_title')}</h2>
+        <p className="wl-empty-desc">{t('auth.login_subtitle')}</p>
+        <Link to="/login" className="btn btn-primary">{t('auth.login_button')}</Link>
       </div>
     );
   }
@@ -117,7 +118,7 @@ export default function Wishlist() {
     return (
       <div className="wl-loading animate-fade-in">
         <div className="wl-spinner" />
-        <p>Loading your wishlist…</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -126,13 +127,11 @@ export default function Wishlist() {
   const selectableItems = items.filter(i => i.status !== 'SoldOut' && i.status !== 'Inactive');
   const isAllSelected = selectableItems.length > 0 && selectedItems.size === selectableItems.length;
 
-  // Calculate order summary
   const selectedProducts = items.filter(i => selectedItems.has(i.wishlistItemId));
   const subtotal = selectedProducts.reduce((sum, item) => sum + (item.price || 0), 0);
 
-  // Group items by Seller (or "Curated by...")
   const groups = items.reduce((acc, item) => {
-    const seller = item.sellerName || 'Heritage Luxury';
+    const seller = item.sellerName || 'ReTrade Seller';
     if (!acc[seller]) acc[seller] = [];
     acc[seller].push(item);
     return acc;
@@ -140,24 +139,22 @@ export default function Wishlist() {
 
   return (
     <main className="wl-main-container animate-fade-in">
-      {/* Page Title */}
       <header className="wl-page-header">
-        <h1 className="wl-page-title">Your Curated Wishlist</h1>
+        <h1 className="wl-page-title">{t('nav.wishlist')}</h1>
         <p className="wl-page-desc">
-          A selection of circular luxury items saved for your consideration. Review, adjust quantities, or transition your favorites to your bag.
+          {t('home.favorites_subtitle')}
         </p>
       </header>
 
       {items.length === 0 ? (
         <div className="wl-empty-state">
           <span className="material-symbols-outlined wl-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>favorite_border</span>
-          <h2 className="wl-empty-title">Your wishlist is empty</h2>
-          <p className="wl-empty-desc">Browse products and tap the heart icon to save items you love.</p>
-          <Link to="/product" className="btn btn-primary">Browse Products</Link>
+          <h2 className="wl-empty-title">{t('common.no_data')}</h2>
+          <p className="wl-empty-desc">{t('home.latest_subtitle_user')}</p>
+          <Link to="/product" className="btn btn-primary">{t('home.browse_all')}</Link>
         </div>
       ) : (
         <>
-          {/* Bulk Actions */}
           <div className="wl-bulk-actions">
             <label className="wl-checkbox-label">
               <input
@@ -168,31 +165,26 @@ export default function Wishlist() {
                 disabled={selectableItems.length === 0}
               />
               <span className="wl-bulk-text">
-                Select All ({selectableItems.length} active items)
+                {t('common.all')} ({selectedItems.size}/{selectableItems.length})
               </span>
             </label>
             {selectedItems.size > 0 && (
-              <button className="wl-bulk-delete" onClick={handleRemoveSelected}>
+              <button className="wl-delete-selected-btn" onClick={handleRemoveSelected}>
                 <span className="material-symbols-outlined">delete</span>
-                <span>Remove Selected ({selectedItems.size})</span>
+                {t('common.delete')} ({selectedItems.size})
               </button>
             )}
           </div>
 
           <div className="wl-layout-grid">
-            {/* Wishlist Content (Grouped by Seller) */}
             <div className="wl-content-area">
               {Object.entries(groups).map(([sellerName, groupItems]) => (
                 <div key={sellerName} className="wl-seller-group">
                   <div className="wl-seller-header">
-                    {sellerName === 'Heritage Luxury' || sellerName === 'HL' ? (
-                      <div className="wl-seller-avatar-fallback">HL</div>
-                    ) : (
-                      <div className="wl-seller-avatar-fallback">
-                        {sellerName.substring(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                    <span className="wl-seller-title">CURATED BY {sellerName}</span>
+                    <div className="wl-seller-avatar-fallback">
+                      {sellerName.substring(0, 2).toUpperCase()}
+                    </div>
+                    <span className="wl-seller-title">{sellerName}</span>
                   </div>
 
                   <div className="wl-items-stack">
@@ -232,13 +224,13 @@ export default function Wishlist() {
                               <div>
                                 <h3 className="wl-item-name">{item.productName || '—'}</h3>
                                 <p className="wl-item-category">
-                                  {item.condition || 'PREMIUM GRADE A'} • {item.status || 'Active'}
+                                  {item.condition || 'Good'} • {item.status || 'Active'}
                                 </p>
                               </div>
                               <div className="wl-item-price-tag">
                                 {item.price != null
-                                  ? `${Number(item.price).toLocaleString('vi-VN')} VND`
-                                  : 'Auction'}
+                                  ? formatCurrency(item.price)
+                                  : t('nav.auction')}
                               </div>
                             </div>
 
@@ -257,7 +249,7 @@ export default function Wishlist() {
                                 className="wl-item-delete-btn"
                                 onClick={() => handleRemove(item.wishlistItemId)}
                                 disabled={removing === item.wishlistItemId}
-                                title="Remove from wishlist"
+                                title={t('product.remove_from_wishlist')}
                               >
                                 {removing === item.wishlistItemId ? (
                                   <span className="wl-spinner-sm" />
@@ -275,32 +267,27 @@ export default function Wishlist() {
               ))}
             </div>
 
-            {/* Sidebar Summary */}
             <aside className="wl-sidebar">
               <div className="wl-summary-card glass-card">
-                <h2 className="wl-summary-title">Order Summary</h2>
+                <h2 className="wl-summary-title">{t('checkout.order_summary')}</h2>
                 <div className="wl-summary-lines">
                   <div className="wl-summary-line">
-                    <span>Product Subtotal</span>
+                    <span>{t('checkout.subtotal')}</span>
                     <strong className="wl-summary-price">
-                      {subtotal.toLocaleString('vi-VN')} VND
+                      {formatCurrency(subtotal)}
                     </strong>
                   </div>
                   <div className="wl-summary-line">
-                    <span>Estimated Shipping</span>
-                    <span className="wl-summary-badge-text">Calculated at checkout</span>
-                  </div>
-                  <div className="wl-summary-line">
-                    <span>Authentication Fee</span>
-                    <span className="wl-summary-badge-text">Included</span>
+                    <span>{t('checkout.shipping_fee')}</span>
+                    <span className="wl-summary-badge-text">{t('checkout.shipping_address')}</span>
                   </div>
                 </div>
 
                 <div className="wl-summary-footer">
                   <div className="wl-summary-total-row">
-                    <span>Total Amount</span>
+                    <span>{t('checkout.total_payment')}</span>
                     <strong className="wl-total-price">
-                      {subtotal.toLocaleString('vi-VN')} VND
+                      {formatCurrency(subtotal)}
                     </strong>
                   </div>
                   <button
@@ -313,21 +300,13 @@ export default function Wishlist() {
                       }
                     }}
                   >
-                    Proceed to Checkout
+                    {t('product.buy_now')}
                   </button>
                   {selectedItems.size > 1 && (
                     <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '8px', textAlign: 'center', fontWeight: '500' }}>
-                      ⚠️ Please select only 1 item to checkout.
+                      ⚠️ {t('common.warning')}
                     </p>
                   )}
-                </div>
-
-                <div className="wl-auth-protocol-box">
-                  <span className="material-symbols-outlined">verified_user</span>
-                  <p>
-                    Every item is verified by our experts through the{' '}
-                    <strong>RETRADE Authentication Protocol</strong>.
-                  </p>
                 </div>
               </div>
             </aside>

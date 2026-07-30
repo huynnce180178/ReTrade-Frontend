@@ -392,3 +392,130 @@
     display: none;
   }
 }
+
+/* AUD-03: Realtime Price Flash & Leading Bidder Badge */
+@keyframes pricePulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+    color: #10b981;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.price-flash-up {
+  animation: pricePulse 0.8s ease-in-out;
+  display: inline-block;
+}
+
+.leading-bidder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.25));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #047857;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+}
+
+/* Compact auction-end banner (replaces full-screen overlay) */
+.auction-end-banner {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: rgba(2, 36, 27, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #d1fae5;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  animation: bannerSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: calc(100vw - 32px);
+  white-space: normal;
+}
+
+.auction-end-banner .material-symbols-outlined {
+  font-size: 18px;
+  color: #6ee7b7;
+  flex-shrink: 0;
+}
+
+.auction-end-banner-link {
+  color: #6ee7b7;
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.auction-end-banner-link:hover {
+  color: #a7f3d0;
+}
+
+.auction-end-banner-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(209, 250, 229, 0.6);
+  padding: 0;
+  margin-left: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.auction-end-banner-close:hover {
+  color: #d1fae5;
+}
+
+.auction-end-banner-close .material-symbols-outlined {
+  font-size: 16px;
+}
+
+@keyframes bannerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Prominent Ended badge styling on Auction Detail main image */
+.auction-detail-main-image .auction-card-status.ended {
+  background: linear-gradient(135deg, #dc2626, #991b1b) !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  padding: 6px 14px !important;
+  letter-spacing: 0.6px !important;
+  box-shadow: 0 4px 16px rgba(185, 28, 28, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  text-transform: uppercase;
+}
+
+

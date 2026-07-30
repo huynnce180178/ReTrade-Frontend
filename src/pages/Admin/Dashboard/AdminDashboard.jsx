@@ -2,20 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import adminDashboardService from '../../../services/adminDashboardService';
 import accountService from '../../../services/accountService';
 import productService from '../../../services/productService';
 import './AdminDashboard.css';
 
-const numberFormatter = new Intl.NumberFormat('vi-VN');
-function formatVnd(value) {
-  return `${numberFormatter.format(Number(value || 0))} VND`;
-}
-
 export default function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { t, formatCurrency, formatNumber } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [subStats, setSubStats] = useState(null);
@@ -48,7 +45,7 @@ export default function AdminDashboard() {
         setPendingCount(prodRes.value?.totalItems || prodRes.value?.items?.length || 0);
       }
     } catch (error) {
-      showToast('Failed to load overview metrics.', 'error');
+      showToast(t('common.load_error') || 'Failed to load overview metrics.', 'error');
     } finally {
       setLoading(false);
     }
@@ -58,39 +55,39 @@ export default function AdminDashboard() {
     return (
       <div className="admin-dashboard-loading">
         <span className="page-btn-spinner"></span>
-        <p>Loading Admin Overview...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
 
   const overviewMetrics = [
-    { icon: 'group', label: 'Total Accounts', value: totalUsers, note: 'Registered platform users', color: '#0284c7', bg: '#e0f2fe' },
-    { icon: 'rule', label: 'Pending Approvals', value: pendingCount, note: 'Listings waiting review', color: '#d97706', bg: '#fef3c7', hot: pendingCount > 0 },
-    { icon: 'how_to_reg', label: 'Active Subscribers', value: subStats?.activeSubscribers || 0, note: 'Paid plan members', color: '#16a34a', bg: '#dcfce7' },
-    { icon: 'account_balance_wallet', label: 'Platform Revenue', value: formatVnd(subStats?.totalRevenue || 0), note: 'Subscription earnings', color: '#7c2d12', bg: '#fee2e2' },
+    { icon: 'group', label: t('admin.dashboard.total_accounts'), value: formatNumber(totalUsers), note: t('admin.dashboard.total_accounts_note'), color: '#0284c7', bg: '#e0f2fe' },
+    { icon: 'rule', label: t('admin.dashboard.pending_approvals'), value: formatNumber(pendingCount), note: t('admin.dashboard.pending_approvals_note'), color: '#d97706', bg: '#fef3c7', hot: pendingCount > 0 },
+    { icon: 'how_to_reg', label: t('admin.dashboard.active_subscribers'), value: formatNumber(subStats?.activeSubscribers || 0), note: t('admin.dashboard.active_subscribers_note'), color: '#16a34a', bg: '#dcfce7' },
+    { icon: 'account_balance_wallet', label: t('admin.dashboard.platform_revenue'), value: formatCurrency(subStats?.totalRevenue || 0), note: t('admin.dashboard.platform_revenue_note'), color: '#7c2d12', bg: '#fee2e2' },
   ];
 
   return (
     <div className="admin-dashboard-page animate-fade-in">
       <header className="admin-dashboard-hero">
         <div>
-          <p className="admin-eyebrow">Admin Overview</p>
-          <h1>Good to see you, {user?.firstName || user?.username || 'Admin'}.</h1>
-          <p>Supervise platform accounts, review product listings, and monitor platform health.</p>
+          <p className="admin-eyebrow">{t('admin.eyebrow')}</p>
+          <h1>{t('admin.dashboard.hero_title', { name: user?.firstName || user?.username || 'Admin' })}</h1>
+          <p>{t('admin.dashboard.hero_sub')}</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="button" className="admin-action-btn outline" style={{ height: '40px', padding: '0 16px', fontSize: '13px', borderRadius: '12px' }} onClick={() => navigate('/admin/listings')}>
-            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#991B1B' }}>rule</span>
-            <span>Review Listings</span>
+        <div className="admin-hero-actions">
+          <button type="button" className="admin-btn-secondary" onClick={() => navigate('/admin/listings')}>
+            <span className="material-symbols-outlined">rule</span>
+            <span>{t('admin.dashboard.review_listings_btn')}</span>
           </button>
-          <button type="button" className="admin-action-btn danger" style={{ height: '40px', padding: '0 16px', fontSize: '13px', borderRadius: '12px', background: '#991B1B', color: '#ffffff', border: '1px solid #991B1B' }} onClick={() => navigate('/admin/statistics')}>
-            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#ffffff' }}>monitoring</span>
-            <span style={{ color: '#ffffff' }}>View Statistics</span>
+          <button type="button" className="admin-btn-primary" onClick={() => navigate('/admin/statistics')}>
+            <span className="material-symbols-outlined">monitoring</span>
+            <span>{t('admin.dashboard.view_statistics_btn')}</span>
           </button>
         </div>
       </header>
 
-      <section className="admin-dashboard-stats-grid" style={{ marginBottom: '24px' }}>
+      <section className="admin-dashboard-stats-grid">
         {overviewMetrics.map((metric) => (
           <article key={metric.label} className="admin-dashboard-stat-card">
             <div className="stat-icon-wrap" style={{ background: metric.bg, color: metric.color }}>
@@ -98,8 +95,8 @@ export default function AdminDashboard() {
             </div>
             <div className="stat-info">
               <span>{metric.label}</span>
-              <strong className="revenue-text">{typeof metric.value === 'number' ? numberFormatter.format(metric.value) : metric.value}</strong>
-              <small style={{ color: '#6b7280', fontSize: '11px', marginTop: '2px', display: 'block' }}>{metric.note}</small>
+              <strong className="revenue-text">{metric.value}</strong>
+              <small className="stat-note">{metric.note}</small>
             </div>
           </article>
         ))}
@@ -107,37 +104,39 @@ export default function AdminDashboard() {
 
       <div className="admin-dashboard-charts-layout">
         <section className="admin-dashboard-chart-section flex-2">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div className="section-header-wrap">
             <div>
-              <h2>Products Needing Review</h2>
-              <p className="breakdown-subtitle">Newest seller listings awaiting administrative approval.</p>
+              <h2>{t('admin.dashboard.products_needing_review')}</h2>
+              <p className="breakdown-subtitle">{t('admin.dashboard.products_needing_review_sub')}</p>
             </div>
-            <button type="button" className="admin-action-btn outline" onClick={() => navigate('/admin/listings')}>
-              View All
+            <button type="button" className="admin-btn-secondary sm" onClick={() => navigate('/admin/listings')}>
+              {t('admin.dashboard.view_all')}
             </button>
           </div>
 
           {pendingProducts.length === 0 ? (
-            <div className="no-data-msg" style={{ padding: '40px 0', textAlign: 'center' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#16a34a', marginBottom: '8px', display: 'block' }}>check_circle</span>
-              <strong>All clear! No pending products.</strong>
-              <p style={{ fontSize: '13px', color: '#6b7280', margin: '4px 0 0' }}>All product submissions have been processed.</p>
+            <div className="no-data-msg">
+              <span className="material-symbols-outlined check-icon">check_circle</span>
+              <strong>{t('admin.dashboard.all_clear')}</strong>
+              <p>{t('admin.dashboard.all_clear_sub')}</p>
             </div>
           ) : (
             <div className="package-details-list">
               {pendingProducts.slice(0, 9).map((prod) => (
-                <div key={prod.productId} className="package-detail-card" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 14px' }}>
+                <div key={prod.productId} className="pending-prod-item">
                   <img 
                     src={prod.mainImageUrl || 'https://placehold.co/60'} 
                     alt={prod.name} 
-                    style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover' }} 
+                    className="pending-prod-img"
                   />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <strong style={{ display: 'block', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prod.name}</strong>
-                    <span style={{ fontSize: '11px', color: '#6b7280' }}>Seller: {prod.sellerName || prod.sellerId || 'Unknown'} · {prod.categoryName || 'General'}</span>
+                  <div className="pending-prod-meta">
+                    <strong className="pending-prod-name">{prod.name}</strong>
+                    <span className="pending-prod-sub">
+                      Seller: {prod.sellerName || prod.sellerId || 'Unknown'} · {prod.categoryName || 'General'}
+                    </span>
                   </div>
-                  <button type="button" className="admin-action-btn outline" style={{ height: '32px', fontSize: '12px', padding: '0 10px' }} onClick={() => navigate('/admin/listings')}>
-                    Review
+                  <button type="button" className="admin-btn-action-sm" onClick={() => navigate('/admin/listings')}>
+                    {t('admin.dashboard.review')}
                   </button>
                 </div>
               ))}
@@ -146,39 +145,51 @@ export default function AdminDashboard() {
         </section>
 
         <section className="admin-dashboard-chart-section flex-1">
-          <h2>Quick Actions</h2>
-          <p className="breakdown-subtitle">Administrative control shortcuts.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-            <button type="button" className="admin-action-btn outline" style={{ justifyContent: 'flex-start', padding: '12px 14px', height: 'auto' }} onClick={() => navigate('/admin/users')}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#0284c7' }}>group</span>
-              <div style={{ textAlign: 'left' }}>
-                <strong style={{ display: 'block', fontSize: '13px' }}>User Accounts</strong>
-                <small style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'normal' }}>Manage accounts, ban & roles</small>
+          <h2>{t('admin.dashboard.quick_actions')}</h2>
+          <p className="breakdown-subtitle">{t('admin.dashboard.quick_actions_sub')}</p>
+          <div className="quick-actions-list">
+            <button type="button" className="quick-action-card" onClick={() => navigate('/admin/users')}>
+              <div className="quick-action-icon-wrap user-bg">
+                <span className="material-symbols-outlined">group</span>
               </div>
+              <div className="quick-action-text">
+                <strong>{t('admin.dashboard.manage_user_accounts')}</strong>
+                <small>{t('admin.dashboard.manage_user_accounts_sub')}</small>
+              </div>
+              <span className="material-symbols-outlined arrow-icon">chevron_right</span>
             </button>
 
-            <button type="button" className="admin-action-btn outline" style={{ justifyContent: 'flex-start', padding: '12px 14px', height: 'auto' }} onClick={() => navigate('/admin/category')}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#16a34a' }}>category</span>
-              <div style={{ textAlign: 'left' }}>
-                <strong style={{ display: 'block', fontSize: '13px' }}>Categories</strong>
-                <small style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'normal' }}>Add & modify system categories</small>
+            <button type="button" className="quick-action-card" onClick={() => navigate('/admin/category')}>
+              <div className="quick-action-icon-wrap cat-bg">
+                <span className="material-symbols-outlined">category</span>
               </div>
+              <div className="quick-action-text">
+                <strong>{t('admin.dashboard.manage_categories')}</strong>
+                <small>{t('admin.dashboard.manage_categories_sub')}</small>
+              </div>
+              <span className="material-symbols-outlined arrow-icon">chevron_right</span>
             </button>
 
-            <button type="button" className="admin-action-btn outline" style={{ justifyContent: 'flex-start', padding: '12px 14px', height: 'auto' }} onClick={() => navigate('/admin/refunds')}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#d97706' }}>payments</span>
-              <div style={{ textAlign: 'left' }}>
-                <strong style={{ display: 'block', fontSize: '13px' }}>Refund Requests</strong>
-                <small style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'normal' }}>Review buyer refund disputes</small>
+            <button type="button" className="quick-action-card" onClick={() => navigate('/admin/refunds')}>
+              <div className="quick-action-icon-wrap refund-bg">
+                <span className="material-symbols-outlined">payments</span>
               </div>
+              <div className="quick-action-text">
+                <strong>{t('admin.dashboard.refund_requests')}</strong>
+                <small>{t('admin.dashboard.refund_requests_sub')}</small>
+              </div>
+              <span className="material-symbols-outlined arrow-icon">chevron_right</span>
             </button>
 
-            <button type="button" className="admin-action-btn outline" style={{ justifyContent: 'flex-start', padding: '12px 14px', height: 'auto' }} onClick={() => navigate('/admin/statistics')}>
-              <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#7f1d1d' }}>monitoring</span>
-              <div style={{ textAlign: 'left' }}>
-                <strong style={{ display: 'block', fontSize: '13px' }}>Analytics & Statistics</strong>
-                <small style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'normal' }}>Detailed charts & revenue statistics</small>
+            <button type="button" className="quick-action-card" onClick={() => navigate('/admin/statistics')}>
+              <div className="quick-action-icon-wrap stats-bg">
+                <span className="material-symbols-outlined">monitoring</span>
               </div>
+              <div className="quick-action-text">
+                <strong>{t('admin.dashboard.analytics_stats')}</strong>
+                <small>{t('admin.dashboard.analytics_stats_sub')}</small>
+              </div>
+              <span className="material-symbols-outlined arrow-icon">chevron_right</span>
             </button>
           </div>
         </section>
@@ -186,3 +197,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

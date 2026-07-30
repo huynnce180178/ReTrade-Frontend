@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import productService from '../../../services/productService';
 import addressService from '../../../services/addressService';
 import AddressPopup from '../../../components/AddressPopup/AddressPopup';
@@ -17,6 +18,7 @@ export default function MyProducts() {
   const { user } = useOutletContext();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const [myProducts, setMyProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -27,7 +29,31 @@ export default function MyProducts() {
   
   const [isAddressPopupOpen, setIsAddressPopupOpen] = useState(false);
 
-  const fetchMyProducts = async () => {
+  // Detail Modal States
+  const [detailModalProduct, setDetailModalProduct] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedModalImg, setSelectedModalImg] = useState('');
+
+  const openDetailModal = async (productSummary) => {
+    setDetailModalProduct(productSummary);
+    setSelectedModalImg(productSummary.mainImageUrl || '');
+    try {
+      setDetailLoading(true);
+      const fullDetail = await productService.getById(productSummary.productId);
+      if (fullDetail) {
+        setDetailModalProduct(fullDetail);
+        if (fullDetail.mainImageUrl) {
+          setSelectedModalImg(fullDetail.mainImageUrl);
+        }
+      }
+    } catch {
+      // Keep summary data if getById fails
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const fetchMyProducts = useCallback(async () => {
     if (!user?.userId) return;
     try {
       setProductsLoading(true);
@@ -41,19 +67,18 @@ export default function MyProducts() {
 
       const res = await productService.getAll(params);
       setMyProducts(res?.items || []);
-    } catch (e) {
-      showToast('Failed to load your product list.', 'error');
+    } catch {
+      showToast(t('my_products.fetch_error'), 'error');
     } finally {
       setProductsLoading(false);
     }
-  };
+  }, [user, sellerSort, sellerSearch, sellerStatus, showToast, t]);
 
   useEffect(() => {
     let disposed = false;
     const connection = createNotificationHubConnection();
 
-    connection.on('ReceiveNotification', (notification) => {
-      // Refresh seller product list whenever they receive a notification (e.g. approval, rejection)
+    connection.on('ReceiveNotification', () => {
       if (!disposed) {
         setRefreshTrigger(prev => prev + 1);
       }
@@ -74,7 +99,7 @@ export default function MyProducts() {
     if (user) {
       fetchMyProducts();
     }
-  }, [user, sellerStatus, sellerSort, refreshTrigger]);
+  }, [user, sellerStatus, sellerSort, refreshTrigger, fetchMyProducts]);
 
   const handleSellerSearchSubmit = (e) => {
     e.preventDefault();
@@ -82,14 +107,14 @@ export default function MyProducts() {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product listing?')) return;
+    if (!window.confirm(t('my_products.confirm_delete_msg', { name: productId }))) return;
     try {
       setProductsLoading(true);
       await productService.delete(productId);
-      showToast('Product deleted successfully.', 'success');
+      showToast(t('my_products.delete_success'), 'success');
       fetchMyProducts();
     } catch (e) {
-      showToast(e?.response?.data || 'Failed to delete product.', 'error');
+      showToast(e?.response?.data || t('my_products.delete_error'), 'error');
     } finally {
       setProductsLoading(false);
     }
@@ -98,16 +123,14 @@ export default function MyProducts() {
   const initNewProductForm = async () => {
     try {
       setProductsLoading(true);
-      const data = await addressService.getMyAddresses();
-      const addrList = Array.isArray(data) ? data : (data?.data || []);
-      if (addrList.length === 0) {
-        showToast('Bạn cần thêm địa chỉ trước khi tạo sản phẩm!', 'warning');
+      const addresses = await addressService.getAddresses();
+      if (!addresses || addresses.length === 0) {
         setIsAddressPopupOpen(true);
-        return;
+      } else {
+        navigate('/seller-dashboard/products/new');
       }
-      navigate('/seller-dashboard/products/new');
-    } catch (error) {
-      showToast('Không thể xác thực thông tin địa chỉ giao hàng.', 'error');
+    } catch {
+      setIsAddressPopupOpen(true);
     } finally {
       setProductsLoading(false);
     }
@@ -115,14 +138,14 @@ export default function MyProducts() {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'Pending': return { text: 'Pending Approval', cls: 'status-pending' };
-      case 'Accepted': return { text: 'Approved for Sale', cls: 'status-accepted' };
-      case 'SaleRejected': return { text: 'Sale Rejected', cls: 'status-rejected' };
-      case 'Waiting': return { text: 'Pending Auction', cls: 'status-waiting' };
-      case 'Ready': return { text: 'Ready for Auction', cls: 'status-ready' };
-      case 'AuctionRejected': return { text: 'Auction Rejected', cls: 'status-rejected' };
-      case 'Sold': return { text: 'Sold', cls: 'status-sold' };
-      case 'Inactive': return { text: 'Inactive', cls: 'status-inactive' };
+      case 'Pending': return { text: t('seller_dashboard.status_pending'), cls: 'status-pending' };
+      case 'Accepted': return { text: t('seller_dashboard.status_accepted'), cls: 'status-accepted' };
+      case 'SaleRejected': return { text: t('seller_dashboard.status_rejected'), cls: 'status-rejected' };
+      case 'Waiting': return { text: t('seller_dashboard.status_waiting'), cls: 'status-waiting' };
+      case 'Ready': return { text: t('seller_dashboard.status_ready'), cls: 'status-ready' };
+      case 'AuctionRejected': return { text: t('seller_dashboard.status_auction_rejected'), cls: 'status-rejected' };
+      case 'Sold': return { text: t('seller_dashboard.status_sold'), cls: 'status-sold' };
+      case 'Inactive': return { text: t('seller_dashboard.status_inactive'), cls: 'status-inactive' };
       default: return { text: status, cls: 'status-unknown' };
     }
   };
@@ -138,11 +161,11 @@ export default function MyProducts() {
       <div className="tab-products animate-fade-in">
         <header className="seller-dash-header">
           <div>
-            <h1>My Products</h1>
-            <p>View, edit, or delete the products you are selling or auctioning.</p>
+            <h1>{t('my_products.title')}</h1>
+            <p>{t('my_products.subtitle')}</p>
           </div>
           <button className="seller-list-btn" onClick={initNewProductForm}>
-            <span className="material-symbols-outlined">add</span>Add New Product
+            <span className="material-symbols-outlined">add</span>{t('my_products.add_product_btn')}
           </button>
         </header>
 
@@ -151,7 +174,7 @@ export default function MyProducts() {
             <form onSubmit={handleSellerSearchSubmit} style={{ display: 'flex', flex: 1, minWidth: '250px', position: 'relative' }}>
               <input 
                 type="text" 
-                placeholder="Search by product name..." 
+                placeholder={t('my_products.search_placeholder')} 
                 value={sellerSearch}
                 onChange={(e) => setSellerSearch(e.target.value)}
                 style={{ width: '100%', padding: '10px 40px 10px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)' }}
@@ -167,15 +190,15 @@ export default function MyProducts() {
                 onChange={(e) => setSellerStatus(e.target.value)}
                 style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
               >
-                <option value="">All Statuses</option>
-                <option value="Pending">Pending Approval</option>
-                <option value="Accepted">Approved (Sale)</option>
-                <option value="Waiting">Pending Auction</option>
-                <option value="Ready">Ready for Auction</option>
-                <option value="SaleRejected">Sale Rejected</option>
-                <option value="AuctionRejected">Auction Rejected</option>
-                <option value="Sold">Sold</option>
-                <option value="Inactive">Inactive</option>
+                <option value="">{t('common.all')}</option>
+                <option value="Pending">{t('seller_dashboard.status_pending')}</option>
+                <option value="Accepted">{t('seller_dashboard.status_accepted')}</option>
+                <option value="Waiting">{t('seller_dashboard.status_waiting')}</option>
+                <option value="Ready">{t('seller_dashboard.status_ready')}</option>
+                <option value="SaleRejected">{t('seller_dashboard.status_rejected')}</option>
+                <option value="AuctionRejected">{t('seller_dashboard.status_auction_rejected')}</option>
+                <option value="Sold">{t('seller_dashboard.status_sold')}</option>
+                <option value="Inactive">{t('seller_dashboard.status_inactive')}</option>
               </select>
 
               <select 
@@ -183,10 +206,9 @@ export default function MyProducts() {
                 onChange={(e) => setSellerSort(e.target.value)}
                 style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
               >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
+                <option value="newest">{t('product.sort_newest')}</option>
+                <option value="price_asc">{t('product.sort_price_asc')}</option>
+                <option value="price_desc">{t('product.sort_price_desc')}</option>
               </select>
             </div>
           </div>
@@ -195,22 +217,20 @@ export default function MyProducts() {
             {myProducts.length === 0 ? (
               <div className="seller-empty-products">
                 <span className="material-symbols-outlined">inventory</span>
-                <h3>No products found</h3>
-                <p>Try adjusting your filters or post a new product.</p>
-                <button className="seller-list-btn" style={{ marginTop: '16px' }} onClick={initNewProductForm}>Post Now</button>
+                <h3>{t('common.no_data')}</h3>
+                <p>{t('my_products.subtitle')}</p>
+                <button className="seller-list-btn" style={{ marginTop: '16px' }} onClick={initNewProductForm}>{t('my_products.add_product_btn')}</button>
               </div>
             ) : (
               <table className="seller-products-table">
                 <thead>
                   <tr>
-                    <th>Product</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Stock</th>
-                    <th>Condition</th>
-                    <th>Approval Status</th>
-                    <th>Date Posted</th>
-                    <th>Actions</th>
+                    <th>{t('my_products.th_product')}</th>
+                    <th>{t('my_products.th_category')}</th>
+                    <th>{t('my_products.th_price')}</th>
+                    <th>{t('my_products.th_stock')}</th>
+                    <th>{t('my_products.th_status')}</th>
+                    <th>{t('my_products.th_action')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -218,7 +238,7 @@ export default function MyProducts() {
                     const status = getStatusText(p.status);
                     const isAuction = p.status === 'Waiting' || p.status === 'Ready' || p.status === 'AuctionRejected';
                     return (
-                      <tr key={p.productId}>
+                      <tr key={p.productId} className="seller-product-row-clickable" onClick={() => openDetailModal(p)}>
                         <td>
                           <div className="seller-prod-identity">
                             <img src={p.mainImageUrl || 'https://placehold.co/100'} alt={p.name} />
@@ -231,23 +251,48 @@ export default function MyProducts() {
                         <td>{p.categoryName}</td>
                         <td>
                           {isAuction ? (
-                            <span className="badge-auct">Auction</span>
+                            <span className="badge-auct">{t('nav.auction')}</span>
                           ) : (
-                            <strong>{p.price ? formatVnd(p.price) : 'Contact'}</strong>
+                            <strong>{p.price ? formatVnd(p.price) : t('seller_dashboard.contact')}</strong>
                           )}
                         </td>
                         <td>{p.stockQuantity}</td>
-                        <td>{p.condition}</td>
                         <td>
                           <span className={`seller-status-chip ${status.cls}`}>{status.text}</span>
                         </td>
-                        <td>{formatDateGmt7(p.createdAt)}</td>
                         <td>
                           <div className="seller-action-actions">
-                            <button type="button" className="seller-icon-action" onClick={() => navigate(`/seller-dashboard/products/edit/${p.productId}`)}>
+                            <button
+                              type="button"
+                              className="seller-icon-action"
+                              title={t('common.view_detail')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDetailModal(p);
+                              }}
+                            >
+                              <span className="material-symbols-outlined">visibility</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="seller-icon-action"
+                              title={t('common.edit')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/seller-dashboard/products/edit/${p.productId}`);
+                              }}
+                            >
                               <span className="material-symbols-outlined">edit</span>
                             </button>
-                            <button type="button" className="seller-icon-action danger" onClick={() => handleDeleteProduct(p.productId)}>
+                            <button
+                              type="button"
+                              className="seller-icon-action danger"
+                              title={t('common.delete')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProduct(p.productId);
+                              }}
+                            >
                               <span className="material-symbols-outlined">delete</span>
                             </button>
                           </div>
@@ -262,15 +307,157 @@ export default function MyProducts() {
         </section>
       </div>
 
+      {/* Address Popup for New Product Address Check */}
       {isAddressPopupOpen && (
         <AddressPopup 
           onClose={() => setIsAddressPopupOpen(false)} 
-          onSelect={(selectedAddr) => {
+          onSelect={() => {
             setIsAddressPopupOpen(false);
-            showToast('Đã thêm địa chỉ thành công! Giờ bạn có thể tạo sản phẩm.', 'success');
+            showToast(t('address.add_success'), 'success');
             navigate('/seller-dashboard/products/new');
           }} 
         />
+      )}
+
+      {/* Product Detail Modal */}
+      {detailModalProduct && (
+        <div className="seller-modal-overlay animate-fade-in" onClick={() => setDetailModalProduct(null)}>
+          <div className="seller-modal-card seller-product-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="seller-modal-header">
+              <div>
+                <span className="seller-modal-eyebrow">{t('common.detail')}</span>
+                <h2>{detailModalProduct.name}</h2>
+                <small>ID: {detailModalProduct.productId}</small>
+              </div>
+              <button type="button" className="seller-modal-close" onClick={() => setDetailModalProduct(null)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <div className="seller-modal-body" style={{ textAlign: 'center', padding: '40px' }}>
+                <span className="btn-spinner"></span>
+                <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>{t('common.loading')}</p>
+              </div>
+            ) : (
+              <div className="seller-modal-body seller-product-detail-body">
+                <div className="seller-detail-gallery">
+                  <div className="seller-detail-main-img">
+                    <img
+                      src={selectedModalImg || detailModalProduct.mainImageUrl || 'https://placehold.co/400'}
+                      alt={detailModalProduct.name}
+                    />
+                  </div>
+                  {Array.isArray(detailModalProduct.imageUrls || detailModalProduct.images) &&
+                    (detailModalProduct.imageUrls || detailModalProduct.images).length > 0 && (
+                      <div className="seller-detail-thumbs">
+                        {(detailModalProduct.imageUrls || detailModalProduct.images.map(i => i.imageUrl || i)).map((imgUrl, idx) => (
+                          <img
+                            key={idx}
+                            src={imgUrl}
+                            alt=""
+                            className={selectedModalImg === imgUrl ? 'active' : ''}
+                            onClick={() => setSelectedModalImg(imgUrl)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                </div>
+
+                <div className="seller-detail-info">
+                  <div className="seller-detail-badge-bar">
+                    <span className={`seller-status-chip ${getStatusText(detailModalProduct.status).cls}`}>
+                      {getStatusText(detailModalProduct.status).text}
+                    </span>
+                    <span className="seller-detail-format-badge">
+                      {detailModalProduct.isForAuction || detailModalProduct.status === 'Ready' || detailModalProduct.status === 'Waiting'
+                        ? `🔨 ${t('nav.auction')}`
+                        : `🏷️ ${t('home.fast_deal')}`}
+                    </span>
+                  </div>
+
+                  <div className="seller-detail-price-box">
+                    <span>{t('common.price')}</span>
+                    <strong>{detailModalProduct.price ? formatVnd(detailModalProduct.price) : t('seller_dashboard.contact')}</strong>
+                  </div>
+
+                  <div className="seller-detail-grid">
+                    <div>
+                      <span>{t('common.category')}</span>
+                      <strong>{detailModalProduct.categoryName || t('common.none')}</strong>
+                    </div>
+                    <div>
+                      <span>{t('common.quantity')}</span>
+                      <strong>{detailModalProduct.stockQuantity ?? 0}</strong>
+                    </div>
+                    <div>
+                      <span>{t('product.condition')}</span>
+                      <strong>{detailModalProduct.condition || t('common.none')}</strong>
+                    </div>
+                    <div>
+                      <span>{t('common.created_at')}</span>
+                      <strong>{formatDateGmt7(detailModalProduct.createdAt)}</strong>
+                    </div>
+                    {(detailModalProduct.weightGram || detailModalProduct.lengthCm) && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <span>{t('common.description')}</span>
+                        <strong>
+                          {detailModalProduct.weightGram ? `${detailModalProduct.weightGram}g` : ''} 
+                          {detailModalProduct.lengthCm ? ` • ${detailModalProduct.lengthCm}x${detailModalProduct.widthCm}x${detailModalProduct.heightCm} cm` : ''}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {detailModalProduct.description && (
+                    <div className="seller-detail-description">
+                      <h3>{t('common.description')}</h3>
+                      <p>{detailModalProduct.description}</p>
+                    </div>
+                  )}
+
+                  {Array.isArray(detailModalProduct.attributes) && detailModalProduct.attributes.length > 0 && (
+                    <div className="seller-detail-attributes">
+                      <h3>{t('product.title')}</h3>
+                      <ul>
+                        {detailModalProduct.attributes.map((attr, idx) => (
+                          <li key={idx}>
+                            <span>{attr.attributeName || attr.name}:</span>
+                            <strong>{attr.value} {attr.unit || ''}</strong>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="seller-modal-footer">
+              <a
+                href={`/product/${detailModalProduct.productId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="seller-modal-btn outline"
+              >
+                <span className="material-symbols-outlined">open_in_new</span>
+                {t('common.view_detail')}
+              </a>
+              <button
+                type="button"
+                className="seller-modal-btn primary"
+                onClick={() => {
+                  const pId = detailModalProduct.productId;
+                  setDetailModalProduct(null);
+                  navigate(`/seller-dashboard/products/edit/${pId}`);
+                }}
+              >
+                <span className="material-symbols-outlined">edit</span>
+                {t('seller.edit_product')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

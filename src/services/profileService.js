@@ -10,6 +10,7 @@ const profileService = {
   updateMyProfile: (data) => put('/Profile/my-profile', data),
   getUserProfile: (userId) => get(`/Profile/user-profile/${userId}`),
   getSellerInformation: (sellerId) => get(`/Seller/${sellerId}`),
+  getSellerProfile: (sellerId) => get(`/Seller/${sellerId}`),
   followSeller: (sellerId) => post(`/Seller/${sellerId}/follow`),
   unfollowSeller: (sellerId) => del(`/Seller/${sellerId}/follow`),
 };

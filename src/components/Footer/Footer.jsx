@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 import './Footer.css';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
+  const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const handleSubscribeSubmit = (e) => {
     e.preventDefault();
     if (email.trim()) {
-      alert(`Thank you for subscribing with ${email}!`);
+      showToast(t('toast.saved_success'), 'success');
       setEmail('');
     }
   };
@@ -22,7 +26,7 @@ export default function Footer() {
             <span style={{ fontSize: '24px', fontWeight: '800', color: '#FFFFFF', letterSpacing: '1px' }}>RETRADE</span>
           </Link>
           <p className="brand-description">
-            Experience the future of smart second-hand commerce. Buy, sell, and auction quality pre-owned goods securely with verified users.
+            {t('home.hero_subtitle')}
           </p>
           <div className="social-links">
             <a href="#facebook" className="social-icon-link" aria-label="Facebook">
@@ -53,38 +57,40 @@ export default function Footer() {
         </div>
 
         <div className="footer-links-col">
-          <h4 className="footer-heading">Navigation</h4>
+          <h4 className="footer-heading">{t('nav.home')}</h4>
           <ul className="footer-list">
-            <li><Link to="/">Home</Link></li>
-            <li><Link to="/product">Products</Link></li>
-            <li><Link to="/auction">Auctions</Link></li>
-            <li><Link to="/wishlist">Wishlist</Link></li>
+            <li><Link to="/">{t('nav.home')}</Link></li>
+            <li><Link to="/product">{t('nav.product')}</Link></li>
+            <li><Link to="/auction">{t('nav.auction')}</Link></li>
+            <li><Link to="/wishlist">{t('nav.wishlist')}</Link></li>
           </ul>
         </div>
 
         <div className="footer-links-col">
-          <h4 className="footer-heading">Support</h4>
+          <h4 className="footer-heading">{t('nav.support')}</h4>
           <ul className="footer-list">
             <li><Link to="/support?tab=faq">FAQ</Link></li>
-            <li><Link to="/support?tab=safety">Safety Tips</Link></li>
-            <li><Link to="/support?tab=terms">Terms of Service</Link></li>
-            <li><Link to="/support?tab=privacy">Privacy Policy</Link></li>
+            <li><Link to="/support?tab=safety">{t('home.why_choose_us')}</Link></li>
+            <li><Link to="/support?tab=terms">{t('auth.agree_terms')}</Link></li>
+            <li><Link to="/support?tab=privacy">{t('nav.support')}</Link></li>
           </ul>
         </div>
 
         <div className="footer-newsletter-col">
-          <h4 className="footer-heading">Newsletter</h4>
-          <p className="newsletter-text">Subscribe to receive notifications about drops, prices, and special deals.</p>
+          <h4 className="footer-heading">{t('nav.notifications')}</h4>
+          <p className="newsletter-text">{t('auth.forgot_desc')}</p>
           <form className="newsletter-form" onSubmit={handleSubscribeSubmit}>
             <input
               type="email"
               className="form-input newsletter-input"
+              placeholder={t('auth.email')}
+              aria-label={t('auth.email')}
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
             <button type="submit" className="btn btn-primary newsletter-btn">
-              Join
+              {t('common.submit')}
             </button>
           </form>
         </div>
@@ -92,7 +98,7 @@ export default function Footer() {
       
       <div className="footer-bottom">
         <div className="container footer-bottom-container">
-          <p className="copyright-text">&copy; {new Date().getFullYear()} ReTrade. All rights reserved.</p>
+          <p className="copyright-text">&copy; {new Date().getFullYear()} ReTrade. {t('common.all')} rights reserved.</p>
           <p className="made-text">Made with ❤️ for smart trading</p>
         </div>
       </div>

@@ -30,8 +30,8 @@
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
-  padding: 0 40px;
-  gap: 32px;
+  padding: 0 24px;
+  gap: 16px;
 }
 
 .header-left {
@@ -110,7 +110,8 @@
   color: white;
   border: none;
   padding: 0 24px;
-  height: 44px; /* Matches the approximate height of the input */
+  height: 44px;
+  /* Matches the approximate height of the input */
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -126,16 +127,18 @@
 .header-nav {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 18px;
+  flex-shrink: 0;
 }
 
 .nav-link {
-  font-size: 15.5px;
+  font-size: 14.5px;
   font-weight: 500;
   color: #02241b;
   padding: 8px 0;
   position: relative;
   transition: all 0.3s ease;
+  white-space: nowrap;
 }
 
 .nav-link::after {
@@ -165,19 +168,25 @@
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 /* Subscription Button */
 .btn-subscription {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
   background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
   color: white;
-  padding: 11px 26px;
+  padding: 8px 18px;
   border-radius: 9999px;
   font-weight: 700;
-  font-size: 13.5px;
-  letter-spacing: 0.6px;
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   overflow: hidden;
   box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3),
@@ -453,13 +462,14 @@
 /* User Dropdown Profile */
 .user-dropdown-wrapper {
   position: relative;
+  flex-shrink: 0;
 }
 
 .user-profile-trigger {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 16px 6px 6px;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
   border-radius: 40px;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.6);
@@ -488,6 +498,7 @@
   color: white;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  flex-shrink: 0;
 }
 
 .user-avatar-img {
@@ -497,9 +508,9 @@
 }
 
 .username-text {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  max-width: 180px;
+  max-width: 110px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -654,7 +665,8 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(2, 36, 27, 0.5); /* Darker backdrop with pine green tint */
+  background: rgba(2, 36, 27, 0.5);
+  /* Darker backdrop with pine green tint */
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -1076,7 +1088,21 @@
   background: rgba(2, 36, 27, 0.1);
 }
 
+.mobile-drawer-footer {
+  display: none;
+}
+
 @media (max-width: 1024px) {
+  .mobile-drawer-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(2, 36, 27, 0.1);
+  }
+
   .mobile-menu-toggle {
     display: flex;
   }
@@ -1329,6 +1355,12 @@
   background: rgba(11, 148, 133, 0.1);
 }
 
+.search-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
 .search-history-item {
   display: flex;
   align-items: center;
@@ -1384,15 +1416,18 @@
 
 .site-header .nav-link:hover,
 .site-header .nav-link.active {
-  color: #a6f2d1 !important; /* Light mint green highlight */
+  color: #a6f2d1 !important;
+  /* Light mint green highlight */
 }
 
 .site-header .username-text {
-  color: #ffffff !important; /* Fix disappearing text */
+  color: #ffffff !important;
+  /* Fix disappearing text */
 }
 
 .site-header .dropdown-arrow {
-  color: rgba(255, 255, 255, 0.8) !important; /* Fix disappearing arrow */
+  color: rgba(255, 255, 255, 0.8) !important;
+  /* Fix disappearing arrow */
 }
 
 .site-header .nav-link::after {
@@ -1400,15 +1435,16 @@
 }
 
 .site-header .search-input-wrapper {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: none;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 50px !important;
+  box-shadow: none !important;
 }
 
 .site-header .search-input-wrapper:focus-within {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12) !important;
 }
 
 .site-header .search-input-wrapper:focus-within .search-input {
@@ -1416,20 +1452,22 @@
 }
 
 .site-header .search-input {
-  color: #ffffff;
+  color: #ffffff !important;
+  background: transparent !important;
 }
 
 .site-header .search-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.65) !important;
 }
 
 .site-header .search-btn-inside {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .site-header .search-btn-inside:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 .site-header .btn-subscription {
@@ -1507,20 +1545,25 @@
     background: rgba(2, 36, 27, 0.98);
     border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   }
+
   .site-header .mobile-search-wrapper .search-input {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.15);
     color: #ffffff;
   }
+
   .site-header .mobile-search-wrapper .search-icon {
     color: rgba(255, 255, 255, 0.6);
   }
+
   .site-header .mobile-only-menu-items {
     border-top: 1px solid rgba(255, 255, 255, 0.15);
   }
+
   .site-header .logout-item-btn {
     color: #fca5a5 !important;
   }
+
   .site-header .logout-item-btn:hover {
     color: #ef4444 !important;
   }

@@ -2,10 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import accountService from '../../services/accountService';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 import './Verify.css';
 
 export default function VerifyModal({ isOpen, onClose, email }) {
+  const { t } = useLanguage();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -68,10 +70,10 @@ export default function VerifyModal({ isOpen, onClose, email }) {
     setResending(true);
     try {
       await accountService.resendOtp(email);
-      showToast('A new code has been sent to your email.', 'success');
+      showToast(t('toast.saved_success'), 'success');
       setCountdown(60);
     } catch (err) {
-      showToast('Failed to resend code.', 'error');
+      showToast(t('common.error_occurred'), 'error');
     } finally {
       setResending(false);
     }
@@ -81,18 +83,18 @@ export default function VerifyModal({ isOpen, onClose, email }) {
     e.preventDefault();
     const code = otp.join('');
     if (code.length !== 6) {
-      showToast('Please enter all 6 digits of the OTP.', 'error');
+      showToast(t('validation.required'), 'error');
       return;
     }
 
     setLoading(true);
     try {
       await accountService.verify({ email, otp: code });
-      showToast('Email verified successfully! You can now log in.', 'success');
+      showToast(t('toast.login_success'), 'success');
       onClose();
       navigate('/login');
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || 'Verification failed. Please try again.';
+      const errorMsg = err.response?.data?.message || err.message || t('common.error_occurred');
       showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
@@ -105,7 +107,7 @@ export default function VerifyModal({ isOpen, onClose, email }) {
     <div className="verify-modal-overlay">
       <div className="verify-modal-card">
         
-        <button className="verify-close-btn" onClick={onClose} disabled={loading}>
+        <button className="verify-close-btn" onClick={onClose} disabled={loading} aria-label={t('common.close')}>
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
 
@@ -113,9 +115,9 @@ export default function VerifyModal({ isOpen, onClose, email }) {
           <span className="material-symbols-outlined">mark_email_read</span>
         </div>
 
-        <h1 className="verify-title">Verify Your Identity</h1>
+        <h1 className="verify-title">{t('common.confirm')}</h1>
         <p className="verify-desc">
-          We've sent a 6-digit verification code to <span>{email || 'your email'}</span>. Please enter it below to secure your account.
+          <span>{email || 'your email'}</span>
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -141,20 +143,19 @@ export default function VerifyModal({ isOpen, onClose, email }) {
             {loading ? (
               <span className="btn-spinner" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></span>
             ) : (
-              'Verify Account'
+              t('common.confirm')
             )}
           </button>
         </form>
 
         <div className="verify-footer-text">
-          Didn't receive the code? 
           <button 
             type="button" 
             className="verify-resend-btn"
             onClick={handleResend}
             disabled={countdown > 0 || resending || loading}
           >
-            {resending ? 'Sending...' : countdown > 0 ? `Resend in ${countdown}s` : 'Click to resend'}
+            {resending ? t('common.submitting') : countdown > 0 ? `${countdown}s` : t('common.reset')}
           </button>
         </div>
 

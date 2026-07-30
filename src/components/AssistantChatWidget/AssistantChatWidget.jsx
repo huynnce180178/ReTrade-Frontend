@@ -3,18 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import assistantChatService from '../../services/assistantChatService';
 import wishlistService from '../../services/wishlistService';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import './AssistantChatWidget.css';
 
 const SESSION_KEY = 'retrade_assistant_session_id';
-
-function formatCurrency(value) {
-  if (value === null || value === undefined) return 'Contact';
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatTextNode(text) {
   if (!text) return null;
@@ -85,15 +77,8 @@ function renderFormattedContent(content) {
   return elements.length > 0 ? elements : formatTextNode(content);
 }
 
-const QUICK_SUGGESTIONS = [
-  { label: 'My Orders', query: 'Check my orders' },
-  { label: 'Auction Guide', query: 'How to participate in auctions on ReTrade?' },
-  { label: 'Sell Item', query: 'I want to sell a second-hand product on ReTrade' },
-  { label: 'Latest Products', query: 'Show me the latest products on ReTrade' },
-  { label: 'My Wishlist', query: 'View my wishlist items' },
-];
-
 export default function AssistantChatWidget() {
+  const { t, language, formatCurrency } = useLanguage();
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messageText, setMessageText] = useState('');
@@ -103,7 +88,7 @@ export default function AssistantChatWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Hello! I am ReTrade AI Assistant. How can I help you find products, check orders, or guide you today?',
+      content: t('chat.assistant_welcome'),
       products: [],
     },
   ]);
@@ -111,6 +96,20 @@ export default function AssistantChatWidget() {
   const bottomRef = useRef(null);
   const navigate = useNavigate();
   const toast = useToast();
+
+  const QUICK_SUGGESTIONS = language === 'vi' ? [
+    { label: t('history.purchase_title'), query: 'Kiểm tra lịch sử mua hàng của tôi trên ReTrade' },
+    { label: t('auction.title'), query: 'Làm sao để tham gia đấu giá trên ReTrade?' },
+    { label: t('home.start_selling'), query: 'Tôi muốn đăng bán sản phẩm đồ cũ trên ReTrade' },
+    { label: t('home.featured_products'), query: 'Cho tôi xem danh sách các sản phẩm mới nhất' },
+    { label: t('nav.wishlist'), query: 'Xem danh sách sản phẩm yêu thích của tôi' },
+  ] : [
+    { label: t('history.purchase_title'), query: 'Check my purchase history on ReTrade' },
+    { label: t('auction.title'), query: 'How to participate in auctions on ReTrade?' },
+    { label: t('home.start_selling'), query: 'I want to sell a second-hand product on ReTrade' },
+    { label: t('home.featured_products'), query: 'Show me the latest products on ReTrade' },
+    { label: t('nav.wishlist'), query: 'View my wishlist items' },
+  ];
 
   useEffect(() => {
     if (!sessionId) return;
@@ -152,14 +151,14 @@ export default function AssistantChatWidget() {
           next.delete(productId);
           return next;
         });
-        toast?.info?.('Removed from wishlist');
+        toast?.info?.(t('product.remove_from_wishlist'));
       } else {
         await wishlistService.addToWishlist(productId);
         setWishlistSet((prev) => new Set(prev).add(productId));
-        toast?.success?.('Added to wishlist!');
+        toast?.success?.(t('product.add_to_wishlist'));
       }
     } catch {
-      toast?.error?.('Please login to manage wishlist.');
+      toast?.error?.(t('auth.login_title'));
     }
   };
 
@@ -186,7 +185,9 @@ export default function AssistantChatWidget() {
     setSending(true);
 
     try {
-      const response = await assistantChatService.sendMessage(text, sessionId);
+      // Append language hint for Gemini API if in Vietnamese mode
+      const queryWithLang = language === 'vi' ? `${text} (Vui lòng trả lời hoàn toàn bằng Tiếng Việt)` : text;
+      const response = await assistantChatService.sendMessage(queryWithLang, sessionId);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
         setSessionId(response.sessionId);
@@ -197,7 +198,7 @@ export default function AssistantChatWidget() {
         {
           id: response?.messageId || `assistant-${Date.now()}`,
           role: 'assistant',
-          content: response?.content || 'I could not find a suitable response. Please try again.',
+          content: response?.content || t('common.error_occurred'),
           products: Array.isArray(response?.products) ? response.products : [],
         },
       ]);
@@ -207,7 +208,7 @@ export default function AssistantChatWidget() {
         {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: 'Sorry, I am currently unable to connect to the AI assistant. Please try again later.',
+          content: t('common.error_occurred'),
           products: [],
         },
       ]);
@@ -228,7 +229,7 @@ export default function AssistantChatWidget() {
       {
         id: 'welcome-new',
         role: 'assistant',
-        content: 'Started a new conversation. How can I help you today?',
+        content: t('chat.assistant_welcome'),
         products: [],
       },
     ]);
@@ -237,7 +238,7 @@ export default function AssistantChatWidget() {
   return (
     <div className={`assistant-widget ${open ? 'open' : ''}`}>
       {open && (
-        <section className="assistant-widget-panel" aria-label="ReTrade AI Assistant">
+        <section className="assistant-widget-panel" aria-label={t('chat.assistant_title')}>
           <header className="assistant-widget-header">
             <div className="assistant-widget-brand">
               <div className="assistant-widget-avatar-head">
@@ -245,15 +246,15 @@ export default function AssistantChatWidget() {
                 <span className="assistant-widget-online-dot" />
               </div>
               <div className="assistant-widget-header-title">
-                <strong>ReTrade Assistant</strong>
+                <strong>{t('chat.assistant_title')}</strong>
                 <span>AI Shopping Assistant</span>
               </div>
             </div>
             <div className="assistant-widget-actions">
-              <button type="button" onClick={handleNewChat} title="Start new conversation">
+              <button type="button" onClick={handleNewChat} title={t('common.reset')}>
                 <span className="material-symbols-outlined">autorenew</span>
               </button>
-              <button type="button" onClick={() => setOpen(false)} title="Close window">
+              <button type="button" onClick={() => setOpen(false)} title={t('common.close')}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -276,10 +277,10 @@ export default function AssistantChatWidget() {
                   {message.products?.length > 0 && (
                     <div className="assistant-widget-product-list">
                       <div className="assistant-widget-product-header">
-                        <span className="material-symbols-outlined">local_offer</span>
-                        RECOMMENDED PRODUCTS
+                        <span className="material-symbols-outlined">shopping_bag</span>
+                        {t('product.related_products')}
                       </div>
-                      {message.products.slice(0, 3).map((product) => (
+                      {message.products.slice(0, 5).map((product) => (
                         <div key={product.productId} className="assistant-widget-product-card-container">
                           <Link to={`/product/${product.productId}`} className="assistant-widget-product-card">
                             <div className="assistant-widget-product-img">
@@ -287,20 +288,23 @@ export default function AssistantChatWidget() {
                                 <img src={product.mainImageUrl} alt={product.name || 'Product'} />
                               ) : (
                                 <div className="assistant-widget-img-placeholder">
-                                  <span className="material-symbols-outlined">image</span>
+                                  <span className="material-symbols-outlined">inventory_2</span>
                                 </div>
                               )}
                             </div>
                             <div className="assistant-widget-product-meta">
                               <span className="product-title">{product.name || 'ReTrade Product'}</span>
                               <span className="product-price">{formatCurrency(product.price)}</span>
+                              <small style={{ color: '#059669', fontWeight: 600, fontSize: '11px', marginTop: '2px' }}>
+                                {t('common.view_detail')} &rarr;
+                              </small>
                             </div>
                           </Link>
                           <div className="assistant-widget-product-card-actions">
                             <button
                               type="button"
                               className={`assistant-widget-action-icon wishlist-btn ${wishlistSet.has(product.productId) ? 'active' : ''}`}
-                              title={wishlistSet.has(product.productId) ? 'In Wishlist' : 'Add to Wishlist'}
+                              title={wishlistSet.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
                               onClick={(e) => handleToggleWishlist(e, product.productId)}
                             >
                               <span className="material-symbols-outlined">
@@ -310,7 +314,7 @@ export default function AssistantChatWidget() {
                             <button
                               type="button"
                               className="assistant-widget-action-icon buy-btn"
-                              title="Buy Now"
+                              title={t('product.buy_now')}
                               onClick={(e) => handleBuyNow(e, product.productId)}
                             >
                               <span className="material-symbols-outlined">bolt</span>
@@ -364,10 +368,10 @@ export default function AssistantChatWidget() {
               type="text"
               value={messageText}
               onChange={(event) => setMessageText(event.target.value)}
-              placeholder="Type a question or select a suggestion..."
+              placeholder={t('chat.type_message')}
               maxLength={2000}
             />
-            <button type="submit" disabled={!messageText.trim() || sending} title="Send message">
+            <button type="submit" disabled={!messageText.trim() || sending} title={t('chat.send')}>
               <span className="material-symbols-outlined">{sending ? 'sync' : 'send'}</span>
             </button>
           </form>
@@ -378,7 +382,7 @@ export default function AssistantChatWidget() {
         type="button"
         className="assistant-widget-toggle-btn"
         onClick={() => setOpen((current) => !current)}
-        aria-label="ReTrade AI Assistant"
+        aria-label={t('chat.assistant_title')}
       >
         <span className="material-symbols-outlined">{open ? 'expand_more' : 'robot'}</span>
       </button>

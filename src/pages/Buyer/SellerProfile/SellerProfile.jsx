@@ -8,6 +8,7 @@ import reviewService from '../../../services/reviewService';
 import { createSellerHubConnection } from '../../../services/sellerRealtimeService';
 import wishlistService from '../../../services/wishlistService';
 import chatService from '../../../services/chatService';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/ProfileView.css';
 import './SellerProfileReviews.css';
 
@@ -24,12 +25,11 @@ const getInitials = (seller) => {
   }
   return name.slice(0, 2).toUpperCase();
 };
-const currencyFormatter = new Intl.NumberFormat('vi-VN');
 
-const formatAddress = (address) => {
-  if (!address) return 'No default address yet';
-  const parts = [address.street, address.wardCode, address.districtId && `District ${address.districtId}`, address.provinceId && `Province ${address.provinceId}`].filter(Boolean);
-  return parts.length ? parts.join(', ') : 'No default address yet';
+const formatAddress = (address, t) => {
+  if (!address) return t('seller_profile.no_default_address');
+  const parts = [address.street, address.wardCode, address.districtId && `Quận ${address.districtId}`, address.provinceId && `Tỉnh/TP ${address.provinceId}`].filter(Boolean);
+  return parts.length ? parts.join(', ') : t('seller_profile.no_default_address');
 };
 
 const hasRole = (user, roleName) => {
@@ -58,8 +58,9 @@ function getReviewInitials(name) {
 export default function SellerProfile() {
   const { sellerId } = useParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -93,196 +94,179 @@ export default function SellerProfile() {
     fetchWishlist();
   }, [user]);
 
-  const handleWishlistToggle = async (productId, sellerId) => {
+  const handleWishlistToggle = async (productId) => {
     if (!user) {
-      showToast('Please sign in to use the wishlist.', 'error');
-      return;
-    }
-    if (sellerId === user.userId || sellerId === user.accountId) {
-      showToast('You cannot add your own product to your wishlist.', 'error');
+      showToast(t('seller_profile.login_required_chat'), 'error');
       return;
     }
     setTogglingId(productId);
-    const isAdded = wishlistIds.has(productId);
     try {
-      if (isAdded) {
-        const data = await wishlistService.getWishlist();
-        const item = (data.items ?? []).find(i => i.productId === productId);
-        if (item) {
-          await wishlistService.removeItem(item.wishlistItemId);
-          setWishlistIds(prev => { const n = new Set(prev); n.delete(productId); return n; });
-          showToast('Removed from wishlist.', 'success');
-        }
+      if (wishlistIds.has(productId)) {
+        await wishlistService.removeFromWishlist(productId);
+        setWishlistIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+        showToast(t('toast.deleted_success'), 'success');
       } else {
         await wishlistService.addToWishlist(productId);
-        setWishlistIds(prev => new Set([...prev, productId]));
-        showToast('Added to wishlist!', 'success');
+        setWishlistIds((prev) => new Set(prev).add(productId));
+        showToast(t('toast.saved_success'), 'success');
       }
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Something went wrong.';
-      showToast(msg, 'error');
+      showToast(err?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setTogglingId(null);
     }
   };
 
   useEffect(() => {
-    if (authLoading) return;
+    let connection = null;
 
-    const loadSeller = async () => {
+    const fetchSellerData = async () => {
       setLoading(true);
       setError('');
       try {
-        const data = await profileService.getSellerInformation(sellerId);
+        const data = await profileService.getSellerProfile(sellerId);
         setSeller(data);
       } catch (err) {
-        setError(err?.response?.data || 'Seller not found.');
+        setError(typeof err.response?.data === 'string' ? err.response.data : (err.response?.data?.message || t('common.error_occurred')));
       } finally {
         setLoading(false);
       }
     };
 
-    loadSeller();
-  }, [sellerId, authLoading, user?.accountId]);
+    if (sellerId) {
+      fetchSellerData();
+      connection = createSellerHubConnection(sellerId, (payload) => {
+        setSeller((current) => {
+          if (!current) return current;
 
-  useEffect(() => {
-    const resolvedSellerId = seller?.sellerId;
-    if (!resolvedSellerId) return undefined;
+          let updatedFollowers = current.followersCount;
+          let updatedFollowingStatus = current.isFollowing;
 
-    const connection = createSellerHubConnection();
-    let cancelled = false;
+          if (payload?.followerId && user && payload.followerId === user.userId) {
+            updatedFollowingStatus = payload.action === 'followed';
+          }
 
-    const startConnection = async () => {
-      try {
-        connection.on('SellerFollowChanged', (result) => {
-          if (!result || result.sellerId !== resolvedSellerId) return;
+          if (payload?.action === 'followed') {
+            updatedFollowers += 1;
+          } else if (payload?.action === 'unfollowed') {
+            updatedFollowers = Math.max(0, updatedFollowers - 1);
+          }
 
-          setSeller((current) => {
-            if (!current) return current;
-            const isCurrentUserFollowEvent = result.followerId && result.followerId === user?.userId;
-            const nextSeller = {
-              ...current,
-              followersCount: result.followersCount,
-            };
-            if (isCurrentUserFollowEvent) {
-              nextSeller.isFollowing = result.isFollowing;
-            }
-            return nextSeller;
-          });
+          return {
+            ...current,
+            followersCount: updatedFollowers,
+            isFollowing: updatedFollowingStatus,
+          };
         });
-
-        await connection.start();
-        if (!cancelled) {
-          await connection.invoke('JoinSellerGroup', resolvedSellerId);
-        }
-      } catch (err) {
-        console.error('Failed to connect seller realtime hub:', err);
-      }
-    };
-
-    startConnection();
+      });
+    }
 
     return () => {
-      cancelled = true;
-      connection.off('SellerFollowChanged');
-      connection.stop().catch(() => {});
+      if (connection) {
+        connection.stop().catch(() => {});
+      }
     };
-  }, [seller?.sellerId, user?.userId]);
+  }, [sellerId, user, t]);
 
   useEffect(() => {
-    const resolvedSellerId = seller?.sellerId;
-    if (!resolvedSellerId) return undefined;
-
-    let cancelled = false;
-
-    const loadSellerProducts = async () => {
+    const fetchSellerProducts = async () => {
+      if (!sellerId) return;
       setProductsLoading(true);
       try {
-        const params = {
-          SellerId: resolvedSellerId,
-          Page: productPage,
-          PageSize: 6,
-          SortBy: 'newest',
-        };
-        if (productStatus) params.Status = productStatus;
-        const data = await productService.getAll(params);
-
-        if (!cancelled) {
-          setSellerProducts(data?.items || []);
-          setProductsTotal(Number(data?.totalItems || 0));
-          setTotalPages(Number(data?.totalPages || 1));
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setSellerProducts([]);
-          setProductsTotal(0);
-          setTotalPages(1);
-          showToast(err?.response?.data || 'Failed to load seller products.', 'error');
-        }
+        const queryStatus = productStatus !== '' ? productStatus : (activeTab === 'auction' ? 'Ready' : undefined);
+        const res = await productService.getSellerProducts(sellerId, {
+          page: productPage,
+          pageSize: 8,
+          status: queryStatus,
+        });
+        setSellerProducts(res.items || []);
+        setProductsTotal(res.totalItems || 0);
+        setTotalPages(res.totalPages || 1);
+      } catch {
+        setSellerProducts([]);
+        setProductsTotal(0);
+        setTotalPages(1);
       } finally {
-        if (!cancelled) setProductsLoading(false);
+        setProductsLoading(false);
       }
     };
 
-    loadSellerProducts();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [seller?.sellerId, productStatus, productPage, showToast]);
+    fetchSellerProducts();
+  }, [sellerId, productPage, productStatus, activeTab]);
 
   useEffect(() => {
-    const resolvedSellerId = seller?.sellerId;
-    if (!resolvedSellerId || activeTab !== 'reviews') return undefined;
-
-    let cancelled = false;
-
-    const loadSellerReviews = async () => {
+    const fetchReviews = async () => {
+      if (!sellerId || activeTab !== 'reviews') return;
       setReviewsLoading(true);
       try {
-        const data = await reviewService.getPublicSellerReviews(resolvedSellerId, {
-          Page: reviewPage,
-          PageSize: 5,
-          SortBy: 'newest',
+        const res = await reviewService.getSellerReviews(sellerId, {
+          page: reviewPage,
+          pageSize: 5,
         });
-
-        if (!cancelled) {
-          setSellerReviews(data?.items || []);
-          setReviewTotalItems(Number(data?.totalItems || 0));
-          setReviewTotalPages(Math.max(1, Number(data?.totalPages || 1)));
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setSellerReviews([]);
-          setReviewTotalItems(0);
-          setReviewTotalPages(1);
-          showToast(err?.response?.data || 'Failed to load seller reviews.', 'error');
-        }
+        setSellerReviews(res.items || []);
+        setReviewTotalItems(res.totalItems || 0);
+        setReviewTotalPages(res.totalPages || 1);
+      } catch {
+        setSellerReviews([]);
+        setReviewTotalItems(0);
+        setReviewTotalPages(1);
       } finally {
-        if (!cancelled) setReviewsLoading(false);
+        setReviewsLoading(false);
       }
     };
 
-    loadSellerReviews();
+    fetchReviews();
+  }, [sellerId, activeTab, reviewPage]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, reviewPage, seller?.sellerId, showToast]);
+  if (loading) {
+    return (
+      <div className="profile-view-page container">
+        <div className="profile-view-card skeleton-box">
+          <div className="skeleton-avatar"></div>
+          <div className="skeleton-line" style={{ width: '40%' }}></div>
+          <div className="skeleton-line" style={{ width: '60%' }}></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !seller) {
+    return (
+      <div className="profile-view-page container">
+        <div className="profile-view-card error-card">
+          <h2>{t('common.error')}</h2>
+          <p>{error || t('seller_dashboard.load_error')}</p>
+          <button type="button" className="profile-view-btn outline" onClick={() => navigate(-1)}>
+            {t('common.back')}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleFollowToggle = async () => {
-    if (!seller || followLoading || !canFollowSeller) return;
+    if (!user) {
+      showToast(t('seller_profile.login_required_chat'), 'warning');
+      navigate('/login');
+      return;
+    }
+
+    if (followLoading || !seller?.sellerId) return;
 
     const previousSeller = seller;
-    const nextIsFollowing = !seller.isFollowing;
-    const nextFollowersCount = Math.max(0, (seller.followersCount || 0) + (nextIsFollowing ? 1 : -1));
+    const nextIsFollowing = !previousSeller.isFollowing;
+    const nextFollowersCount = previousSeller.followersCount + (nextIsFollowing ? 1 : -1);
 
+    setFollowLoading(true);
     setSeller((current) => ({
       ...current,
       isFollowing: nextIsFollowing,
-      followersCount: nextFollowersCount,
+      followersCount: Math.max(0, nextFollowersCount),
     }));
-    setFollowLoading(true);
 
     try {
       const result = previousSeller.isFollowing
@@ -294,10 +278,10 @@ export default function SellerProfile() {
         isFollowing: result.isFollowing,
         followersCount: result.followersCount,
       }));
-      showToast(result.message || 'Seller follow status updated.', 'success');
+      showToast(nextIsFollowing ? t('seller_profile.follow_success') : t('seller_profile.unfollow_success'), 'success');
     } catch (err) {
       setSeller(previousSeller);
-      showToast(err?.response?.data || 'Failed to update follow status.', 'error');
+      showToast(err?.response?.data || t('seller_profile.follow_error'), 'error');
     } finally {
       setFollowLoading(false);
     }
@@ -305,13 +289,13 @@ export default function SellerProfile() {
 
   const handleMessageSeller = async () => {
     if (!user) {
-      showToast('Please sign in to message this seller.', 'warning');
+      showToast(t('seller_profile.login_required_chat'), 'warning');
       navigate('/login');
       return;
     }
 
     if (!seller?.sellerId || isOwnSellerPage) {
-      showToast('You cannot message your own seller profile.', 'warning');
+      showToast(t('seller_profile.cannot_chat_self'), 'warning');
       return;
     }
 
@@ -321,29 +305,10 @@ export default function SellerProfile() {
         navigate(`/chat/${room.roomId}`);
       }
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Failed to open chat.';
+      const msg = err.response?.data || err.message || t('common.error_occurred');
       showToast(String(msg), 'error');
     }
   };
-
-  if (loading) {
-    return (
-      <div className="profile-view-state">
-        <span className="btn-spinner"></span>
-        <p>Loading seller...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="profile-view-state">
-        <span className="material-symbols-outlined profile-view-state-icon">storefront</span>
-        <h2>{error}</h2>
-        <Link to="/" className="btn btn-primary">Back to Home</Link>
-      </div>
-    );
-  }
 
   const isOwnSellerPage = Boolean(
     seller.isOwnSeller ||
@@ -355,11 +320,11 @@ export default function SellerProfile() {
   const canFollowSeller = Boolean(user && seller.isSeller && !isOwnSellerPage && !hasRole(user, 'Admin'));
   const reviewCount = Number(seller.reviewCount || 0);
   const ratingValue = reviewCount && seller.averageRating ? seller.averageRating.toFixed(1) : '-';
-  const ratingText = reviewCount && seller.averageRating ? `${ratingValue} / 5` : 'No rating yet';
-  const reviewText = `${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'}`;
+  const ratingText = reviewCount && seller.averageRating ? `${ratingValue} / 5` : t('seller_profile.no_rating_yet');
+  const reviewText = `${reviewCount} ${t('seller_profile.reviews_suffix')}`;
   const visibleProductCount = productsTotal || seller.productCount || 0;
-  const memberSince = seller.createdAt ? new Date(seller.createdAt).getFullYear() : 'New seller';
-  const locationText = formatAddress(seller.defaultAddress);
+  const memberSince = seller.createdAt ? new Date(seller.createdAt).getFullYear() : t('seller_profile.new_seller');
+  const locationText = formatAddress(seller.defaultAddress, t);
   const isBuyerViewingSeller = !isOwnSellerPage;
 
   const renderBuyerShopContent = () => {
@@ -381,11 +346,21 @@ export default function SellerProfile() {
 
     if (activeTab === 'auction') {
       return (
-        <div className="buyer-shop-empty">
-          <span className="material-symbols-outlined">gavel</span>
-          <h2>Live Auctions</h2>
-          <p>Active auctions from this seller will appear here when auction listings are connected.</p>
-        </div>
+        <SellerProductGrid
+          products={sellerProducts}
+          loading={productsLoading}
+          total={visibleProductCount}
+          compact
+          hideStatusTabs
+          productStatus="Ready"
+          setProductStatus={(s) => { setProductStatus(s); setProductPage(1); }}
+          productPage={productPage}
+          setProductPage={setProductPage}
+          totalPages={totalPages}
+          wishlistIds={wishlistIds}
+          togglingId={togglingId}
+          onWishlistToggle={handleWishlistToggle}
+        />
       );
     }
 
@@ -418,32 +393,32 @@ export default function SellerProfile() {
       return (
         <div className="seller-tab-panel profile-view-grid seller-tab-grid">
           <article className="profile-view-card">
-            <h2>Contact</h2>
+            <h2>{t('seller_profile.contact')}</h2>
             <div className="profile-view-list">
               <div>
                 <span>Email</span>
-                <strong>{seller.email || 'Not available'}</strong>
+                <strong>{seller.email || t('common.not_available')}</strong>
               </div>
               <div>
-                <span>Phone</span>
-                <strong>{seller.phone || 'Not available'}</strong>
+                <span>{t('seller_profile.phone')}</span>
+                <strong>{seller.phone || t('common.not_available')}</strong>
               </div>
               <div>
-                <span>Location</span>
+                <span>{t('seller_profile.location')}</span>
                 <strong>{locationText}</strong>
               </div>
             </div>
           </article>
           <article className="profile-view-card">
-            <h2>Seller Reference</h2>
+            <h2>{t('seller_profile.seller_reference')}</h2>
             <div className="profile-view-list">
               <div>
-                <span>Seller ID</span>
+                <span>Mã người bán</span>
                 <strong>{seller.sellerId}</strong>
               </div>
               <div>
-                <span>Account ID</span>
-                <strong>{seller.accountId || 'Not available'}</strong>
+                <span>Mã tài khoản</span>
+                <strong>{seller.accountId || t('common.not_available')}</strong>
               </div>
             </div>
           </article>
@@ -454,29 +429,29 @@ export default function SellerProfile() {
     return (
       <div className="seller-tab-panel profile-view-grid seller-tab-grid">
         <article className="profile-view-card seller-about-card">
-          <h2>About Shop</h2>
+          <h2>{t('seller_profile.about_shop')}</h2>
           <p>
-            {seller.username || 'This seller'} has been part of ReTrade since {memberSince}, offering curated second-hand listings with a focus on trustworthy trading.
+            {t('seller_profile.about_shop_desc', { name: seller.username || 'Seller', year: memberSince })}
           </p>
           <div className="seller-trust-row">
-            <span><span className="material-symbols-outlined">verified</span> Verified profile</span>
-            <span><span className="material-symbols-outlined">eco</span> ReTrade seller</span>
+            <span><span className="material-symbols-outlined">verified</span> {t('seller_profile.verified_profile')}</span>
+            <span><span className="material-symbols-outlined">eco</span> {t('seller_profile.retrade_seller')}</span>
           </div>
         </article>
         <article className="profile-view-card">
-          <h2>Shop Snapshot</h2>
+          <h2>{t('seller_profile.shop_snapshot')}</h2>
           <div className="profile-view-list">
             <div>
-              <span>Followers</span>
+              <span>{t('seller_profile.followers')}</span>
               <strong>{seller.followersCount}</strong>
             </div>
             <div>
-              <span>Following</span>
+              <span>{t('seller_profile.following')}</span>
               <strong>{seller.followingCount}</strong>
             </div>
             <div>
-              <span>Relationship</span>
-              <strong>{isOwnSellerPage ? 'Your shop' : seller.isFollowing ? 'Following' : 'Not following'}</strong>
+              <span>{t('seller_profile.relationship')}</span>
+              <strong>{isOwnSellerPage ? t('seller_profile.your_shop') : seller.isFollowing ? t('seller_profile.following') : t('seller_profile.not_following')}</strong>
             </div>
           </div>
         </article>
@@ -506,12 +481,12 @@ export default function SellerProfile() {
                 {canFollowSeller && (
                   <button className={`buyer-follow-btn ${seller.isFollowing ? 'following' : ''}`} onClick={handleFollowToggle} disabled={followLoading}>
                     <span className="material-symbols-outlined">{seller.isFollowing ? 'person_remove' : 'person_add'}</span>
-                    {followLoading ? 'Updating...' : seller.isFollowing ? 'Unfollow' : 'Follow'}
+                    {followLoading ? t('seller_profile.updating') : seller.isFollowing ? t('seller_profile.unfollow') : t('seller_profile.follow')}
                   </button>
                 )}
                 <button className="buyer-message-btn" type="button" onClick={handleMessageSeller}>
                   <span className="material-symbols-outlined">mail</span>
-                  Message
+                  {t('seller_profile.message')}
                 </button>
               </div>
             </div>
@@ -520,30 +495,34 @@ export default function SellerProfile() {
           <div className="buyer-shop-kpis">
             <div>
               <strong>{seller.followersCount}</strong>
-              <span>Followers</span>
+              <span>{t('seller_profile.followers')}</span>
             </div>
             <div>
               <strong>{ratingValue}</strong>
-              <span>Rating</span>
+              <span>{t('seller_profile.rating')}</span>
             </div>
             <div>
               <strong>{reviewCount}</strong>
-              <span>Reviews</span>
+              <span>{t('seller_profile.reviews_count')}</span>
             </div>
           </div>
         </section>
 
         <section className="buyer-shop-tabs">
           {[
-            ['items', 'Product'],
-            ['auction', 'Live Auctions'],
-            ['reviews', 'Reviews'],
+            ['items', t('seller_profile.listings')],
+            ['auction', t('seller_profile.live_auctions')],
+            ['reviews', t('seller_profile.reviews_count')],
           ].map(([key, label]) => (
             <button
               key={key}
               type="button"
               className={`buyer-shop-tab ${activeTab === key ? 'active' : ''}`}
-              onClick={() => setActiveTab(key)}
+              onClick={() => {
+                setActiveTab(key);
+                setProductPage(1);
+                setProductStatus(key === 'auction' ? 'Ready' : '');
+              }}
             >
               {label}
             </button>
@@ -567,14 +546,14 @@ export default function SellerProfile() {
             </span>
           </div>
           <div className="seller-shop-heading">
-            <span className="seller-badge">{isOwnSellerPage ? 'Your Seller Profile' : seller.isSeller ? 'Trusted Seller' : 'Member Profile'}</span>
+            <span className="seller-badge">{isOwnSellerPage ? t('seller_profile.your_seller_profile') : seller.isSeller ? t('seller_profile.trusted_seller') : t('seller_profile.member_profile')}</span>
             <h1>{getDisplayName(seller)}</h1>
             <div className="seller-shop-meta">
               <span><span className="material-symbols-outlined">location_on</span>{locationText}</span>
               <span><span className="material-symbols-outlined">star</span>{ratingText}</span>
             </div>
             <p className="seller-hero-desc">
-              {seller.username || 'This seller'} has been part of ReTrade since {memberSince}, offering curated second-hand listings with a focus on trustworthy trading.
+              {t('seller_profile.about_shop_desc', { name: seller.username || 'Seller', year: memberSince })}
             </p>
           </div>
         </div>
@@ -583,19 +562,19 @@ export default function SellerProfile() {
             {canFollowSeller && (
               <button className={`profile-follow-btn ${seller.isFollowing ? 'following' : ''}`} onClick={handleFollowToggle} disabled={followLoading}>
                 <span className="material-symbols-outlined">{seller.isFollowing ? 'person_remove' : 'person_add'}</span>
-                {followLoading ? 'Updating...' : seller.isFollowing ? 'Unfollow' : 'Follow'}
+                {followLoading ? t('seller_profile.updating') : seller.isFollowing ? t('seller_profile.unfollow') : t('seller_profile.follow')}
               </button>
             )}
             {!isOwnSellerPage && (
               <button className="seller-message-btn" type="button" onClick={handleMessageSeller}>
                 <span className="material-symbols-outlined">mail</span>
-                Message
+                {t('seller_profile.message')}
               </button>
             )}
             {isOwnSellerPage && (
               <Link to="/profile" className="seller-message-btn owner-action">
                 <span className="material-symbols-outlined">manage_accounts</span>
-                Edit Profile
+                {t('seller_profile.edit_profile')}
               </Link>
             )}
           </div>
@@ -603,23 +582,23 @@ export default function SellerProfile() {
           <div className="seller-hero-stats">
             <div className="seller-hero-stat">
               <strong>{visibleProductCount}</strong>
-              <span>Listings</span>
+              <span>{t('seller_profile.listings')}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{seller.followersCount}</strong>
-              <span>Followers</span>
+              <span>{t('seller_profile.followers')}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{seller.followingCount}</strong>
-              <span>Following</span>
+              <span>{t('seller_profile.following')}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{ratingValue}</strong>
-              <span>Rating</span>
+              <span>{t('seller_profile.rating')}</span>
             </div>
             <div className="seller-hero-stat">
               <strong>{reviewCount}</strong>
-              <span>Reviews</span>
+              <span>{t('seller_profile.reviews_count')}</span>
             </div>
           </div>
         </div>
@@ -628,9 +607,9 @@ export default function SellerProfile() {
       <section className="seller-shop-tabs">
         <div className="seller-tab-list" role="tablist" aria-label="Seller sections">
           {[
-            ['items', 'Product'],
-            ['reviews', 'Reviews'],
-            ['contact', 'Contact'],
+            ['items', t('seller_profile.listings')],
+            ['reviews', t('seller_profile.reviews_count')],
+            ['contact', t('seller_profile.contact')],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -648,28 +627,31 @@ export default function SellerProfile() {
   );
 }
 
-function SellerProductGrid({ products, loading, total, compact = false, productStatus, setProductStatus, productPage, setProductPage, totalPages, wishlistIds, togglingId, onWishlistToggle }) {
+function SellerProductGrid({ products, loading, total, compact = false, hideStatusTabs = false, productStatus, setProductStatus, productPage, setProductPage, totalPages, wishlistIds, togglingId, onWishlistToggle }) {
+  const { t } = useLanguage();
   const statusTabs = [
-    { key: '', label: 'All' },
-    { key: 'Accepted', label: 'For Sale' },
-    { key: 'Ready', label: 'Auction' },
-    { key: 'Sold', label: 'Sold' },
+    { key: '', label: t('common.all') },
+    { key: 'Accepted', label: t('my_products.tab_approved') },
+    { key: 'Ready', label: t('my_products.tab_auction_ready') },
+    { key: 'Sold', label: t('seller_dashboard.status_sold') },
   ];
 
   return (
     <div className={`seller-products-section ${compact ? 'compact' : ''}`}>
-      <div className="seller-product-status-tabs">
-        {statusTabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={`seller-status-tab ${productStatus === tab.key ? 'active' : ''}`}
-            onClick={() => setProductStatus(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {!hideStatusTabs && (
+        <div className="seller-product-status-tabs">
+          {statusTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`seller-status-tab ${productStatus === tab.key ? 'active' : ''}`}
+              onClick={() => setProductStatus(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="seller-profile-products">
@@ -683,8 +665,8 @@ function SellerProductGrid({ products, loading, total, compact = false, productS
       ) : !products.length ? (
         <div className="buyer-shop-empty">
           <span className="material-symbols-outlined">inventory_2</span>
-          <h2>{total ? `${total} listings` : 'No products found'}</h2>
-          <p>No products match the selected filter.</p>
+          <h2>{total ? `${total} listings` : t('seller_profile.no_products')}</h2>
+          <p>{t('seller_profile.no_products_desc')}</p>
         </div>
       ) : (
         <>
@@ -729,8 +711,8 @@ function SellerProductGrid({ products, loading, total, compact = false, productS
 }
 
 function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle }) {
+  const { t, formatCurrency } = useLanguage();
   const isWishlist = wishlistIds?.has(product.productId) ?? false;
-  const isAuction = product.price == null;
 
   return (
     <div className="seller-profile-product-card-wrapper">
@@ -745,11 +727,11 @@ function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle 
         </div>
 
         <div className="seller-profile-product-body">
-          <span>{product.categoryName || 'Uncategorized'}</span>
-          <strong>{product.name || 'Untitled product'}</strong>
+          <span>{product.categoryName || t('common.none')}</span>
+          <strong>{product.name || t('nav.product')}</strong>
           <div>
-            <b>{product.price != null ? formatPrice(product.price) : 'Auction'}</b>
-            <small>{product.stockQuantity ?? 0} left</small>
+            <b>{product.price != null ? formatCurrency(product.price) : t('nav.auction')}</b>
+            <small>{t('seller_dashboard.stock_count', { count: product.stockQuantity ?? 0 })}</small>
           </div>
         </div>
       </Link>
@@ -786,6 +768,7 @@ function SellerRatingPanel({
   reviewTotalPages = 1,
   reviewTotalItems = 0,
 }) {
+  const { t } = useLanguage();
   const [selectedReview, setSelectedReview] = useState(null);
   const stats = seller.ratingStats?.length
     ? seller.ratingStats
@@ -821,20 +804,20 @@ function SellerRatingPanel({
 
       <section className="seller-public-review-list">
         <div className="seller-public-review-head">
-          <h2>Buyer Reviews</h2>
-          <span>{firstReview}-{lastReview} of {reviewTotalItems}</span>
+          <h2>{t('product.reviews')}</h2>
+          <span>{`${firstReview}-${lastReview} / ${reviewTotalItems}`}</span>
         </div>
 
         {loadingReviews ? (
           <div className="seller-public-review-loading">
             <span className="btn-spinner"></span>
-            <p>Loading reviews...</p>
+            <p>{t('common.loading')}</p>
           </div>
         ) : reviews.length === 0 ? (
           <div className="seller-public-review-empty">
             <span className="material-symbols-outlined">rate_review</span>
-            <h2>No reviews yet</h2>
-            <p>This seller has not received any completed-order reviews.</p>
+            <h2>{t('product.no_reviews')}</h2>
+            <p>{t('seller_profile.no_products_desc')}</p>
           </div>
         ) : (
           <>
@@ -859,12 +842,12 @@ function SellerRatingPanel({
                   <div>
                     <div className="seller-public-review-top">
                       <div>
-                        <strong>{review.reviewerName || 'Anonymous buyer'}</strong>
+                        <strong>{review.reviewerName || 'Buyer'}</strong>
                         <span>{formatReviewDate(review.createdAt)}</span>
                       </div>
                       <StarMeter value={review.rating || 0} />
                     </div>
-                    <p>{review.comment || 'No written comment.'}</p>
+                    <p>{review.comment || ''}</p>
                     <div className="seller-public-review-product">
                       <span className="seller-public-review-product-img">
                         {review.productImageUrl ? (
@@ -922,7 +905,7 @@ function SellerRatingPanel({
             aria-labelledby="seller-public-review-modal-title"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <button type="button" className="seller-public-review-modal-close" onClick={closeReviewPreview} aria-label="Close review preview">
+            <button type="button" className="seller-public-review-modal-close" onClick={closeReviewPreview} aria-label={t('common.close')}>
               <span className="material-symbols-outlined">close</span>
             </button>
 
@@ -935,7 +918,7 @@ function SellerRatingPanel({
             </div>
 
             <div className="seller-public-review-modal-body">
-              <span className="seller-public-review-modal-eyebrow">Reviewed Product</span>
+              <span className="seller-public-review-modal-eyebrow">{t('nav.product')}</span>
               <h2 id="seller-public-review-modal-title">{selectedReview.productName || 'Reviewed product'}</h2>
               <div className="seller-public-review-modal-meta">
                 <strong>{selectedReview.reviewerName || 'Buyer'}</strong>
@@ -943,7 +926,7 @@ function SellerRatingPanel({
                 {selectedReview.orderCode ? <span>{selectedReview.orderCode}</span> : null}
               </div>
               <StarMeter value={selectedReview.rating || 0} />
-              <p>{selectedReview.comment || 'No written comment.'}</p>
+              <p>{selectedReview.comment || ''}</p>
             </div>
           </section>
         </div>
@@ -962,8 +945,4 @@ function StarMeter({ value }) {
       ))}
     </div>
   );
-}
-
-function formatPrice(value) {
-  return `${currencyFormatter.format(Number(value || 0))} VND`;
 }

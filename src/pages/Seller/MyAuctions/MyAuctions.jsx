@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import { auctionDateTimeLocalToApiValue, formatAuctionDateTime, getFutureAuctionDateTimeLocal, parseAuctionDateTime, toAuctionDateTimeLocal } from '../../../utils/auctionTime';
 import './MyAuctions.css';
 
@@ -12,7 +13,6 @@ const moneyFormatter = new Intl.NumberFormat('vi-VN', {
   currency: 'VND',
 });
 
-const statusOptions = ['All', 'Upcoming', 'Ongoing', 'Ended'];
 const DEFAULT_AUCTION_START_OFFSET_MS = 0;
 
 function isEndedStatus(status) {
@@ -59,23 +59,19 @@ function getProgress(auction) {
   return Math.round(((now - start) / (end - start)) * 100);
 }
 
-function canEditAuction(auction) {
-  return !getAuctionEditBlockReason(auction);
-}
-
-function getAuctionEditBlockReason(auction) {
-  if (!auction) return 'Auction data is not available.';
-  if (auction.status !== 'Upcoming') return 'Only upcoming auctions can be updated.';
-  if (Number(auction.bidCount || 0) > 0) return 'Auctions with existing bids cannot be updated.';
+function getAuctionEditBlockReason(auction, t) {
+  if (!auction) return t('common.no_data');
+  if (auction.status !== 'Upcoming') return t('my_auctions.cancel_error');
+  if (Number(auction.bidCount || 0) > 0) return t('auction.err_limit_exceeded');
 
   const startTime = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
-  if (!startTime || startTime <= Date.now()) return 'Auction start time has passed.';
+  if (!startTime || startTime <= Date.now()) return t('auction.auction_ended');
 
   return '';
 }
 
-function validateAuctionForm(form, { requireProduct = false, requireFutureStart = false } = {}) {
-  if (requireProduct && !form.productId) return 'Please select a ready auction product.';
+function validateAuctionForm(form, { requireProduct = false, requireFutureStart = false }, t) {
+  if (requireProduct && !form.productId) return t('validation.required');
 
   const startingPrice = Number(form.startingPrice);
   const minIncrement = Number(form.minIncrement);
@@ -83,22 +79,23 @@ function validateAuctionForm(form, { requireProduct = false, requireFutureStart 
   const start = parseAuctionDateTime(form.startTime);
   const end = parseAuctionDateTime(form.endTime);
 
-  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return 'Starting bid must be greater than 0.';
-  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return 'Bid step must be greater than 0.';
-  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return 'Buy now price is required.';
-  if (buyNowPrice <= startingPrice) return 'Buy now price must be greater than the starting bid.';
-  if (!form.startTime || !start || Number.isNaN(start.getTime())) return 'Please choose a valid start time.';
-  if (!form.endTime || !end || Number.isNaN(end.getTime())) return 'Please choose a valid end time.';
-  if (requireFutureStart && start <= new Date()) return 'Start time must remain in the future.';
-  if (end <= start) return 'End time must be after start time.';
+  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return t('auction.err_greater_than_zero');
+  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return t('auction.err_greater_than_zero');
+  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return t('validation.required');
+  if (buyNowPrice <= startingPrice) return t('auction.err_buy_now_exceeded');
+  if (!form.startTime || !start || Number.isNaN(start.getTime())) return t('validation.required');
+  if (!form.endTime || !end || Number.isNaN(end.getTime())) return t('validation.required');
+  if (requireFutureStart && start <= new Date()) return t('auction.err_active_only');
+  if (end <= start) return t('validation.required');
 
   return '';
 }
 
 export default function MyAuctions() {
-  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
+
   const [auctions, setAuctions] = useState([]);
   const [eligibleProducts, setEligibleProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -111,9 +108,12 @@ export default function MyAuctions() {
   const [editForm, setEditForm] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const selectedProduct = useMemo(() => {
-    return eligibleProducts.find(p => p.productId === createForm.productId);
-  }, [eligibleProducts, createForm.productId]);
+  const statusOptions = useMemo(() => [
+    { value: 'All', label: t('common.all') },
+    { value: 'Upcoming', label: t('my_auctions.tab_upcoming') },
+    { value: 'Ongoing', label: t('my_auctions.tab_active') },
+    { value: 'Ended', label: t('my_auctions.tab_ended') },
+  ], [t]);
 
   const stats = useMemo(() => {
     return {
@@ -133,7 +133,7 @@ export default function MyAuctions() {
       const data = await auctionService.getMyAuctions(params);
       setAuctions(data?.items || []);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load your auctions.', 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setLoading(false);
     }
@@ -199,7 +199,7 @@ export default function MyAuctions() {
 
   const handleCreate = async (event) => {
     event.preventDefault();
-    const validationError = validateAuctionForm(createForm, { requireProduct: true });
+    const validationError = validateAuctionForm(createForm, { requireProduct: true }, t);
     if (validationError) {
       showToast(validationError, 'warning');
       return;
@@ -211,19 +211,19 @@ export default function MyAuctions() {
         productId: createForm.productId,
         ...toAuctionPayload(createForm),
       });
-      showToast('Auction created successfully.', 'success');
+      showToast(t('toast.saved_success'), 'success');
       setCreateForm(getDefaultCreateForm());
       setIsCreateModalOpen(false);
       await Promise.all([loadEligibleProducts(), loadAuctions()]);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to create auction.', 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const openEditModal = (auction) => {
-    const blockReason = getAuctionEditBlockReason(auction);
+    const blockReason = getAuctionEditBlockReason(auction, t);
     if (blockReason) {
       showToast(blockReason, 'warning');
       return;
@@ -247,7 +247,7 @@ export default function MyAuctions() {
   const handleUpdate = async (event) => {
     event.preventDefault();
     if (!editingAuction || !editForm) return;
-    const validationError = validateAuctionForm(editForm, { requireFutureStart: true });
+    const validationError = validateAuctionForm(editForm, { requireFutureStart: true }, t);
     if (validationError) {
       showToast(validationError, 'warning');
       return;
@@ -256,11 +256,11 @@ export default function MyAuctions() {
     try {
       setSaving(true);
       await auctionService.update(editingAuction.auctionId, toAuctionPayload(editForm));
-      showToast('Auction updated successfully.', 'success');
+      showToast(t('toast.saved_success'), 'success');
       closeEditModal();
       await loadAuctions();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to update auction.', 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setSaving(false);
     }
@@ -269,6 +269,16 @@ export default function MyAuctions() {
   const handleSearchSubmit = (event) => {
     event.preventDefault();
     loadAuctions();
+  };
+
+  const getAuctionStatusText = (status) => {
+    switch (status) {
+      case 'Upcoming': return t('my_auctions.tab_upcoming');
+      case 'Ongoing': return t('my_auctions.tab_active');
+      case 'Ended': case 'EndedByBuyNow': case 'EndedByTime': case 'EndedNoBid':
+        return t('my_auctions.tab_ended');
+      default: return status;
+    }
   };
 
   return (
@@ -282,37 +292,38 @@ export default function MyAuctions() {
 
         <header className="seller-dash-header">
           <div>
-            <h1>My Auctions</h1>
-            <p>Create auction rooms from approved auction products and update upcoming auctions before they become active.</p>
+            <h1>{t('my_auctions.title')}</h1>
+            <p>{t('my_auctions.subtitle')}</p>
           </div>
           <button
             type="button"
             className="seller-list-btn"
             onClick={() => setIsCreateModalOpen(true)}
           >
-            <span className="material-symbols-outlined">add</span>Create Auction
+            <span className="material-symbols-outlined">add</span>{t('my_auctions.create_auction_btn')}
           </button>
         </header>
 
         <section className="seller-auctions-stat-grid">
-          <article><small>Total</small><strong>{stats.total}</strong></article>
-          <article><small>Upcoming</small><strong>{stats.upcoming}</strong></article>
-          <article><small>Ongoing</small><strong>{stats.ongoing}</strong></article>
-          <article><small>Ended</small><strong>{stats.ended}</strong></article>
+          <article><small>{t('common.all')}</small><strong>{stats.total}</strong></article>
+          <article><small>{t('my_auctions.tab_upcoming')}</small><strong>{stats.upcoming}</strong></article>
+          <article><small>{t('my_auctions.tab_active')}</small><strong>{stats.ongoing}</strong></article>
+          <article><small>{t('my_auctions.tab_ended')}</small><strong>{stats.ended}</strong></article>
         </section>
 
         <div className="seller-auctions-layout" style={{ gridTemplateColumns: '1fr' }}>
           <section className="seller-auctions-list-panel">
           <div className="seller-auctions-section-head split">
             <div>
-              <h2>My Auction List</h2>
-              <p>Track progress and update details before a room goes live.</p>
+              <h2>{t('my_auctions.title')}</h2>
+              <p>{t('my_auctions.subtitle')}</p>
             </div>
           </div>
 
           <div className="seller-auctions-filter-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <div className="seller-auctions-tabs" style={{ display: 'flex', gap: '8px' }}>
-              {statusOptions.map((status) => {
+              {statusOptions.map((opt) => {
+                const status = opt.value;
                 const count = status === 'All' ? stats.total :
                               status === 'Upcoming' ? stats.upcoming :
                               status === 'Ongoing' ? stats.ongoing : stats.ended;
@@ -335,7 +346,7 @@ export default function MyAuctions() {
                       boxShadow: statusFilter === status ? '0 4px 12px rgba(153, 27, 27, 0.2)' : 'none'
                     }}
                   >
-                    {status} ({count})
+                    {opt.label} ({count})
                   </button>
                 );
               })}
@@ -345,7 +356,7 @@ export default function MyAuctions() {
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search auction..."
+                placeholder={t('common.search_placeholder')}
                 style={{
                   width: '100%',
                   padding: '10px 16px 10px 40px',
@@ -365,8 +376,8 @@ export default function MyAuctions() {
           {auctions.length === 0 ? (
             <div className="seller-auctions-empty">
               <span className="material-symbols-outlined">gavel</span>
-              <h3>No auctions found</h3>
-              <p>Create a new auction or adjust your filter.</p>
+              <h3>{t('common.no_data')}</h3>
+              <p>{t('my_auctions.subtitle')}</p>
             </div>
           ) : (
             <div className="seller-auctions-list">
@@ -374,23 +385,23 @@ export default function MyAuctions() {
                 const progress = getProgress(auction);
                 return (
                   <article key={auction.auctionId} className="seller-auctions-row">
-                    <img src={auction.productImageUrl || 'https://placehold.co/140'} alt={auction.productName || 'Auction'} />
+                    <img src={auction.productImageUrl || 'https://placehold.co/140'} alt={auction.productName || t('nav.auction')} />
                     <div className="seller-auctions-row-main">
                       <div className="seller-auctions-row-top">
                         <div>
-                          <strong>{auction.productName || 'Unnamed auction'}</strong>
-                          <span>{auction.categoryName || 'Uncategorized'} - {auction.auctionId}</span>
+                          <strong>{auction.productName || t('nav.auction')}</strong>
+                          <span>{auction.categoryName || t('common.none')} - {auction.auctionId}</span>
                         </div>
-                        <em className={`seller-auctions-status ${String(auction.status || '').toLowerCase()}`}>{auction.status}</em>
+                        <em className={`seller-auctions-status ${String(auction.status || '').toLowerCase()}`}>{getAuctionStatusText(auction.status)}</em>
                       </div>
                       <div className="seller-auctions-progress">
                         <i><b style={{ width: `${progress}%` }} /></i>
                         <small>{progress}%</small>
                       </div>
                       <div className="seller-auctions-meta">
-                        <span>Current <b>{formatMoney(auction.currentPrice)}</b></span>
-                        <span>Step <b>{formatMoney(auction.minIncrement)}</b></span>
-                        <span>Bids <b>{auction.bidCount || 0}</b></span>
+                        <span>{t('auction.current_bid')} <b>{formatMoney(auction.currentPrice)}</b></span>
+                        <span>{t('auction.min_step')} <b>{formatMoney(auction.minIncrement)}</b></span>
+                        <span>{t('auction.bid_count')} <b>{auction.bidCount || 0}</b></span>
                       </div>
                       <div className="seller-auctions-time">
                         <span>{formatDateTime(auction.startTime)}</span>
@@ -398,17 +409,18 @@ export default function MyAuctions() {
                       </div>
                     </div>
                     <div className="seller-auctions-actions">
-                      <button type="button" onClick={() => navigate(`/auction/${auction.auctionId}`)} title="View detail">
-                        <span className="material-symbols-outlined">visibility</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(auction)}
-                        aria-disabled={!canEditAuction(auction)}
-                        title={getAuctionEditBlockReason(auction) || 'Update auction'}
-                      >
-                        <span className="material-symbols-outlined">edit</span>
-                      </button>
+                      <Link to={`/auction/${auction.auctionId}`} className="btn-secondary">
+                        {t('auction.title')}
+                      </Link>
+                      {auction.status === 'Upcoming' && Number(auction.bidCount || 0) === 0 && (
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          onClick={() => openEditModal(auction)}
+                        >
+                          {t('common.edit')}
+                        </button>
+                      )}
                     </div>
                   </article>
                 );
@@ -419,128 +431,181 @@ export default function MyAuctions() {
       </div>
     </div>
 
+    {/* Create Auction Modal */}
     {isCreateModalOpen && (
-        <div className="seller-auctions-modal" role="dialog" aria-modal="true" onClick={() => setIsCreateModalOpen(false)}>
-          <form className="seller-auctions-modal-card" onClick={(e) => e.stopPropagation()} onSubmit={handleCreate} noValidate>
-            <header style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '14px', marginBottom: '16px' }}>
-              <div>
-                <h2>Create Auction</h2>
-                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Set rules for your approved auction product</p>
-              </div>
-              <button type="button" onClick={() => setIsCreateModalOpen(false)} disabled={saving} style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </header>
-
-            <label className="seller-auctions-field wide" style={{ marginBottom: '12px' }}>
-              <span>Auction Product</span>
-              <select name="productId" value={createForm.productId} onChange={handleCreateChange} required disabled={saving}>
-                <option value="">Select product</option>
-                {eligibleProducts.map((product) => (
-                  <option key={product.productId} value={product.productId}>
-                    {product.name} - {product.categoryName || 'Uncategorized'}
+      <div className="seller-auctions-modal-overlay" onClick={() => !saving && setIsCreateModalOpen(false)}>
+        <div className="seller-auctions-modal animate-fade-in" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>{t('my_auctions.create_auction_btn')}</h3>
+            <button className="close-btn" onClick={() => !saving && setIsCreateModalOpen(false)}>×</button>
+          </div>
+          <form onSubmit={handleCreate} className="modal-body">
+            <div className="form-group">
+              <label>{t('my_auctions.th_product')} *</label>
+              <select
+                name="productId"
+                value={createForm.productId}
+                onChange={handleCreateChange}
+                required
+              >
+                <option value="">{t('common.select')}</option>
+                {eligibleProducts.map((p) => (
+                  <option key={p.productId} value={p.productId}>
+                    {p.name} ({p.productId})
                   </option>
                 ))}
               </select>
-            </label>
-
-            {selectedProduct && (
-              <div className="seller-auctions-selected-product-card" style={{ display: 'flex', gap: '16px', alignItems: 'center', background: '#f9fafb', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
-                <img src={selectedProduct.mainImageUrl || '/vite.svg'} alt={selectedProduct.name} style={{ width: '80px', height: '72px', objectFit: 'cover', borderRadius: '8px', background: '#f3f4f6' }} />
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)', fontWeight: 800 }}>{selectedProduct.name}</h4>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>Category: {selectedProduct.categoryName || 'Uncategorized'}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="seller-auctions-form-grid">
-              <label className="seller-auctions-field">
-                <span>Starting Bid</span>
-                <input name="startingPrice" type="number" min="1" value={createForm.startingPrice} onChange={handleCreateChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field">
-                <span>Bid Step</span>
-                <input name="minIncrement" type="number" min="1" value={createForm.minIncrement} onChange={handleCreateChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field">
-                <span>Start Time</span>
-                <input name="startTime" type="datetime-local" value={createForm.startTime} onChange={handleCreateChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field">
-                <span>End Time</span>
-                <input name="endTime" type="datetime-local" value={createForm.endTime} onChange={handleCreateChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field wide">
-                <span>Buy Now Price</span>
-                <input name="buyNowPrice" type="number" min="0" value={createForm.buyNowPrice} onChange={handleCreateChange} disabled={saving} />
-              </label>
             </div>
 
-            {eligibleProducts.length === 0 && (
-              <div className="seller-auctions-empty-inline" style={{ marginTop: '14px' }}>
-                <span className="material-symbols-outlined">inventory_2</span>
-                <p>No ready auction products are available.</p>
+            <div className="form-group-row">
+              <div className="form-group">
+                <label>{t('auction.starting_price')} (VND) *</label>
+                <input
+                  type="number"
+                  name="startingPrice"
+                  value={createForm.startingPrice}
+                  onChange={handleCreateChange}
+                  required
+                  min="1"
+                  placeholder="e.g. 100000"
+                />
               </div>
-            )}
-
-            <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '14px', marginTop: '18px' }}>
-              <button type="button" className="seller-auctions-secondary" onClick={() => setIsCreateModalOpen(false)} disabled={saving}>Cancel</button>
-              <button type="submit" className="seller-auctions-primary" disabled={saving || eligibleProducts.length === 0}>
-                {saving ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">add_circle</span>}
-                Create Auction
-              </button>
-            </footer>
-          </form>
-        </div>
-      )}
-
-      {editingAuction && editForm && (
-        <div className="seller-auctions-modal" role="dialog" aria-modal="true" onClick={closeEditModal}>
-          <form className="seller-auctions-modal-card" onClick={(e) => e.stopPropagation()} onSubmit={handleUpdate} noValidate>
-            <header>
-              <div>
-                <h2>Update Auction</h2>
-                <p>{editingAuction.productName}</p>
+              <div className="form-group">
+                <label>{t('auction.min_step')} (VND) *</label>
+                <input
+                  type="number"
+                  name="minIncrement"
+                  value={createForm.minIncrement}
+                  onChange={handleCreateChange}
+                  required
+                  min="1"
+                  placeholder="e.g. 50000"
+                />
               </div>
-              <button type="button" onClick={closeEditModal} disabled={saving}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </header>
-
-            <div className="seller-auctions-form-grid">
-              <label className="seller-auctions-field">
-                <span>Starting Bid</span>
-                <input name="startingPrice" type="number" min="1" value={editForm.startingPrice} onChange={handleEditChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field">
-                <span>Bid Step</span>
-                <input name="minIncrement" type="number" min="1" value={editForm.minIncrement} onChange={handleEditChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field">
-                <span>Start Time</span>
-                <input name="startTime" type="datetime-local" value={editForm.startTime} onChange={handleEditChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field">
-                <span>End Time</span>
-                <input name="endTime" type="datetime-local" value={editForm.endTime} onChange={handleEditChange} required disabled={saving} />
-              </label>
-              <label className="seller-auctions-field wide">
-                <span>Buy Now Price</span>
-                <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditChange} disabled={saving} />
-              </label>
             </div>
 
-            <footer>
-              <button type="button" className="seller-auctions-secondary" onClick={closeEditModal} disabled={saving}>Cancel</button>
-              <button type="submit" className="seller-auctions-primary" disabled={saving}>
-                {saving ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">save</span>}
-                Save Changes
-              </button>
-            </footer>
+            <div className="form-group">
+              <label>{t('auction.buy_now_price')} (VND) *</label>
+              <input
+                type="number"
+                name="buyNowPrice"
+                value={createForm.buyNowPrice}
+                onChange={handleCreateChange}
+                required
+                min="1"
+                placeholder="e.g. 1000000"
+              />
+            </div>
+
+            <div className="form-group-row">
+              <div className="form-group">
+                <label>{t('auction.start_time')} *</label>
+                <input
+                  type="datetime-local"
+                  name="startTime"
+                  value={createForm.startTime}
+                  onChange={handleCreateChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>{t('auction.end_time')} *</label>
+                <input
+                  type="datetime-local"
+                  name="endTime"
+                  value={createForm.endTime}
+                  onChange={handleCreateChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setIsCreateModalOpen(false)} disabled={saving}>{t('common.cancel')}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('common.saving') : t('my_auctions.create_auction_btn')}</button>
+            </div>
           </form>
         </div>
-      )}
-    </>
+      </div>
+    )}
+
+    {/* Edit Auction Modal */}
+    {editingAuction && editForm && (
+      <div className="seller-auctions-modal-overlay" onClick={closeEditModal}>
+        <div className="seller-auctions-modal animate-fade-in" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>{t('common.edit')}</h3>
+            <button className="close-btn" onClick={closeEditModal}>×</button>
+          </div>
+          <form onSubmit={handleUpdate} className="modal-body">
+            <div className="form-group-row">
+              <div className="form-group">
+                <label>{t('auction.starting_price')} (VND) *</label>
+                <input
+                  type="number"
+                  name="startingPrice"
+                  value={editForm.startingPrice}
+                  onChange={handleEditChange}
+                  required
+                  min="1"
+                />
+              </div>
+              <div className="form-group">
+                <label>{t('auction.min_step')} (VND) *</label>
+                <input
+                  type="number"
+                  name="minIncrement"
+                  value={editForm.minIncrement}
+                  onChange={handleEditChange}
+                  required
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>{t('auction.buy_now_price')} (VND) *</label>
+              <input
+                type="number"
+                name="buyNowPrice"
+                value={editForm.buyNowPrice}
+                onChange={handleEditChange}
+                required
+                min="1"
+              />
+            </div>
+
+            <div className="form-group-row">
+              <div className="form-group">
+                <label>{t('auction.start_time')} *</label>
+                <input
+                  type="datetime-local"
+                  name="startTime"
+                  value={editForm.startTime}
+                  onChange={handleEditChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>{t('auction.end_time')} *</label>
+                <input
+                  type="datetime-local"
+                  name="endTime"
+                  value={editForm.endTime}
+                  onChange={handleEditChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeEditModal} disabled={saving}>{t('common.cancel')}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

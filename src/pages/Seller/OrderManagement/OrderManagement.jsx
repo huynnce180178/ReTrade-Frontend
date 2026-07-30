@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import orderService from '../../../services/orderService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import './OrderManagement.css';
@@ -9,58 +10,14 @@ import ReportModal from '../../../components/ReportModal/ReportModal';
 import reportService from '../../../services/reportService';
 
 const pageSize = 5;
-const SHIPPING_PROVIDER = 'GHN';
 const numberFormatter = new Intl.NumberFormat('vi-VN');
-const awaitingPaymentCancelDelayMs = 15 * 60 * 1000;
-const defaultShippingDelayMs = 30 * 1000;
-
-const tabs = [
-  { key: '', label: 'All' },
-  { key: 'AwaitingPayment', label: 'Awaiting Payment' },
-  { key: 'Pending', label: 'Pending' },
-  { key: 'Confirmed', label: 'Confirmed' },
-  { key: 'Shipping', label: 'Shipping' },
-  { key: 'Delivered', label: 'Delivered' },
-  { key: 'Completed', label: 'Completed' },
-  { key: 'DeliveryFailed', label: 'Delivery Failed' },
-  { key: 'Returned', label: 'Returned' },
-  { key: 'Cancelled', label: 'Cancelled' },
-];
-
-const statusMeta = {
-  AwaitingPayment: { label: 'Awaiting Payment', className: 'awaiting' },
-  Pending: { label: 'Pending', className: 'pending' },
-  Confirmed: { label: 'Confirmed', className: 'confirmed' },
-  Shipping: { label: 'Shipping', className: 'shipping' },
-  Delivered: { label: 'Delivered', className: 'delivered' },
-  Completed: { label: 'Completed', className: 'completed' },
-  DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
-  Returned: { label: 'Returned', className: 'returned' },
-  ReturnRequested: { label: 'Return Requested', className: 'return-requested' },
-  ReturnRejected: { label: 'Return Rejected', className: 'return-rejected' },
-  Cancelled: { label: 'Cancelled', className: 'cancelled' },
-};
-
-const nextActionByStatus = {
-  Pending: { label: 'Confirm', status: 'Confirmed', tone: 'primary' },
-  Confirmed: { label: 'Ship', status: 'Shipping', tone: 'info' },
-};
-
-const initialFilterForm = {
-  sortBy: 'newest',
-};
-
-const sortOptions = [
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'total_desc', label: 'Highest total' },
-  { value: 'total_asc', label: 'Lowest total' },
-];
 
 export default function OrderManagement() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { t } = useLanguage();
+
   const skipNextFilterAutoApply = useRef(false);
 
   const [orders, setOrders] = useState([]);
@@ -69,9 +26,8 @@ export default function OrderManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [filterForm, setFilterForm] = useState(initialFilterForm);
+  const [filterForm, setFilterForm] = useState({ sortBy: 'newest' });
   const [appliedFilters, setAppliedFilters] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [reportTarget, setReportTarget] = useState(null);
@@ -79,37 +35,70 @@ export default function OrderManagement() {
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
-  const sellerId = user?.userId || user?.id;
-  const hasActiveControls = Boolean(activeStatus || appliedSearchTerm || appliedFilters);
+  const sellerId = user?.userId;
+
+  const statusMeta = useMemo(() => ({
+    AwaitingPayment: { label: t('sales_stats.awaiting_payment'), className: 'awaiting' },
+    Pending: { label: t('sales_stats.pending'), className: 'pending' },
+    Confirmed: { label: t('sales_stats.confirmed'), className: 'confirmed' },
+    Shipping: { label: t('sales_stats.shipping'), className: 'shipping' },
+    Delivered: { label: t('sales_stats.delivered'), className: 'delivered' },
+    Completed: { label: t('sales_stats.completed'), className: 'completed' },
+    DeliveryFailed: { label: t('sales_stats.delivery_failed'), className: 'delivery-failed' },
+    Returned: { label: t('sales_stats.returned'), className: 'returned' },
+    ReturnRequested: { label: t('history.refund_reason'), className: 'return-requested' },
+    ReturnRejected: { label: t('admin.reject'), className: 'return-rejected' },
+    Cancelled: { label: t('sales_stats.cancelled'), className: 'cancelled' },
+  }), [t]);
+
+  const tabs = useMemo(() => [
+    { key: '', label: t('common.all') },
+    { key: 'Pending', label: t('sales_stats.pending') },
+    { key: 'Confirmed', label: t('sales_stats.confirmed') },
+    { key: 'Shipping', label: t('sales_stats.shipping') },
+    { key: 'Delivered', label: t('sales_stats.delivered') },
+    { key: 'Completed', label: t('sales_stats.completed') },
+    { key: 'Cancelled', label: t('sales_stats.cancelled') },
+  ], [t]);
+
+  const sortOptions = useMemo(() => [
+    { value: 'newest', label: t('product.sort_newest') },
+    { value: 'price_desc', label: t('product.sort_price_desc') },
+    { value: 'price_asc', label: t('product.sort_price_asc') },
+  ], [t]);
+
+  const hasActiveControls = Boolean(
+    activeStatus || appliedSearchTerm || (appliedFilters && appliedFilters.sortBy !== 'newest')
+  );
 
   useEffect(() => {
     if (skipNextFilterAutoApply.current) {
       skipNextFilterAutoApply.current = false;
-      return undefined;
+      return;
     }
 
-    const timer = setTimeout(() => {
-      const nextFilters = normalizeFilterForm(filterForm);
-      setAppliedFilters(nextFilters);
-      setPage(1);
-    }, 350);
+    const nextNormalized = normalizeFilterForm(filterForm);
+    setAppliedFilters((current) => {
+      if (JSON.stringify(current) === JSON.stringify(nextNormalized)) {
+        return current;
+      }
+      return nextNormalized;
+    });
 
-    return () => clearTimeout(timer);
+    setPage(1);
   }, [filterForm]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setAppliedSearchTerm(searchTerm.trim());
       setPage(1);
-    }, 350);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
   const fetchOrders = useCallback(async () => {
-    if (!sellerId) {
-      return;
-    }
+    if (!sellerId) return;
 
     try {
       setLoading(true);
@@ -119,20 +108,20 @@ export default function OrderManagement() {
         SellerId: sellerId,
         Status: effectiveStatus,
         SearchTerm: appliedSearchTerm || undefined,
-        SortBy: appliedFilters?.sortBy || 'newest',
-        Page: page,
+        SortBy: appliedFilters?.sortBy || filterForm.sortBy || 'newest',
+        PageNumber: page,
         PageSize: pageSize,
       });
 
-      setOrders(data?.items || []);
-      setTotalItems(data?.totalItems || 0);
-      setTotalPages(data?.totalPages || 1);
+      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      setOrders(items);
+      setTotalPages(data?.totalPages ?? Math.max(1, Math.ceil((data?.totalCount ?? items.length) / pageSize)));
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load seller orders.', 'error');
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, appliedFilters, appliedSearchTerm, page, sellerId, showToast]);
+  }, [activeStatus, appliedFilters, appliedSearchTerm, filterForm.sortBy, page, sellerId, showToast, t]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -141,81 +130,35 @@ export default function OrderManagement() {
   }, [fetchOrders, isAdmin, isSeller, user]);
 
   useEffect(() => {
-    if (!sellerId || !isSeller) {
-      return undefined;
-    }
+    if (authLoading || !user || (!isSeller && !isAdmin)) return undefined;
 
     const connection = createOrderHubConnection();
     let disposed = false;
 
-    const handleOrderStatusChanged = (payload) => {
-      const eventType = payload?.eventType || payload?.EventType;
-      const isNewSellerOrder = eventType === 'Created' || eventType === 'PaymentConfirmed';
-      const realtimeOrder = toRealtimeOrder(payload);
-
-      if (isNewSellerOrder) {
-        showToast('New seller order received.', 'success');
-        if (realtimeOrder) {
-          setOrders((value) => upsertOrder(value, realtimeOrder));
-        }
-
-        if (activeStatus || appliedSearchTerm || appliedFilters || page !== 1) {
-          setActiveStatus('');
-          setAppliedSearchTerm('');
-          setSearchTerm('');
-          setAppliedFilters(null);
-          setPage(1);
-          return;
-        }
-      }
-
-      if (realtimeOrder) {
-        setOrders((value) => upsertOrder(value, realtimeOrder));
-      }
-      fetchOrders();
+    const handleOrderUpdate = () => {
+      if (!disposed) fetchOrders();
     };
 
-    connection.on('SellerOrderStatusChanged', handleOrderStatusChanged);
+    connection.on('ReceiveOrderNotification', handleOrderUpdate);
+    connection.on('OrderStatusUpdated', handleOrderUpdate);
 
-    const startConnection = async () => {
-      try {
-        await connection.start();
-        if (!disposed) {
-          await connection.invoke('JoinSellerOrderGroup', sellerId);
-        }
-      } catch (error) {
-        console.error('Failed to connect seller order hub:', error);
-      }
-    };
-
-    startConnection();
+    connection.start()
+      .then(() => {
+        if (!disposed) connection.invoke('JoinSellerOrders').catch(() => { });
+      })
+      .catch(() => { });
 
     return () => {
       disposed = true;
-      connection.off('SellerOrderStatusChanged', handleOrderStatusChanged);
-      if (connection.state === 'Connected') {
-        connection.invoke('LeaveSellerOrderGroup', sellerId).catch(() => { });
-      }
+      connection.off('ReceiveOrderNotification', handleOrderUpdate);
+      connection.off('OrderStatusUpdated', handleOrderUpdate);
       connection.stop().catch(() => { });
     };
-  }, [activeStatus, appliedFilters, appliedSearchTerm, fetchOrders, isSeller, page, sellerId, showToast]);
+  }, [authLoading, fetchOrders, isAdmin, isSeller, user]);
 
-  const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
-  const firstVisibleItem = orders.length ? (page - 1) * pageSize + 1 : 0;
-  const lastVisibleItem = orders.length ? firstVisibleItem + orders.length - 1 : 0;
-
-  const stats = useMemo(() => {
-    const awaiting = orders.filter((order) => order.status === 'AwaitingPayment' || order.status === 'Pending').length;
-    const confirmed = orders.filter((order) => order.status === 'Confirmed').length;
-    const shipping = orders.filter((order) => order.status === 'Shipping').length;
-
-    return [
-      { label: 'Total Orders', icon: 'shopping_cart', value: totalItems, note: 'All matched orders' },
-      { label: 'Need Confirm', icon: 'fact_check', value: awaiting, note: 'Waiting seller action', hot: true },
-      { label: 'Confirmed', icon: 'inventory', value: confirmed, note: 'Ready to ship' },
-      { label: 'Shipping', icon: 'local_shipping', value: shipping, note: 'In transit' },
-    ];
-  }, [orders, totalItems]);
+  const handleFilterChange = (field, value) => {
+    setFilterForm((current) => ({ ...current, [field]: value }));
+  };
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -223,93 +166,103 @@ export default function OrderManagement() {
     setPage(1);
   };
 
-  const handleFilterChange = (field, value) => {
-    setFilterForm((current) => ({ ...current, [field]: value }));
-  };
-
   const resetFilterFormSilently = () => {
-    if (!isDefaultFilterForm(filterForm)) {
-      skipNextFilterAutoApply.current = true;
-    }
-    setFilterForm(initialFilterForm);
+    skipNextFilterAutoApply.current = true;
+    setFilterForm({ sortBy: 'newest' });
   };
 
   const handleResetFilters = () => {
     resetFilterFormSilently();
     setAppliedFilters(null);
-    setAppliedSearchTerm('');
     setSearchTerm('');
+    setAppliedSearchTerm('');
     setActiveStatus('');
     setPage(1);
   };
 
-  const handleInlineStatusUpdate = async (order) => {
-    const action = getNextAction(order);
-    if (!action?.status || !sellerId) {
-      return;
-    }
+  const stats = useMemo(() => {
+    const pendingCount = orders.filter((o) => o.status === 'Pending').length;
+    const confirmedCount = orders.filter((o) => o.status === 'Confirmed').length;
+    const shippingCount = orders.filter((o) => o.status === 'Shipping').length;
+    const totalRevenue = orders
+      .filter((o) => o.status === 'Completed' || o.status === 'Delivered')
+      .reduce((sum, o) => sum + Number(o.finalAmount || 0), 0);
 
+    return [
+      {
+        icon: 'hourglass_top',
+        label: t('sales_stats.pending'),
+        value: pendingCount,
+        note: t('my_products.subtitle'),
+        hot: pendingCount > 0,
+      },
+      {
+        icon: 'package_2',
+        label: t('sales_stats.confirmed'),
+        value: confirmedCount,
+        note: t('my_products.subtitle'),
+        hot: confirmedCount > 0,
+      },
+      {
+        icon: 'local_shipping',
+        label: t('sales_stats.shipping'),
+        value: shippingCount,
+        note: t('sales_stats.shipping'),
+      },
+      {
+        icon: 'payments',
+        label: t('seller.total_revenue'),
+        value: formatVnd(totalRevenue),
+        note: t('sales_stats.desc'),
+      },
+    ];
+  }, [orders, t]);
+
+  const handleUpdateStatus = async (order, targetStatus) => {
     try {
       setUpdatingOrderId(order.orderId);
-      const updated = await orderService.updateStatus(
+      await orderService.updateSellerOrderStatus(
         order.orderId,
-        buildStatusPayload(order, action.status),
-        { sellerId }
+        { status: targetStatus },
+        { sellerId: user.userId }
       );
-
-      const updatedOrder = { ...order, ...(updated || {}), status: updated?.status || action.status };
-      setOrders((current) => current.map((item) => (
-        item.orderId === order.orderId ? { ...item, ...updatedOrder } : item
-      )));
-      showToast(`Order status updated to ${getStatusLabel(updatedOrder.status)}.`, 'success');
-      fetchOrders();
+      showToast(t('order_status_update.update_success'), 'success');
+      await fetchOrders();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to update order status.', 'error');
+      showToast(error?.response?.data || t('order_status_update.update_error'), 'error');
     } finally {
       setUpdatingOrderId(null);
     }
   };
 
-  const handleApproveReturn = async (orderId) => {
-    if (!sellerId) return;
-
-    try {
-      setUpdatingOrderId(orderId);
-      await orderService.approveReturn(orderId, sellerId);
-      showToast('Return approved successfully.', 'success');
-      fetchOrders();
-    } catch (error) {
-      showToast(error?.response?.data || 'Failed to approve return.', 'error');
-    } finally {
-      setUpdatingOrderId(null);
+  const getNextAction = (order) => {
+    if (order.status === 'Pending') {
+      return { label: t('common.confirm'), status: 'Confirmed', tone: 'primary' };
     }
-  };
-
-  const handleRejectReturn = async (orderId) => {
-    if (!sellerId) return;
-
-    try {
-      setUpdatingOrderId(orderId);
-      await orderService.rejectReturn(orderId, sellerId);
-      showToast('Return rejected successfully.', 'success');
-      fetchOrders();
-    } catch (error) {
-      showToast(error?.response?.data || 'Failed to reject return.', 'error');
-    } finally {
-      setUpdatingOrderId(null);
+    if (order.status === 'Confirmed') {
+      return { label: t('sales_stats.shipping'), status: 'Shipping', tone: 'info' };
     }
+    return null;
   };
 
   const openDetail = (orderId) => navigate(`/seller-dashboard/orders/${orderId}`);
+
   const submitBuyerReport = async (payload) => {
     if (!reportTarget?.orderId) return;
-    try { setReportSubmitting(true); await reportService.reportBuyer(reportTarget.orderId, payload); showToast('Report submitted successfully.', 'success'); setReportTarget(null); }
-    catch (error) { showToast(error?.response?.data || 'Failed to submit report.', 'error'); }
-    finally { setReportSubmitting(false); }
+    try {
+      setReportSubmitting(true);
+      await reportService.reportBuyer(reportTarget.orderId, payload);
+      showToast(t('reports.report_success'), 'success');
+      setReportTarget(null);
+    } catch (error) {
+      showToast(error?.response?.data || t('common.error_occurred'), 'error');
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   if (authLoading) {
-    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading orders...</p></div>;
+    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>{t('common.loading')}</p></div>;
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -319,9 +272,9 @@ export default function OrderManagement() {
     <div className="om-page animate-fade-in">
       <header className="om-header">
         <div className="om-header-copy">
-          <span className="om-eyebrow">Seller Orders</span>
-          <h1>Order Management</h1>
-          <p>Review buyer orders, confirm processing, and keep fulfillment status current.</p>
+          <span className="om-eyebrow">{t('seller.orders_management')}</span>
+          <h1>{t('order_management.title')}</h1>
+          <p>{t('order_management.subtitle')}</p>
         </div>
       </header>
 
@@ -345,11 +298,11 @@ export default function OrderManagement() {
             <input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search orders, products, buyers..."
+              placeholder={t('common.search_placeholder')}
             />
           </form>
           <label className="om-sort-control">
-            <span>Sort</span>
+            <span>{t('common.sort')}</span>
             <select value={filterForm.sortBy} onChange={(event) => handleFilterChange('sortBy', event.target.value)}>
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -361,8 +314,8 @@ export default function OrderManagement() {
             className="om-reset-button"
             disabled={!hasActiveControls}
             onClick={handleResetFilters}
-            aria-label="Reset filters"
-            title="Reset filters"
+            aria-label={t('common.reset')}
+            title={t('common.reset')}
           >
             <span className="material-symbols-outlined">restart_alt</span>
           </button>
@@ -392,25 +345,25 @@ export default function OrderManagement() {
             <thead>
               <tr>
                 <th>STT</th>
-                <th>Customer</th>
-                <th>Product Details</th>
-                <th>Total Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{t('order_management.th_buyer')}</th>
+                <th>{t('my_products.th_product')}</th>
+                <th>{t('order_management.th_total')}</th>
+                <th>{t('order_management.th_status')}</th>
+                <th>{t('order_management.th_action')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6"><div className="om-empty">Loading orders...</div></td>
+                  <td colSpan="6"><div className="om-empty">{t('common.loading')}</div></td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan="6"><div className="om-empty">No seller orders found.</div></td>
+                  <td colSpan="6"><div className="om-empty">{t('common.no_data')}</div></td>
                 </tr>
               ) : (
                 orders.map((order, index) => {
-                  const meta = statusMeta[order.status] || { label: order.status || 'Unknown', className: 'default' };
+                  const meta = statusMeta[order.status] || { label: order.status || t('common.unknown'), className: 'default' };
                   const action = getNextAction(order);
                   const orderNumber = (page - 1) * pageSize + index + 1;
                   const isUpdating = updatingOrderId === order.orderId;
@@ -421,17 +374,17 @@ export default function OrderManagement() {
                         <strong>{orderNumber}</strong>
                       </td>
                       <td>
-                        <strong>{order.buyerName || 'Unknown Buyer'}</strong>
+                        <strong>{order.buyerName || t('common.unknown_buyer')}</strong>
                       </td>
                       <td>
                         <div className="om-product">
-                          <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
+                          <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || t('nav.product')} />
                           <div>
-                            <strong>{order.productName || 'Untitled product'}</strong>
-                              <span>Qty {order.quantity || 0}</span>
-                              {order.returnReason ? (
-                                <div className="om-return-reason">Return reason: {order.returnReason}</div>
-                              ) : null}
+                            <strong>{order.productName || t('nav.product')}</strong>
+                            <span>{t('common.quantity')} {order.quantity || 0}</span>
+                            {order.returnReason ? (
+                              <div className="om-return-reason">{t('history.refund_reason')}: {order.returnReason}</div>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -446,40 +399,34 @@ export default function OrderManagement() {
                             className="om-detail-btn"
                             onClick={() => openDetail(order.orderId)}
                           >
-                            Details
+                            {t('common.detail')}
                           </button>
-                          {order.status === 'ReturnRequested' ? (
-                            <>
-                              <button
-                                type="button"
-                                className="om-primary-action primary"
-                                disabled={isUpdating}
-                                onClick={() => handleApproveReturn(order.orderId)}
-                              >
-                                {isUpdating === order.orderId ? 'Processing...' : 'Approve Return'}
-                              </button>
-                              <button
-                                type="button"
-                                className="om-primary-action danger"
-                                disabled={isUpdating}
-                                onClick={() => handleRejectReturn(order.orderId)}
-                              >
-                                {isUpdating === order.orderId ? 'Processing...' : 'Reject Return'}
-                              </button>
-                            </>
-                          ) : action ? (
+                          {action ? (
                             <button
                               type="button"
-                              className={`om-primary-action ${action.tone || 'primary'}`}
+                              className={`om-action-btn ${action.tone}`}
                               disabled={isUpdating}
-                              onClick={() => handleInlineStatusUpdate(order)}
+                              onClick={() => handleUpdateStatus(order, action.status)}
                             >
-                              {isUpdating ? 'Updating...' : action.label}
+                              {isUpdating ? <span className="btn-spinner sm"></span> : action.label}
                             </button>
-                          ) : (
-                            <span className="om-action-spacer" aria-hidden="true" />
-                          )}
-                          {order.status === 'Completed' && <button type="button" className="om-detail-btn" disabled={isUpdating} onClick={() => setReportTarget(order)}>Report Buyer</button>}
+                          ) : null}
+                          {order.status === 'ReturnRequested' ? (
+                            <button
+                              type="button"
+                              className="om-action-btn primary"
+                              onClick={() => openDetail(order.orderId)}
+                            >
+                              {t('common.view_detail')}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="om-report-btn"
+                            onClick={() => setReportTarget(order)}
+                          >
+                            {t('reports.report_button')}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -490,140 +437,50 @@ export default function OrderManagement() {
           </table>
         </div>
 
-        <footer className="om-footer">
-          <span>Showing {firstVisibleItem}-{lastVisibleItem} of {totalItems} orders</span>
-          <nav className="om-pagination" aria-label="Order list pagination">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} aria-label="Previous page">
-              <span className="material-symbols-outlined">chevron_left</span>
+        {totalPages > 1 && (
+          <div className="om-pagination">
+            <button
+              type="button"
+              disabled={page === 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              {t('common.previous')}
             </button>
-            {paginationItems.map((item, index) => (
-              item === 'ellipsis' ? (
-                <span key={`${item}-${index}`} className="om-pagination-ellipsis">...</span>
-              ) : (
-                <button
-                  key={item}
-                  type="button"
-                  className={page === item ? 'active' : ''}
-                  onClick={() => setPage(item)}
-                  aria-current={page === item ? 'page' : undefined}
-                >
-                  {item}
-                </button>
-              )
-            ))}
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} aria-label="Next page">
-              <span className="material-symbols-outlined">chevron_right</span>
+            <span>
+              {t('common.page')} {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            >
+              {t('common.next')}
             </button>
-          </nav>
-        </footer>
+          </div>
+        )}
       </section>
-      <ReportModal isOpen={Boolean(reportTarget)} title="Report Buyer" targetLabel={`Report the buyer for order #${reportTarget?.orderCode || reportTarget?.orderId || ''}.`} submitting={reportSubmitting} onClose={() => !reportSubmitting && setReportTarget(null)} onSubmit={submitBuyerReport} />
+
+      {reportTarget ? (
+        <ReportModal
+          isOpen={Boolean(reportTarget)}
+          onClose={() => setReportTarget(null)}
+          onSubmit={submitBuyerReport}
+          targetName={reportTarget.buyerName || t('common.unknown_buyer')}
+          targetType="User"
+          reportType="Buyer"
+          submitting={reportSubmitting}
+        />
+      ) : null}
     </div>
   );
-}
-
-function normalizeFilterForm(form) {
-  const nextFilters = {
-    sortBy: form.sortBy,
-  };
-
-  const hasFilters = nextFilters.sortBy !== initialFilterForm.sortBy;
-
-  return hasFilters ? nextFilters : null;
-}
-
-function isDefaultFilterForm(form) {
-  return form.sortBy === initialFilterForm.sortBy;
 }
 
 function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
-function buildStatusPayload(order, status) {
+function normalizeFilterForm(form) {
   return {
-    status,
-    trackingCode: order.trackingCode || null,
-    shippingProvider: status === 'Shipping' ? SHIPPING_PROVIDER : order.shippingProvider || null,
-    expectedDeliveryTime: status === 'Shipping'
-      ? new Date(Date.now() + defaultShippingDelayMs).toISOString()
-      : null,
+    sortBy: form.sortBy || 'newest',
   };
-}
-
-function getStatusLabel(status) {
-  return statusMeta[status]?.label || status || 'Unknown';
-}
-
-function getNextAction(order) {
-  if (order?.status === 'AwaitingPayment') {
-    return isAwaitingPaymentExpired(order)
-      ? { label: 'Cancel', status: 'Cancelled', tone: 'danger' }
-      : null;
-  }
-
-  return nextActionByStatus[order?.status] || null;
-}
-
-function isAwaitingPaymentExpired(order) {
-  if (!order?.createdAt) return false;
-  const createdAt = new Date(order.createdAt);
-  if (Number.isNaN(createdAt.getTime())) return false;
-  return Date.now() - createdAt.getTime() >= awaitingPaymentCancelDelayMs;
-}
-
-function toRealtimeOrder(payload) {
-  if (!payload) return null;
-
-  const orderId = payload.orderId || payload.OrderId;
-  if (!orderId) return null;
-
-  return {
-    orderId,
-    orderCode: payload.orderCode || payload.OrderCode,
-    productId: payload.productId || payload.ProductId,
-    productName: payload.productName || payload.ProductName,
-    productImageUrl: payload.productImageUrl || payload.ProductImageUrl,
-    buyerId: payload.buyerId || payload.BuyerId,
-    buyerName: payload.buyerName || payload.BuyerName,
-    buyerEmail: payload.buyerEmail || payload.BuyerEmail,
-    sellerId: payload.sellerId || payload.SellerId,
-    quantity: payload.quantity ?? payload.Quantity,
-    unitPrice: payload.unitPrice ?? payload.UnitPrice,
-    totalAmount: payload.totalAmount ?? payload.TotalAmount,
-    shippingFee: payload.shippingFee ?? payload.ShippingFee,
-    discountAmount: payload.discountAmount ?? payload.DiscountAmount,
-    finalAmount: payload.finalAmount ?? payload.FinalAmount,
-    status: payload.status || payload.Status,
-    trackingCode: payload.trackingCode || payload.TrackingCode,
-    shippingProvider: payload.shippingProvider || payload.ShippingProvider,
-    expectedDeliveryTime: payload.expectedDeliveryTime || payload.ExpectedDeliveryTime,
-    createdAt: payload.createdAt || payload.CreatedAt,
-    updatedAt: payload.updatedAt || payload.UpdatedAt,
-  };
-}
-
-function upsertOrder(orders, nextOrder) {
-  const exists = orders.some((order) => order.orderId === nextOrder.orderId);
-  if (!exists) return [nextOrder, ...orders].slice(0, pageSize);
-
-  return orders.map((order) => (
-    order.orderId === nextOrder.orderId ? { ...order, ...nextOrder } : order
-  ));
-}
-
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 4) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  if (currentPage <= 2) {
-    return [1, 2, 3, 'ellipsis'];
-  }
-
-  if (currentPage >= totalPages - 1) {
-    return ['ellipsis', totalPages - 2, totalPages - 1, totalPages];
-  }
-
-  return ['ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis'];
 }

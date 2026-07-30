@@ -1,31 +1,36 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { Link, useNavigate } from 'react-router-dom';
 import auctionService from '../../services/auctionService';
 import { createAuctionHubConnection } from '../../services/auctionRealtimeService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { auctionDateTimeLocalToApiValue, formatAuctionDateTime, getFutureAuctionDateTimeLocal, parseAuctionDateTime, toAuctionDateTimeLocal } from '../../utils/auctionTime';
+import { useLanguage } from '../../context/LanguageContext';
+import { auctionDateTimeLocalToApiValue, getFutureAuctionDateTimeLocal, parseAuctionDateTime, toAuctionDateTimeLocal } from '../../utils/auctionTime';
 import './AuctionWorkspace.css';
 
-const moneyFormatter = new Intl.NumberFormat('vi-VN', {
-  style: 'currency',
-  currency: 'VND',
-});
+const statusOptions = [
+  { value: 'All', labelKey: 'admin.auctions.status_all' },
+  { value: 'Upcoming', labelKey: 'admin.auctions.status_upcoming' },
+  { value: 'Ongoing', labelKey: 'admin.auctions.status_ongoing' },
+  { value: 'Ended', labelKey: 'admin.auctions.status_ended' },
+];
 
-const statusOptions = ['All', 'Upcoming', 'Ongoing', 'Ended'];
 const DEFAULT_AUCTION_START_OFFSET_MS = 0;
+const STATS_PAGE_SIZE = 1;
+const conditionKeyMap = {
+  New: 'admin.auctions.condition_new',
+  LikeNew: 'admin.auctions.condition_like_new',
+  Excellent: 'admin.auctions.condition_excellent',
+  Good: 'admin.auctions.condition_good',
+  Fair: 'admin.auctions.condition_fair',
+  Used: 'admin.auctions.condition_used',
+  Damaged: 'admin.auctions.condition_damaged',
+  ForParts: 'admin.auctions.condition_for_parts',
+};
 
 function isEndedStatus(status) {
   return ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'].includes(status);
-}
-
-function formatMoney(value) {
-  if (value == null) return '-';
-  return moneyFormatter.format(Number(value || 0));
-}
-
-function formatDateTime(value) {
-  return formatAuctionDateTime(value);
 }
 
 function getDefaultForm() {
@@ -50,20 +55,33 @@ function getProgress(auction) {
 }
 
 function getStatusClass(status) {
-  return isEndedStatus(status) ? 'ended' : String(status || '').toLowerCase();
+  if (isEndedStatus(status)) return 'ended';
+  return String(status || 'unknown').toLowerCase();
+}
+
+function getAuctionItems(data) {
+  if (Array.isArray(data)) return data;
+  return data?.items || data?.value || [];
+}
+
+function getAuctionCount(data) {
+  if (Array.isArray(data)) return data.length;
+  const count = data?.totalItems ?? data?.totalCount ?? data?.TotalCount ?? data?.['@odata.count'] ?? data?.count;
+  if (count !== undefined && count !== null) return Number(count) || 0;
+  return getAuctionItems(data).length;
 }
 
 function canEditAuction(auction) {
-  return !getAuctionEditBlockReason(auction);
+  return !getAuctionEditBlockReasonKey(auction);
 }
 
-function getAuctionEditBlockReason(auction) {
-  if (!auction) return 'Auction data is not available.';
-  if (auction.status !== 'Upcoming') return 'Only upcoming auctions can be updated.';
-  if (Number(auction.bidCount || 0) > 0) return 'Auctions with existing bids cannot be updated.';
+function getAuctionEditBlockReasonKey(auction) {
+  if (!auction) return 'admin.auctions.err_auction_unavailable';
+  if (auction.status !== 'Upcoming') return 'admin.auctions.err_edit_upcoming_only';
+  if (Number(auction.bidCount || 0) > 0) return 'admin.auctions.err_edit_has_bids';
 
   const startTime = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
-  if (!startTime || startTime <= Date.now()) return 'Auction start time has passed.';
+  if (!startTime || startTime <= Date.now()) return 'admin.auctions.err_edit_started';
 
   return '';
 }
@@ -79,7 +97,7 @@ function toAuctionPayload(form) {
 }
 
 function validateAuctionForm(form, { requireProduct = false, requireFutureStart = false } = {}) {
-  if (requireProduct && !form.productId) return 'Please select an auction-ready product.';
+  if (requireProduct && !form.productId) return 'admin.auctions.err_select_product';
 
   const startingPrice = Number(form.startingPrice);
   const minIncrement = Number(form.minIncrement);
@@ -87,14 +105,14 @@ function validateAuctionForm(form, { requireProduct = false, requireFutureStart 
   const start = parseAuctionDateTime(form.startTime);
   const end = parseAuctionDateTime(form.endTime);
 
-  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return 'Starting bid must be greater than 0.';
-  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return 'Bid step must be greater than 0.';
-  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return 'Buy now price is required.';
-  if (buyNowPrice <= startingPrice) return 'Buy now price must be greater than the starting bid.';
-  if (!form.startTime || !start || Number.isNaN(start.getTime())) return 'Please choose a valid start time.';
-  if (!form.endTime || !end || Number.isNaN(end.getTime())) return 'Please choose a valid end time.';
-  if (requireFutureStart && start <= new Date()) return 'Start time must remain in the future.';
-  if (end <= start) return 'End time must be after start time.';
+  if (!form.startingPrice || Number.isNaN(startingPrice) || startingPrice <= 0) return 'admin.auctions.err_starting_bid';
+  if (!form.minIncrement || Number.isNaN(minIncrement) || minIncrement <= 0) return 'admin.auctions.err_bid_step';
+  if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return 'admin.auctions.err_buy_now_required';
+  if (buyNowPrice <= startingPrice) return 'admin.auctions.err_buy_now_gt_start';
+  if (!form.startTime || !start || Number.isNaN(start.getTime())) return 'admin.auctions.err_start_time';
+  if (!form.endTime || !end || Number.isNaN(end.getTime())) return 'admin.auctions.err_end_time';
+  if (requireFutureStart && start <= new Date()) return 'admin.auctions.err_future_start';
+  if (end <= start) return 'admin.auctions.err_end_after_start';
 
   return '';
 }
@@ -104,26 +122,43 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, formatCurrency, formatDateTime } = useLanguage();
   const [auctions, setAuctions] = useState([]);
+  const [stats, setStats] = useState({ total: 0, live: 0, upcoming: 0, ended: 0 });
   const [eligibleProducts, setEligibleProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [realtimeTick, setRealtimeTick] = useState(0);
   const [form, setForm] = useState(getDefaultForm);
   const [editingAuction, setEditingAuction] = useState(null);
   const [editForm, setEditForm] = useState(null);
 
-  const stats = useMemo(() => {
-    const total = auctions.length;
-    const live = auctions.filter(a => a.status === 'Ongoing').length;
-    const upcoming = auctions.filter(a => a.status === 'Upcoming').length;
-    const ended = auctions.filter(a => isEndedStatus(a.status)).length;
-    return { total, live, upcoming, ended };
-  }, [auctions]);
+  const pageTitle = title || (isAdmin ? t('admin.auctions.hero_title') : t('my_auctions.title'));
+  const pageSubtitle = subtitle || (isAdmin ? t('admin.auctions.hero_sub') : t('my_auctions.subtitle'));
 
-  const loadAuctions = async () => {
+  const getStatusLabel = (status) => {
+    if (status === 'All') return t('admin.auctions.status_all');
+    if (isEndedStatus(status)) return t('admin.auctions.status_ended');
+
+    const labelMap = {
+      Upcoming: 'admin.auctions.status_upcoming',
+      Ongoing: 'admin.auctions.status_ongoing',
+      Cancelled: 'admin.auctions.status_cancelled',
+    };
+
+    return t(labelMap[status] || 'admin.auctions.status_unknown');
+  };
+
+  const getConditionLabel = (condition) => {
+    if (!condition) return t('admin.auctions.condition_unknown');
+    const key = conditionKeyMap[condition];
+    return key ? t(key) : condition;
+  };
+
+  const loadAuctions = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -131,19 +166,53 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
         SortBy: 'newest',
         IncludeEnded: isAdmin,
       };
-      if (searchTerm.trim()) params.SearchTerm = searchTerm.trim();
+      if (appliedSearchTerm) params.SearchTerm = appliedSearchTerm;
       if (statusFilter !== 'All') params.Status = statusFilter;
 
       const data = isAdmin
         ? await auctionService.getAll(params)
         : await auctionService.getMyAuctions(params);
-      setAuctions(data?.items || []);
+      setAuctions(getAuctionItems(data));
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load auctions.', 'error');
+      showToast(error?.response?.data || t('common.load_error'), 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [appliedSearchTerm, isAdmin, showToast, statusFilter, t]);
+
+  const loadAuctionStats = useCallback(async () => {
+    try {
+      const baseParams = {
+        PageSize: STATS_PAGE_SIZE,
+        SortBy: 'newest',
+        IncludeEnded: isAdmin,
+      };
+
+      const fetchCount = async (status) => {
+        const params = status ? { ...baseParams, Status: status } : baseParams;
+        const data = isAdmin
+          ? await auctionService.getAll(params)
+          : await auctionService.getMyAuctions(params);
+        return getAuctionCount(data);
+      };
+
+      const [totalCount, live, upcoming, ended] = await Promise.all([
+        fetchCount(),
+        fetchCount('Ongoing'),
+        fetchCount('Upcoming'),
+        fetchCount('Ended'),
+      ]);
+      const statusTotal = live + upcoming + ended;
+      setStats({
+        total: Math.max(totalCount, statusTotal),
+        live,
+        upcoming,
+        ended,
+      });
+    } catch (error) {
+      setStats({ total: 0, live: 0, upcoming: 0, ended: 0 });
+    }
+  }, [isAdmin]);
 
   const loadEligibleProducts = async () => {
     try {
@@ -160,7 +229,11 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
   useEffect(() => {
     loadAuctions();
-  }, [statusFilter, realtimeTick]);
+  }, [loadAuctions, realtimeTick]);
+
+  useEffect(() => {
+    loadAuctionStats();
+  }, [loadAuctionStats, realtimeTick]);
 
   useEffect(() => {
     if (authLoading || !user) return undefined;
@@ -195,7 +268,12 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
-    loadAuctions();
+    const nextSearchTerm = searchTerm.trim();
+    if (nextSearchTerm === appliedSearchTerm) {
+      loadAuctions();
+      return;
+    }
+    setAppliedSearchTerm(nextSearchTerm);
   };
 
   const handleFormChange = (event) => {
@@ -207,7 +285,7 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
     event.preventDefault();
     const validationError = validateAuctionForm(form, { requireProduct: true });
     if (validationError) {
-      showToast(validationError, 'warning');
+      showToast(t(validationError), 'warning');
       return;
     }
 
@@ -219,23 +297,23 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
     try {
       setCreating(true);
       const created = await auctionService.create(payload);
-      showToast('Auction created successfully.', 'success');
+      showToast(t('common.saved_success'), 'success');
       setForm(getDefaultForm());
-      await Promise.all([loadEligibleProducts(), loadAuctions()]);
+      await Promise.all([loadEligibleProducts(), loadAuctions(), loadAuctionStats()]);
       if (created?.auctionId) {
         navigate(`/auction/${created.auctionId}`);
       }
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to create auction.', 'error');
+      showToast(error?.response?.data || t('common.save_error'), 'error');
     } finally {
       setCreating(false);
     }
   };
 
   const openEditModal = (auction) => {
-    const blockReason = getAuctionEditBlockReason(auction);
-    if (blockReason) {
-      showToast(blockReason, 'warning');
+    const blockReasonKey = getAuctionEditBlockReasonKey(auction);
+    if (blockReasonKey) {
+      showToast(t(blockReasonKey), 'warning');
       return;
     }
     setEditingAuction(auction);
@@ -264,18 +342,18 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
     if (!editingAuction || !editForm) return;
     const validationError = validateAuctionForm(editForm, { requireFutureStart: true });
     if (validationError) {
-      showToast(validationError, 'warning');
+      showToast(t(validationError), 'warning');
       return;
     }
 
     try {
       setCreating(true);
       await auctionService.update(editingAuction.auctionId, toAuctionPayload(editForm));
-      showToast('Auction updated successfully.', 'success');
+      showToast(t('common.saved_success'), 'success');
       closeEditModal();
-      await loadAuctions();
+      await Promise.all([loadAuctions(), loadAuctionStats()]);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to update auction.', 'error');
+      showToast(error?.response?.data || t('common.save_error'), 'error');
     } finally {
       setCreating(false);
     }
@@ -283,50 +361,46 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
   return (
     <div className={`auction-workspace ${isAdmin ? 'admin-mode' : 'seller-mode'}`}>
-      {loading && (
-        <div className="auction-workspace-loader">
-          <span className="btn-spinner"></span>
-        </div>
-      )}
-
       <header className="auction-workspace-hero">
         <div>
-          <span>{isAdmin ? 'Auction Control' : 'Seller Auctions'}</span>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
+          <span className="auction-workspace-eyebrow">
+            {isAdmin ? t('admin.auctions.eyebrow') : t('my_auctions.title')}
+          </span>
+          <h1>{pageTitle}</h1>
+          <p>{pageSubtitle}</p>
         </div>
         <Link to="/auction" className="auction-workspace-live">
           <span className="material-symbols-outlined">open_in_new</span>
-          Auction Room
+          {t('admin.auctions.live_room')}
         </Link>
       </header>
 
       <section className="auction-stats-grid">
-        <article>
+        <article className="total">
           <span className="material-symbols-outlined">gavel</span>
           <div>
-            <small>Total Auctions</small>
+            <small>{t('admin.auctions.total_auctions')}</small>
             <strong>{stats.total}</strong>
           </div>
         </article>
-        <article>
+        <article className="ongoing">
           <span className="material-symbols-outlined">bolt</span>
           <div>
-            <small>Ongoing</small>
+            <small>{t('admin.auctions.ongoing')}</small>
             <strong>{stats.live}</strong>
           </div>
         </article>
-        <article>
+        <article className="upcoming">
           <span className="material-symbols-outlined">schedule</span>
           <div>
-            <small>Upcoming</small>
+            <small>{t('admin.auctions.upcoming')}</small>
             <strong>{stats.upcoming}</strong>
           </div>
         </article>
-        <article>
+        <article className="ended">
           <span className="material-symbols-outlined">flag</span>
           <div>
-            <small>Ended</small>
+            <small>{t('admin.auctions.ended')}</small>
             <strong>{stats.ended}</strong>
           </div>
         </article>
@@ -337,16 +411,16 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
           <section className="auction-create-panel">
             <div className="auction-section-title">
               <div>
-                <h2>Create Auction</h2>
-                <p>Select a product approved for auction and configure the room.</p>
+                <h2>{t('admin.auctions.create_auction')}</h2>
+                <p>{t('admin.auctions.create_sub')}</p>
               </div>
             </div>
 
             <form onSubmit={handleCreateAuction} className="auction-create-form" noValidate>
               <label>
-                <span>Auction Product</span>
+                <span>{t('admin.auctions.select_product')}</span>
                 <select name="productId" value={form.productId} onChange={handleFormChange} required>
-                  <option value="">Select ready product</option>
+                  <option value="">{t('admin.auctions.select_product_placeholder')}</option>
                   {eligibleProducts.map((product) => (
                     <option key={product.productId} value={product.productId}>
                       {product.name} - {product.sellerName || product.sellerId}
@@ -357,41 +431,41 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
               <div className="auction-form-two">
                 <label>
-                  <span>Starting Bid</span>
+                  <span>{t('admin.auctions.starting_bid')}</span>
                   <input name="startingPrice" type="number" min="1" value={form.startingPrice} onChange={handleFormChange} required />
                 </label>
                 <label>
-                  <span>Bid Step</span>
+                  <span>{t('admin.auctions.bid_step')}</span>
                   <input name="minIncrement" type="number" min="1" value={form.minIncrement} onChange={handleFormChange} required />
                 </label>
               </div>
 
               <div className="auction-form-two">
                 <label>
-                  <span>Start Time</span>
+                  <span>{t('admin.auctions.start_time')}</span>
                   <input name="startTime" type="datetime-local" value={form.startTime} onChange={handleFormChange} required />
                 </label>
                 <label>
-                  <span>End Time</span>
+                  <span>{t('admin.auctions.end_time')}</span>
                   <input name="endTime" type="datetime-local" value={form.endTime} onChange={handleFormChange} required />
                 </label>
               </div>
 
               <label>
-                <span>Buy Now Price</span>
+                <span>{t('admin.auctions.buy_now_price')}</span>
                 <input name="buyNowPrice" type="number" min="0" value={form.buyNowPrice} onChange={handleFormChange} />
               </label>
 
               {eligibleProducts.length === 0 && (
                 <div className="auction-create-empty">
                   <span className="material-symbols-outlined">inventory_2</span>
-                  <p>No ready auction products available.</p>
+                  <p>{t('common.no_data')}</p>
                 </div>
               )}
 
               <button type="submit" className="auction-primary-action" disabled={creating || eligibleProducts.length === 0}>
                 {creating ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">add_circle</span>}
-                Create Auction
+                {t('admin.auctions.create_btn')}
               </button>
             </form>
           </section>
@@ -400,67 +474,106 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
         <section className="auction-list-panel">
           <div className="auction-section-title">
             <div>
-              <h2>{isAdmin ? 'Auction Listings' : 'My Auction List'}</h2>
-              <p>{isAdmin ? 'Monitor all platform auctions.' : 'Track every auction you have created.'}</p>
+              <h2>{isAdmin ? t('admin.auctions.list_title') : t('my_auctions.title')}</h2>
+              <p>{isAdmin ? t('admin.auctions.list_sub') : t('my_auctions.subtitle')}</p>
             </div>
           </div>
 
           <form className="auction-toolbar" onSubmit={handleSearchSubmit}>
-            <label>
+            <label className="auction-search-field">
               <span className="material-symbols-outlined">search</span>
-              <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search auctions..." />
+              <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t('admin.auctions.search_placeholder')} />
             </label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              {statusOptions.map(status => <option key={status} value={status}>{status}</option>)}
-            </select>
-            <button type="submit">
+            <div className="auction-status-filter" aria-label={t('admin.auctions.status_filter')}>
+              {statusOptions.map((status) => (
+                <button
+                  key={status.value}
+                  type="button"
+                  className={statusFilter === status.value ? 'active' : ''}
+                  onClick={() => setStatusFilter(status.value)}
+                >
+                  {t(status.labelKey)}
+                </button>
+              ))}
+            </div>
+            <button type="submit" className="auction-filter-action">
               <span className="material-symbols-outlined">tune</span>
-              Apply
+              {t('admin.auctions.apply_filter')}
             </button>
           </form>
 
-          {auctions.length === 0 ? (
+          {loading && (
+            <div className="auction-list-refresh" aria-live="polite">
+              <span className="btn-spinner"></span>
+              <span>{t('common.loading')}</span>
+            </div>
+          )}
+
+          {!loading && auctions.length === 0 ? (
             <div className="auction-table-empty">
               <span className="material-symbols-outlined">gavel</span>
-              <h3>No auctions found</h3>
-              <p>Create a new auction or adjust your filters.</p>
+              <h3>{t('admin.auctions.no_auctions')}</h3>
+              <p>{t('admin.listings.no_products_sub')}</p>
             </div>
           ) : (
             <div className="auction-workspace-list">
               {auctions.map((auction) => (
                 <article key={auction.auctionId} className="auction-workspace-card">
-                  <img src={auction.productImageUrl || 'https://placehold.co/160'} alt={auction.productName || 'Auction'} />
+                  <div className="auction-card-media">
+                    <img src={auction.productImageUrl || 'https://placehold.co/160'} alt={auction.productName || t('admin.auctions.image_alt')} />
+                  </div>
                   <div className="auction-workspace-card-main">
                     <div className="auction-card-title-row">
                       <div>
-                        <strong>{auction.productName || 'Unnamed auction'}</strong>
-                        <span>{auction.categoryName || 'Uncategorized'} - {auction.condition || 'No condition'}</span>
+                        <strong>{auction.productName || t('admin.auctions.unnamed_auction')}</strong>
+                        <span>{auction.categoryName || t('admin.auctions.uncategorized')} - {getConditionLabel(auction.condition)}</span>
                       </div>
-                      <em className={`auction-status ${getStatusClass(auction.status)}`}>{auction.status}</em>
+                      <em className={`auction-status ${getStatusClass(auction.status)}`}>{getStatusLabel(auction.status)}</em>
                     </div>
                     <div className="auction-progress-line">
                       <i><b style={{ width: `${getProgress(auction)}%` }} /></i>
-                      <small>{getProgress(auction)}% progress</small>
+                      <small>{t('admin.auctions.progress', { percent: getProgress(auction) })}</small>
                     </div>
-                    <div className="auction-card-meta">
-                      <span>Current <b>{formatMoney(auction.currentPrice)}</b></span>
-                      <span>Step <b>{formatMoney(auction.minIncrement)}</b></span>
-                      <span>Bids <b>{auction.bidCount || 0}</b></span>
+                    <div className="auction-card-metrics">
+                      <span>
+                        <small>{t('admin.auctions.current_price')}</small>
+                        <b>{formatCurrency(auction.currentPrice)}</b>
+                      </span>
+                      <span>
+                        <small>{t('admin.auctions.bid_step')}</small>
+                        <b>{formatCurrency(auction.minIncrement)}</b>
+                      </span>
+                      <span>
+                        <small>{t('admin.auctions.bids')}</small>
+                        <b>{auction.bidCount || 0}</b>
+                      </span>
                     </div>
                     <div className="auction-card-time">
-                      <span>{formatDateTime(auction.startTime)}</span>
-                      <span>{formatDateTime(auction.endTime)}</span>
+                      <span>
+                        <small>{t('admin.auctions.start_time')}</small>
+                        <b>{formatDateTime(auction.startTime)}</b>
+                      </span>
+                      <span>
+                        <small>{t('admin.auctions.end_time')}</small>
+                        <b>{formatDateTime(auction.endTime)}</b>
+                      </span>
                     </div>
                   </div>
                   <div className="auction-workspace-card-actions">
-                    <button type="button" onClick={() => navigate(`/auction/${auction.auctionId}`)} title="View detail">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/auction/${auction.auctionId}`)}
+                      title={t('admin.auctions.view_auction')}
+                      aria-label={t('admin.auctions.view_auction')}
+                    >
                       <span className="material-symbols-outlined">visibility</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => openEditModal(auction)}
                       aria-disabled={!canEditAuction(auction)}
-                      title={getAuctionEditBlockReason(auction) || 'Update auction'}
+                      title={getAuctionEditBlockReasonKey(auction) ? t(getAuctionEditBlockReasonKey(auction)) : t('admin.auctions.update_auction')}
+                      aria-label={t('admin.auctions.update_auction')}
                     >
                       <span className="material-symbols-outlined">edit</span>
                     </button>
@@ -476,47 +589,44 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
         <div className="auction-workspace-modal" role="dialog" aria-modal="true">
           <form className="auction-workspace-modal-card" onSubmit={handleUpdateAuction} noValidate>
             <header>
-              <div>
-                <h2>Update Auction</h2>
+              <div className="auction-modal-heading">
+                <span>{t('admin.auctions.edit_eyebrow')}</span>
+                <h2>{t('admin.auctions.update_auction')}</h2>
                 <p>{editingAuction.productName}</p>
               </div>
-              <button type="button" onClick={closeEditModal}>
+              <button type="button" onClick={closeEditModal} aria-label={t('admin.auctions.close_modal')}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
 
-            <div className="auction-form-two">
+            <div className="auction-modal-grid">
               <label>
-                <span>Starting Bid</span>
+                <span>{t('admin.auctions.starting_bid')}</span>
                 <input name="startingPrice" type="number" min="1" value={editForm.startingPrice} onChange={handleEditFormChange} required />
               </label>
               <label>
-                <span>Bid Step</span>
+                <span>{t('admin.auctions.bid_step')}</span>
                 <input name="minIncrement" type="number" min="1" value={editForm.minIncrement} onChange={handleEditFormChange} required />
               </label>
-            </div>
-
-            <div className="auction-form-two">
               <label>
-                <span>Start Time</span>
+                <span>{t('admin.auctions.start_time')}</span>
                 <input name="startTime" type="datetime-local" value={editForm.startTime} onChange={handleEditFormChange} required />
               </label>
               <label>
-                <span>End Time</span>
+                <span>{t('admin.auctions.end_time')}</span>
                 <input name="endTime" type="datetime-local" value={editForm.endTime} onChange={handleEditFormChange} required />
+              </label>
+              <label className="auction-modal-wide-field">
+                <span>{t('admin.auctions.buy_now_price')}</span>
+                <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditFormChange} />
               </label>
             </div>
 
-            <label>
-              <span>Buy Now Price</span>
-              <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditFormChange} />
-            </label>
-
             <footer>
-              <button type="button" className="auction-secondary-action" onClick={closeEditModal}>Cancel</button>
+              <button type="button" className="auction-secondary-action" onClick={closeEditModal}>{t('common.cancel')}</button>
               <button type="submit" className="auction-primary-action" disabled={creating}>
                 {creating ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">save</span>}
-                Save Changes
+                {t('admin.auctions.save_changes')}
               </button>
             </footer>
           </form>
@@ -525,3 +635,9 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
     </div>
   );
 }
+
+AuctionWorkspace.propTypes = {
+  mode: PropTypes.oneOf(['seller', 'admin']),
+  title: PropTypes.string,
+  subtitle: PropTypes.string,
+};

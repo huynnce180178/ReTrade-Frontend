@@ -8,6 +8,7 @@ const del = (url) => api.delete(url).then(r => r.data);
 const productService = {
   // Public & Seller endpoints
   getAll: (params) => get('/Product', { params }),
+  getSellerProducts: (sellerId, params) => get('/Product', { params: { sellerId, ...params } }),
   getById: (id) => get(`/Product/${id}`),
   create: (data) => post('/Product', data),
   update: (id, data) => put(`/Product/${id}`, data),

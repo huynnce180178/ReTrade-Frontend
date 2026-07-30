@@ -4,6 +4,7 @@ import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import ReviewModal from '../../../components/ReviewModal/ReviewModal';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import purchaseService from '../../../services/purchaseService';
 import reviewService from '../../../services/reviewService';
 import paymentService from '../../../services/paymentService';
@@ -20,22 +21,23 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   minute: '2-digit',
 });
 
-const journeySteps = [
-  { key: 'AwaitingPayment', label: 'Awaiting Payment', icon: 'receipt_long' },
-  { key: 'Pending', label: 'Processing', icon: 'inventory' },
-  { key: 'Confirmed', label: 'Confirmed', icon: 'verified_user' },
-  { key: 'Shipping', label: 'Shipping', icon: 'local_shipping' },
-  { key: 'Delivered', label: 'Delivered', icon: 'package_2' },
-  { key: 'Completed', label: 'Completed', icon: 'check_circle' },
+const getJourneySteps = (language) => [
+  { key: 'AwaitingPayment', label: language === 'vi' ? 'Chờ thanh toán' : 'Awaiting Payment', icon: 'receipt_long' },
+  { key: 'Pending', label: language === 'vi' ? 'Đang xử lý' : 'Processing', icon: 'inventory' },
+  { key: 'Confirmed', label: language === 'vi' ? 'Đã xác nhận' : 'Confirmed', icon: 'verified_user' },
+  { key: 'Shipping', label: language === 'vi' ? 'Đang giao' : 'Shipping', icon: 'local_shipping' },
+  { key: 'Delivered', label: language === 'vi' ? 'Đã giao' : 'Delivered', icon: 'package_2' },
+  { key: 'Completed', label: language === 'vi' ? 'Hoàn thành' : 'Completed', icon: 'check_circle' },
 ];
 
-const statusOrder = journeySteps.map((step) => step.key);
+const statusOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered', 'Completed'];
 const returnRequestWindowMs = 7 * 24 * 60 * 60 * 1000;
 
 export default function PurchaseDetail() {
   const { orderId } = useParams();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, language, formatCurrency } = useLanguage();
 
   const [purchase, setPurchase] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -57,11 +59,11 @@ export default function PurchaseDetail() {
       const data = await purchaseService.getDetail(buyerId, orderId);
       setPurchase(data);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load purchase detail.', 'error');
+      showToast(error?.response?.data || (language === 'vi' ? 'Không thể tải chi tiết đơn hàng.' : 'Failed to load purchase detail.'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [buyerId, orderId, showToast]);
+  }, [buyerId, orderId, showToast, language]);
 
   useEffect(() => {
     loadPurchase();
@@ -106,13 +108,10 @@ export default function PurchaseDetail() {
     };
   }, [buyerId, loadPurchase, orderId]);
 
-  // Ensure the page scrolls to top when viewing a detail
   useEffect(() => {
     try {
       window.scrollTo({ top: 0, behavior: 'auto' });
-    } catch (e) {
-      // ignore non-browser environments
-    }
+    } catch (e) {}
   }, []);
 
   const totals = useMemo(
@@ -132,11 +131,11 @@ export default function PurchaseDetail() {
       setUpdating(true);
       const updated = await purchaseService.complete(buyerId, purchase.orderId);
       setPurchase(updated);
-      showToast('Purchase marked as completed.', 'success');
+      showToast(language === 'vi' ? 'Đã xác nhận hoàn thành đơn hàng!' : 'Purchase marked as completed.', 'success');
       setReviewTarget(updated ? { ...purchase, ...updated } : purchase);
       setReviewModalOpen(true);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to complete purchase.', 'error');
+      showToast(error?.response?.data || (language === 'vi' ? 'Không thể hoàn thành đơn hàng.' : 'Failed to complete purchase.'), 'error');
     } finally {
       setUpdating(false);
     }
@@ -157,12 +156,12 @@ export default function PurchaseDetail() {
         rating,
         comment,
       });
-      showToast('Review submitted successfully.', 'success');
+      showToast(language === 'vi' ? 'Đã gửi đánh giá thành công!' : 'Review submitted successfully.', 'success');
       setReviewModalOpen(false);
       setReviewTarget(null);
       loadPurchase();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to submit review.', 'error');
+      showToast(error?.response?.data || (language === 'vi' ? 'Không thể gửi đánh giá.' : 'Failed to submit review.'), 'error');
     } finally {
       setReviewSubmitting(false);
     }
@@ -185,7 +184,7 @@ export default function PurchaseDetail() {
 
     const reason = returnReason.trim();
     if (!reason) {
-      showToast('Please enter a return reason.', 'warning');
+      showToast(language === 'vi' ? 'Vui lòng nhập lý do trả hàng.' : 'Please enter a return reason.', 'warning');
       return;
     }
 
@@ -196,9 +195,9 @@ export default function PurchaseDetail() {
       setPurchase(updated);
       setReturnModalOpen(false);
       setReturnReason('');
-      showToast('Return request submitted.', 'success');
+      showToast(language === 'vi' ? 'Yêu cầu trả hàng đã được gửi!' : 'Return request submitted.', 'success');
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to submit return request.', 'error');
+      showToast(error?.response?.data || (language === 'vi' ? 'Không thể gửi yêu cầu trả hàng.' : 'Failed to submit return request.'), 'error');
     } finally {
       setReturnSubmitting(false);
       setUpdating(false);
@@ -210,30 +209,23 @@ export default function PurchaseDetail() {
 
     try {
       setUpdating(true);
-
       const payload = {
         orderId: purchase.orderId,
-        amount: Number(purchase.finalAmount || purchase.totalAmount || totals.final || 0),
+        amount: totals.final,
         orderDescription: `Payment for order ${purchase.orderCode || purchase.orderId}`,
       };
 
       const resp = await paymentService.createVnpayPaymentUrl(payload);
-
-      // Response may be a string URL or an object containing the URL
-      const url =
-        typeof resp === 'string'
-          ? resp
-          : resp?.paymentUrl || resp?.url || resp?.paymentLink || null;
+      const url = typeof resp === 'string' ? resp : resp?.paymentUrl || resp?.url || resp?.paymentLink || null;
 
       if (!url) {
-        showToast('Payment URL not returned from server.', 'error');
+        showToast(language === 'vi' ? 'Không nhận được liên kết thanh toán.' : 'Payment URL not returned from server.', 'error');
         return;
       }
 
-      // Redirect to VNPay
       window.location.href = url;
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to create payment link.', 'error');
+      showToast(error?.response?.data || (language === 'vi' ? 'Không thể tạo liên kết thanh toán.' : 'Failed to create payment link.'), 'error');
     } finally {
       setUpdating(false);
     }
@@ -246,9 +238,9 @@ export default function PurchaseDetail() {
       setUpdating(true);
       const updated = await purchaseService.cancel(buyerId, purchase.orderId);
       setPurchase(updated);
-      showToast('Purchase cancelled successfully.', 'success');
+      showToast(language === 'vi' ? 'Hủy đơn hàng thành công!' : 'Purchase cancelled successfully.', 'success');
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to cancel purchase.', 'error');
+      showToast(error?.response?.data || (language === 'vi' ? 'Không thể hủy đơn hàng.' : 'Failed to cancel purchase.'), 'error');
     } finally {
       setUpdating(false);
     }
@@ -258,14 +250,12 @@ export default function PurchaseDetail() {
     return (
       <div className="profile-loading-wrapper">
         <span className="btn-spinner"></span>
-        <p>Loading purchase detail...</p>
+        <p>{language === 'vi' ? 'Đang tải chi tiết đơn hàng...' : 'Loading purchase detail...'}</p>
       </div>
     );
   }
 
   if (!user) return <Navigate to="/login" replace />;
-
-  
 
   return (
     <div className="profile-page-wrapper container animate-fade-in">
@@ -275,33 +265,33 @@ export default function PurchaseDetail() {
         <main className="ma-main">
           <div className="purchase-detail-page">
             <nav className="purchase-breadcrumb">
-              <Link to="/profile">Profile</Link>
+              <Link to="/profile">{language === 'vi' ? 'Hồ Sơ Cá Nhân' : 'Profile'}</Link>
               <span className="material-symbols-outlined">chevron_right</span>
-              <Link to="/purchase-history">Purchase History</Link>
+              <Link to="/purchase-history">{language === 'vi' ? 'Lịch Sử Mua Hàng' : 'Purchase History'}</Link>
               <span className="material-symbols-outlined">chevron_right</span>
               <strong>#{purchase?.orderCode || orderId}</strong>
             </nav>
 
-              {loading ? (
+            {loading ? (
               <div className="purchase-empty-state">
                 <span className="btn-spinner"></span>
-                <p>Loading purchase detail...</p>
+                <p>{language === 'vi' ? 'Đang tải chi tiết đơn hàng...' : 'Loading purchase detail...'}</p>
               </div>
             ) : !purchase ? (
               <div className="purchase-empty-state">
                 <span className="material-symbols-outlined">receipt_long</span>
-                <h3>Purchase not found</h3>
-                <p>This order may have been removed or is not available for this account.</p>
+                <h3>{language === 'vi' ? 'Không tìm thấy đơn hàng' : 'Purchase not found'}</h3>
+                <p>{language === 'vi' ? 'Đơn hàng này không tồn tại hoặc đã bị xóa.' : 'This order may have been removed or is not available for this account.'}</p>
               </div>
             ) : (
               <>
                 <header className="purchase-detail-header">
                   <div>
-                    <h1>Order #{purchase.orderCode || purchase.orderId}</h1>
-                    <p>Placed on {formatDateTime(purchase.createdAt)}</p>
+                    <h1>{language === 'vi' ? 'Đơn hàng #' : 'Order #'}{purchase.orderCode || purchase.orderId}</h1>
+                    <p>{language === 'vi' ? 'Đặt hàng lúc' : 'Placed on'} {formatDateTime(purchase.createdAt)}</p>
                   </div>
                   <div>
-                    <span>Total Amount</span>
+                    <span>{language === 'vi' ? 'Tổng Tiền Thanh Toán' : 'Total Amount'}</span>
                     <strong>{formatVnd(totals.final)}</strong>
                   </div>
                 </header>
@@ -309,23 +299,23 @@ export default function PurchaseDetail() {
                 <div className="purchase-detail-layout">
                   <section className="purchase-detail-main">
                     <article className="purchase-detail-card">
-                      <h2><span className="material-symbols-outlined">route</span>Order Journey</h2>
-                      <Journey status={purchase.status} createdAt={purchase.createdAt} updatedAt={purchase.updatedAt} />
+                      <h2><span className="material-symbols-outlined">route</span>{language === 'vi' ? 'Hành Trình Đơn Hàng' : 'Order Journey'}</h2>
+                      <Journey status={purchase.status} createdAt={purchase.createdAt} updatedAt={purchase.updatedAt} language={language} />
                     </article>
 
                     <article className="purchase-detail-card">
-                      <h2>Items Ordered</h2>
+                      <h2>{language === 'vi' ? 'Sản Phẩm Đã Đặt' : 'Items Ordered'}</h2>
                       <div className="purchase-detail-item">
-                        <img src={purchase.productImageUrl || '/vite.svg'} alt={purchase.productName || 'Purchased product'} />
+                        <img src={purchase.productImageUrl || '/vite.svg'} alt={purchase.productName || t('common.unnamed_product')} />
                         <div>
                           <div className="purchase-detail-item-top">
-                            <h3>{purchase.productName || 'Untitled product'}</h3>
+                            <h3>{purchase.productName || t('common.unnamed_product')}</h3>
                             <em className={`purchase-status ${getStatusClassName(purchase.status)}`}>
-                              {getStatusLabel(purchase.status)}
+                              {getStatusLabel(purchase.status, language)}
                             </em>
                           </div>
-                          <p>Seller: {purchase.sellerName || purchase.sellerEmail || '-'}</p>
-                          <p>Quantity: {purchase.quantity || 0}</p>
+                          <p>{language === 'vi' ? 'Người bán:' : 'Seller:'} {purchase.sellerName || purchase.sellerEmail || '-'}</p>
+                          <p>{language === 'vi' ? 'Số lượng:' : 'Quantity:'} {purchase.quantity || 0}</p>
                           <strong>{formatVnd(purchase.unitPrice || purchase.finalAmount || 0)}</strong>
                         </div>
                       </div>
@@ -335,58 +325,58 @@ export default function PurchaseDetail() {
                       <div>
                         <span className="material-symbols-outlined">support_agent</span>
                         <div>
-                          <h2>Need help with this order?</h2>
-                          <p>Our support team can help with payment, shipping, and return questions.</p>
+                          <h2>{language === 'vi' ? 'Bạn cần trợ giúp về đơn hàng này?' : 'Need help with this order?'}</h2>
+                          <p>{language === 'vi' ? 'Đội ngũ hỗ trợ của chúng tôi sẵn sàng giải đáp thắc mắc về thanh toán, giao hàng và trả hàng.' : 'Our support team can help with payment, shipping, and return questions.'}</p>
                         </div>
                       </div>
-                      <Link to="/support">Contact Support</Link>
+                      <Link to="/support">{language === 'vi' ? 'Liên Hệ Hỗ Trợ' : 'Contact Support'}</Link>
                     </article>
                   </section>
 
                   <aside className="purchase-detail-side">
                     <section className="purchase-detail-card">
-                      <h2><span className="material-symbols-outlined">location_on</span>Shipping Address</h2>
-                      <p className="purchase-address">{purchase.addressSnapshot || 'No address snapshot available.'}</p>
+                      <h2><span className="material-symbols-outlined">location_on</span>{language === 'vi' ? 'Địa Chỉ Giao Hàng' : 'Shipping Address'}</h2>
+                      <p className="purchase-address">{purchase.addressSnapshot || (language === 'vi' ? 'Chưa có thông tin địa chỉ.' : 'No address snapshot available.')}</p>
                       <dl className="purchase-detail-dl">
-                        <div><dt>Courier</dt><dd>{purchase.shippingProvider || '-'}</dd></div>
-                        <div><dt>Tracking No.</dt><dd>{purchase.trackingCode || '-'}</dd></div>
-                        <div><dt>Expected</dt><dd>{formatDateTime(purchase.expectedDeliveryTime)}</dd></div>
+                        <div><dt>{language === 'vi' ? 'Đơn vị vận chuyển' : 'Courier'}</dt><dd>{purchase.shippingProvider || '-'}</dd></div>
+                        <div><dt>{language === 'vi' ? 'Mã vận đơn' : 'Tracking No.'}</dt><dd>{purchase.trackingCode || '-'}</dd></div>
+                        <div><dt>{language === 'vi' ? 'Dự kiến giao' : 'Expected'}</dt><dd>{formatDateTime(purchase.expectedDeliveryTime)}</dd></div>
                       </dl>
                     </section>
 
                     <section className="purchase-payment-card">
-                      <h2>Payment Summary</h2>
-                      <div><span>Subtotal</span><strong>{formatVnd(totals.subtotal)}</strong></div>
-                      <div><span>Shipping</span><strong>{formatVnd(totals.shipping)}</strong></div>
-                      <div><span>Voucher Discount</span><strong>-{formatVnd(totals.discount)}</strong></div>
+                      <h2>{language === 'vi' ? 'Tóm Tắt Thanh Toán' : 'Payment Summary'}</h2>
+                      <div><span>{language === 'vi' ? 'Tạm tính' : 'Subtotal'}</span><strong>{formatVnd(totals.subtotal)}</strong></div>
+                      <div><span>{language === 'vi' ? 'Phí vận chuyển' : 'Shipping'}</span><strong>{formatVnd(totals.shipping)}</strong></div>
+                      <div><span>{language === 'vi' ? 'Giảm giá Voucher' : 'Voucher Discount'}</span><strong>-{formatVnd(totals.discount)}</strong></div>
                       <hr />
-                      <div className="total"><span>Grand Total</span><strong>{formatVnd(totals.final)}</strong></div>
+                      <div className="total"><span>{language === 'vi' ? 'Tổng cộng' : 'Grand Total'}</span><strong>{formatVnd(totals.final)}</strong></div>
                     </section>
 
                     <section className="purchase-detail-actions">
                       {['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status) && (
                         <button type="button" className="purchase-text-danger" disabled={updating} onClick={cancelPurchase}>
-                          {updating ? 'Updating...' : 'Cancel Purchase'}
+                          {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Updating...') : (language === 'vi' ? 'Hủy đơn hàng' : 'Cancel Purchase')}
                         </button>
                       )}
                       {purchase.status === 'AwaitingPayment' && (
                         <button type="button" className="purchase-primary-btn" disabled={updating} onClick={payAgain}>
-                          {updating ? 'Processing...' : 'Pay Again'}
+                          {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...') : (language === 'vi' ? 'Thanh toán lại' : 'Pay Again')}
                         </button>
                       )}
                       {purchase.status === 'Delivered' && (
                         <button type="button" className="purchase-primary-btn" disabled={updating} onClick={completePurchase}>
-                          {updating ? 'Updating...' : 'Mark Completed'}
+                          {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Updating...') : (language === 'vi' ? 'Xác nhận đã nhận hàng' : 'Mark Completed')}
                         </button>
                       )}
                       {purchase.status === 'Completed' && !purchase.hasReview && (
                         <button type="button" className="purchase-primary-btn" onClick={openReviewModal}>
-                          Write Review
+                          {language === 'vi' ? 'Đánh giá' : 'Write Review'}
                         </button>
                       )}
                       {purchase.status === 'Completed' && isWithinReturnRequestWindow(purchase) && (
                         <button type="button" className="purchase-detail-btn request-return" disabled={updating} onClick={openReturnModal}>
-                          Request Return
+                          {language === 'vi' ? 'Yêu cầu trả hàng' : 'Request Return'}
                         </button>
                       )}
                     </section>
@@ -398,7 +388,7 @@ export default function PurchaseDetail() {
 
           <ReviewModal
             isOpen={reviewModalOpen}
-            title="Write a Review"
+            title={language === 'vi' ? 'Viết Đánh Giá' : 'Write a Review'}
             purchase={reviewTarget}
             submitting={reviewSubmitting}
             onClose={() => {
@@ -416,6 +406,7 @@ export default function PurchaseDetail() {
               onReasonChange={setReturnReason}
               onClose={closeReturnModal}
               onSubmit={handleSubmitReturn}
+              language={language}
             />
           )}
         </main>
@@ -424,7 +415,7 @@ export default function PurchaseDetail() {
   );
 }
 
-function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onClose, onSubmit }) {
+function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onClose, onSubmit, language }) {
   return (
     <div className="purchase-return-modal-overlay" role="presentation" onMouseDown={onClose}>
       <div className="purchase-return-modal" role="dialog" aria-modal="true" aria-labelledby="return-modal-title" onMouseDown={(event) => event.stopPropagation()}>
@@ -432,16 +423,16 @@ function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onCl
           <span className="material-symbols-outlined">close</span>
         </button>
         <header>
-          <h2 id="return-modal-title">Request Return</h2>
-          <p>Order #{purchase?.orderCode || purchase?.orderId}</p>
+          <h2 id="return-modal-title">{language === 'vi' ? 'Yêu Cầu Trả Hàng' : 'Request Return'}</h2>
+          <p>{language === 'vi' ? 'Đơn hàng #' : 'Order #'}{purchase?.orderCode || purchase?.orderId}</p>
         </header>
         <form onSubmit={onSubmit}>
           <label className="purchase-return-reason">
-            <span>Return reason</span>
+            <span>{language === 'vi' ? 'Lý do trả hàng' : 'Return reason'}</span>
             <textarea
               value={reason}
               onChange={(event) => onReasonChange(event.target.value)}
-              placeholder="Describe why you want to return this purchase..."
+              placeholder={language === 'vi' ? 'Mô tả lý do bạn muốn trả lại sản phẩm này...' : 'Describe why you want to return this purchase...'}
               rows={5}
               maxLength={1000}
               disabled={submitting}
@@ -449,10 +440,10 @@ function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onCl
           </label>
           <div className="purchase-return-modal-actions">
             <button type="button" className="purchase-detail-btn" onClick={onClose} disabled={submitting}>
-              Cancel
+              {language === 'vi' ? 'Hủy' : 'Cancel'}
             </button>
             <button type="submit" className="purchase-primary-btn" disabled={submitting || !reason.trim()}>
-              {submitting ? 'Submitting...' : 'Submit Request'}
+              {submitting ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : (language === 'vi' ? 'Gửi Yêu Cầu' : 'Submit Request')}
             </button>
           </div>
         </form>
@@ -461,15 +452,16 @@ function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onCl
   );
 }
 
-function Journey({ status, createdAt, updatedAt }) {
-  // If cancelled, show a clear cancelled state instead of the journey
+function Journey({ status, createdAt, updatedAt, language }) {
   if (!status) return null;
+  const isVi = language === 'vi';
+
   if (String(status).toLowerCase() === 'cancelled') {
     return (
       <div className="purchase-empty-state">
         <span className="material-symbols-outlined">block</span>
-        <h3>Order Cancelled</h3>
-        <p>This order was cancelled on {formatDateTime(updatedAt || createdAt)}.</p>
+        <h3>{isVi ? 'Đơn Hàng Đã Bị Hủy' : 'Order Cancelled'}</h3>
+        <p>{isVi ? `Đơn hàng này đã bị hủy vào ${formatDateTime(updatedAt || createdAt)}.` : `This order was cancelled on ${formatDateTime(updatedAt || createdAt)}.`}</p>
       </div>
     );
   }
@@ -478,8 +470,8 @@ function Journey({ status, createdAt, updatedAt }) {
     return (
       <div className="purchase-empty-state">
         <span className="material-symbols-outlined">report</span>
-        <h3>Delivery Failed</h3>
-        <p>The carrier could not complete delivery on {formatDateTime(updatedAt || createdAt)}.</p>
+        <h3>{isVi ? 'Giao Hàng Thất Bại' : 'Delivery Failed'}</h3>
+        <p>{isVi ? `Đơn vị vận chuyển không thể hoàn tất giao hàng vào ${formatDateTime(updatedAt || createdAt)}.` : `The carrier could not complete delivery on ${formatDateTime(updatedAt || createdAt)}.`}</p>
       </div>
     );
   }
@@ -488,8 +480,8 @@ function Journey({ status, createdAt, updatedAt }) {
     return (
       <div className="purchase-empty-state">
         <span className="material-symbols-outlined">assignment_return</span>
-        <h3>Return Requested</h3>
-        <p>Your return request was submitted on {formatDateTime(updatedAt || createdAt)}.</p>
+        <h3>{isVi ? 'Đã Gửi Yêu Cầu Trả Hàng' : 'Return Requested'}</h3>
+        <p>{isVi ? `Yêu cầu trả hàng của bạn đã gửi vào ${formatDateTime(updatedAt || createdAt)}.` : `Your return request was submitted on ${formatDateTime(updatedAt || createdAt)}.`}</p>
       </div>
     );
   }
@@ -498,8 +490,8 @@ function Journey({ status, createdAt, updatedAt }) {
     return (
       <div className="purchase-empty-state">
         <span className="material-symbols-outlined">do_not_disturb_on</span>
-        <h3>Return Rejected</h3>
-        <p>The seller rejected this return request on {formatDateTime(updatedAt || createdAt)}.</p>
+        <h3>{isVi ? 'Yêu Cầu Trả Hàng Bị Từ Chối' : 'Return Rejected'}</h3>
+        <p>{isVi ? `Người bán đã từ chối yêu cầu trả hàng vào ${formatDateTime(updatedAt || createdAt)}.` : `The seller rejected this return request on ${formatDateTime(updatedAt || createdAt)}.`}</p>
       </div>
     );
   }
@@ -508,18 +500,19 @@ function Journey({ status, createdAt, updatedAt }) {
     return (
       <div className="purchase-empty-state">
         <span className="material-symbols-outlined">assignment_turned_in</span>
-        <h3>Returned</h3>
-        <p>This purchase was approved for return on {formatDateTime(updatedAt || createdAt)}.</p>
+        <h3>{isVi ? 'Đã Trả Hàng Thành Công' : 'Returned'}</h3>
+        <p>{isVi ? `Đơn hàng đã được duyệt trả hàng vào ${formatDateTime(updatedAt || createdAt)}.` : `This purchase was approved for return on ${formatDateTime(updatedAt || createdAt)}.`}</p>
       </div>
     );
   }
 
+  const steps = getJourneySteps(language);
   const activeIndex = statusOrder.indexOf(status);
   const hasActive = activeIndex >= 0;
 
   return (
     <div className="purchase-journey">
-      {journeySteps.map((step, index) => {
+      {steps.map((step, index) => {
         const isDone = hasActive && index <= activeIndex;
         const isCurrent = hasActive && index === activeIndex;
 
@@ -529,7 +522,7 @@ function Journey({ status, createdAt, updatedAt }) {
               <span className="material-symbols-outlined">{isDone ? 'check' : step.icon}</span>
             </div>
             <strong>{step.label}</strong>
-            <small>{isDone ? formatDateTime(isCurrent ? updatedAt || createdAt : createdAt) : 'Pending'}</small>
+            <small>{isDone ? formatDateTime(isCurrent ? updatedAt || createdAt : createdAt) : (isVi ? 'Chờ xử lý' : 'Pending')}</small>
           </div>
         );
       })}
@@ -554,9 +547,22 @@ function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
-function getStatusLabel(status) {
+function getStatusLabel(status, language) {
   if (!status) return 'Unknown';
-  const labels = {
+  const labelsVi = {
+    AwaitingPayment: 'Chờ thanh toán',
+    Pending: 'Đang xử lý',
+    Confirmed: 'Đã xác nhận',
+    Shipping: 'Đang giao hàng',
+    Delivered: 'Đã giao hàng',
+    Completed: 'Hoàn thành',
+    DeliveryFailed: 'Giao hàng thất bại',
+    ReturnRequested: 'Yêu cầu trả hàng',
+    ReturnRejected: 'Bị từ chối trả hàng',
+    Returned: 'Đã trả hàng',
+    Cancelled: 'Đã hủy',
+  };
+  const labelsEn = {
     AwaitingPayment: 'Waiting for Payment',
     Pending: 'Processing',
     Confirmed: 'Confirmed',
@@ -569,7 +575,7 @@ function getStatusLabel(status) {
     Returned: 'Returned',
     Cancelled: 'Cancelled',
   };
-  return labels[status] || status;
+  return language === 'vi' ? (labelsVi[status] || status) : (labelsEn[status] || status);
 }
 
 function getStatusClassName(status) {

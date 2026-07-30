@@ -769,14 +769,15 @@
 }
 
 .buyer-shop-kpis {
-  display: grid;
-  grid-template-columns: repeat(3, 92px);
-  gap: 10px;
+  display: flex;
+  gap: 12px;
 }
 
 .buyer-shop-kpis div {
-  min-height: 72px;
-  border-radius: 6px;
+  min-width: 110px;
+  padding: 10px 14px;
+  min-height: 74px;
+  border-radius: 8px;
   background: #ffffff;
   border: 1px solid rgba(2, 36, 27, 0.06);
   display: flex;
@@ -797,10 +798,12 @@
 .buyer-shop-kpis span {
   margin-top: 6px;
   color: #5c706b;
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 10.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .buyer-shop-tabs {

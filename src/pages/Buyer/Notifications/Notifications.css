@@ -180,6 +180,18 @@
   background: var(--primary);
 }
 
+.notification-card.unread::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
 .notif-card-icon {
   width: 48px;
   height: 48px;

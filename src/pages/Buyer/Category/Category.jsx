@@ -1,13 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import categoryService from '../../../services/categoryService';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/Category.css';
 
 export default function Category() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
   const location = useLocation();
   const isAdmin = user?.roles?.includes('Admin') || false;
   const isAdminView = isAdmin && location.pathname.startsWith('/admin');
@@ -23,6 +26,109 @@ export default function Category() {
   const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Active' | 'Inactive'
   const [isRootOnly, setIsRootOnly] = useState(false);
   const [sortBy, setSortBy] = useState('NameAsc'); // 'NameAsc' | 'NameDesc' | 'Newest' | 'Oldest'
+  const [statusConfirmModal, setStatusConfirmModal] = useState({
+    open: false,
+    category: null,
+    actionType: '',
+    message: ''
+  });
+
+  const toggleTreeNode = (catId) => {
+    setExpandedNodes((prev) => ({
+      ...prev,
+      [catId]: prev[catId] === undefined ? false : !prev[catId],
+    }));
+  };
+
+  const categoryStats = useMemo(() => {
+    const total = categories.length;
+    const root = categories.filter((c) => !c.parentId).length;
+    const child = categories.filter((c) => !!c.parentId).length;
+    const totalAttrs = categories.reduce(
+      (sum, c) => sum + (c.attributes?.filter((a) => !a.isDeleted).length || 0),
+      0
+    );
+    return { total, root, child, totalAttrs };
+  }, [categories]);
+
+  const categoryTree = useMemo(() => {
+    const map = {};
+    const roots = [];
+
+    categories.forEach((c) => {
+      map[c.categoryId] = { ...c, children: [] };
+    });
+
+    categories.forEach((c) => {
+      if (c.parentId && map[c.parentId]) {
+        map[c.parentId].children.push(map[c.categoryId]);
+      } else {
+        roots.push(map[c.categoryId]);
+      }
+    });
+
+    return roots;
+  }, [categories]);
+
+  const renderActionButtons = (cat) => (
+    <div className="cat-actions-cell" onClick={(e) => e.stopPropagation()}>
+      <span className={`badge ${cat.status === 'Active' ? 'badge-success' : cat.status === 'Pending' ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: '10px', marginRight: '2px' }}>
+        {formatStatus(cat.status)}
+      </span>
+      <button
+        type="button"
+        className="cat-tbl-btn view"
+        onClick={() => openCategoryDetail(cat)}
+        title={t('admin.categories.view_detail')}
+      >
+        <span className="material-symbols-outlined">visibility</span>
+        <span>{t('admin.categories.view_short')}</span>
+      </button>
+      <button
+        type="button"
+        className="cat-tbl-btn edit"
+        onClick={() => handleOpenEditModal(cat)}
+        title={t('admin.categories.edit_category')}
+      >
+        <span className="material-symbols-outlined">edit</span>
+        <span>{t('admin.categories.edit_short')}</span>
+      </button>
+      {cat.status === 'Pending' ? (
+        <>
+          <button 
+            type="button"
+            className="cat-tbl-btn toggle-on"
+            onClick={() => promptApproveCategory(cat)}
+            title={t('admin.categories.approve')}
+          >
+            <span className="material-symbols-outlined">check_circle</span>
+            <span>{t('admin.categories.approve_short')}</span>
+          </button>
+          <button 
+            type="button"
+            className="cat-tbl-btn toggle-off"
+            onClick={() => promptRejectCategory(cat)}
+            title={t('admin.categories.reject')}
+          >
+            <span className="material-symbols-outlined">cancel</span>
+            <span>{t('admin.categories.reject_short')}</span>
+          </button>
+        </>
+      ) : (
+        <button 
+          type="button"
+          className={`cat-tbl-btn ${cat.status === 'Active' ? 'toggle-off' : 'toggle-on'}`}
+          onClick={() => promptToggleStatus(cat)}
+          title={cat.status === 'Active' ? t('admin.categories.deactivate') : t('admin.categories.restore')}
+        >
+          <span className="material-symbols-outlined">
+            {cat.status === 'Active' ? 'do_not_disturb_on' : 'check_circle'}
+          </span>
+          <span>{cat.status === 'Active' ? t('admin.categories.deactivate_short') : t('admin.categories.restore_short')}</span>
+        </button>
+      )}
+    </div>
+  );
 
   // Debounce search input
   useEffect(() => {
@@ -35,6 +141,26 @@ export default function Category() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailCategory, setDetailCategory] = useState(null);
+
+  const openCategoryDetail = (cat) => {
+    setDetailCategory(cat);
+    setShowDetailModal(true);
+  };
+
+  const closeCategoryDetail = () => {
+    setShowDetailModal(false);
+    setDetailCategory(null);
+  };
+
+  const formatStatus = (st) => {
+    if (!st || st === 'All') return t('admin.categories.status_all');
+    if (st === 'Active') return t('admin.categories.status_active');
+    if (st === 'Pending') return t('admin.categories.status_pending');
+    if (st === 'Inactive') return t('admin.categories.status_inactive');
+    return st;
+  };
   
   // Form states
   const [name, setName] = useState('');
@@ -70,11 +196,20 @@ export default function Category() {
     imageInputRef.current?.click();
   };
 
+  const getApiErrorMessage = (err, fallbackKey) => {
+    const data = err?.response?.data;
+    if (typeof data === 'string' && data.trim()) return data;
+    if (data?.message && typeof data.message === 'string') return data.message;
+    if (data?.detail && typeof data.detail === 'string') return data.detail;
+    if (data?.title && typeof data.title === 'string') return data.title;
+    return t(fallbackKey);
+  };
+
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      showToast('Uploading category image...', 'info');
+      showToast(t('admin.categories.msg_uploading_img'), 'info');
       const res = await categoryService.uploadImage(selectedCategory.categoryId, file);
       if (res?.imageUrl) {
         setCategories((prev) =>
@@ -85,12 +220,12 @@ export default function Category() {
           )
         );
         setSelectedCategory((prev) => ({ ...prev, imageUrl: res.imageUrl }));
-        showToast('Category image updated successfully.', 'success');
+        showToast(t('admin.categories.msg_img_success'), 'success');
       } else {
-        showToast('Upload succeeded but no image URL was returned.', 'warning');
+        showToast(t('admin.categories.msg_img_warning'), 'warning');
       }
     } catch (err) {
-      showToast(err?.response?.data || 'Failed to upload category image.', 'error');
+      showToast(getApiErrorMessage(err, 'admin.categories.msg_img_error'), 'error');
     }
   };
 
@@ -168,7 +303,7 @@ export default function Category() {
         setSelectedCategory(null);
       }
     } catch (err) {
-      showToast('Failed to load categories.', 'error');
+      showToast(t('admin.categories.msg_load_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -330,14 +465,14 @@ export default function Category() {
   const handleSaveCategory = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      showToast('Name is required.', 'warning');
+      showToast(t('admin.categories.msg_name_required'), 'warning');
       return;
     }
 
     // Validate attributes
     for (let attr of attributes) {
       if (!attr.name.trim()) {
-        showToast('All attribute names must be filled out.', 'warning');
+        showToast(t('admin.categories.msg_attr_name_required'), 'warning');
         return;
       }
     }
@@ -363,18 +498,18 @@ export default function Category() {
     try {
       let savedCategory = null;
       if (modalMode === 'create') {
-        showToast('Creating category...', 'info');
+        showToast(t('admin.categories.msg_creating'), 'info');
         savedCategory = await categoryService.create(payload);
-        showToast('Category created successfully.', 'success');
+        showToast(t('admin.categories.msg_create_success'), 'success');
       } else {
-        showToast('Updating category...', 'info');
+        showToast(t('admin.categories.msg_updating'), 'info');
         savedCategory = await categoryService.update(selectedCategory.categoryId, payload);
-        showToast('Category updated successfully.', 'success');
+        showToast(t('admin.categories.msg_update_success'), 'success');
       }
 
       if (selectedImageFile && (savedCategory || modalMode === 'edit')) {
         const categoryIdToUpload = modalMode === 'create' ? savedCategory.categoryId : selectedCategory.categoryId;
-        showToast('Uploading category image...', 'info');
+        showToast(t('admin.categories.msg_uploading_img'), 'info');
         const imgRes = await categoryService.uploadImage(categoryIdToUpload, selectedImageFile);
         if (imgRes?.imageUrl && modalMode === 'edit') {
           setSelectedCategory(prev => ({ ...prev, imageUrl: imgRes.imageUrl }));
@@ -386,47 +521,69 @@ export default function Category() {
       setImagePreview('');
       await fetchCategories();
     } catch (err) {
-      const errMsg = err?.response?.data || 'Failed to save category.';
-      showToast(errMsg, 'error');
+      showToast(getApiErrorMessage(err, 'admin.categories.msg_save_error'), 'error');
     }
   };
 
-  const handleToggleStatus = async (category) => {
+  const promptToggleStatus = (category) => {
     const isActive = category.status === 'Active';
+    const actionType = isActive ? 'deactivate' : 'restore';
+    const rawMsg = isActive
+      ? t('admin.categories.confirm_deactivate_msg')
+      : t('admin.categories.confirm_restore_msg');
+    const message = rawMsg.replace('{{name}}', category.name);
+
+    setStatusConfirmModal({
+      open: true,
+      category,
+      actionType,
+      message
+    });
+  };
+
+  const promptApproveCategory = (category) => {
+    const rawMsg = t('admin.categories.confirm_approve_msg');
+    const message = rawMsg.replace('{{name}}', category.name);
+
+    setStatusConfirmModal({
+      open: true,
+      category,
+      actionType: 'approve',
+      message
+    });
+  };
+
+  const promptRejectCategory = (category) => {
+    const rawMsg = t('admin.categories.confirm_reject_msg');
+    const message = rawMsg.replace('{{name}}', category.name);
+
+    setStatusConfirmModal({
+      open: true,
+      category,
+      actionType: 'reject',
+      message
+    });
+  };
+
+  const executeStatusChange = async () => {
+    if (!statusConfirmModal.category) return;
+    const { category, actionType } = statusConfirmModal;
+
     try {
-      showToast(isActive ? 'Deactivating category...' : 'Restoring category...', 'info');
-      if (isActive) {
+      if (actionType === 'deactivate' || actionType === 'reject') {
+        showToast(actionType === 'reject' ? t('admin.categories.msg_rejecting') : t('admin.categories.msg_deactivating'), 'info');
         await categoryService.inactive(category.categoryId);
-        showToast('Category deactivated successfully.', 'success');
+        showToast(actionType === 'reject' ? t('admin.categories.msg_reject_success') : t('admin.categories.msg_deactivate_success'), 'success');
       } else {
+        showToast(actionType === 'approve' ? t('admin.categories.msg_approving') : t('admin.categories.msg_restoring'), 'info');
         await categoryService.restore(category.categoryId);
-        showToast('Category restored successfully.', 'success');
+        showToast(actionType === 'approve' ? t('admin.categories.msg_approve_success') : t('admin.categories.msg_restore_success'), 'success');
       }
       await fetchCategories();
     } catch (err) {
-      showToast('Failed to update category status.', 'error');
-    }
-  };
-
-  const handleApproveCategory = async (category) => {
-    try {
-      showToast('Approving category...', 'info');
-      await categoryService.restore(category.categoryId);
-      showToast('Category approved and active now.', 'success');
-      await fetchCategories();
-    } catch (err) {
-      showToast('Failed to approve category.', 'error');
-    }
-  };
-
-  const handleRejectCategory = async (category) => {
-    try {
-      showToast('Rejecting category...', 'info');
-      await categoryService.inactive(category.categoryId);
-      showToast('Category rejected (marked as Inactive).', 'success');
-      await fetchCategories();
-    } catch (err) {
-      showToast('Failed to reject category.', 'error');
+      showToast(getApiErrorMessage(err, 'admin.categories.msg_status_error'), 'error');
+    } finally {
+      setStatusConfirmModal({ open: false, category: null, actionType: '', message: '' });
     }
   };
 
@@ -434,30 +591,70 @@ export default function Category() {
     <div className="category-page-wrapper container animate-fade-in">
       <div className="category-header-section">
         <div>
-          <h1 className="category-headline">Categories</h1>
+          <h1 className="category-headline">{t('admin.categories.hero_title')}</h1>
           <p className="category-subtitle">
-            {isAdminView 
-              ? 'Manage product categories and custom specification attributes (Admin Mode)' 
-              : 'Browse and inspect categories and their specification attributes'
-            }
+            {t('admin.categories.hero_sub')}
           </p>
         </div>
         {isAdminView && (
           <button className="btn btn-primary" onClick={handleOpenCreateModal}>
             <span className="material-symbols-outlined">add_circle</span>
-            Add Category
+            {t('admin.categories.add_category')}
           </button>
         )}
       </div>
 
-      <div className="category-grid">
-        {/* Left Column: Categories List */}
+      {isAdminView && (
+        <div className="cat-stats-grid">
+          <div className="cat-stat-card">
+            <div className="cat-stat-icon icon-red">
+              <span className="material-symbols-outlined">category</span>
+            </div>
+            <div className="cat-stat-info">
+              <span>{t('admin.categories.stat_total_cat')}</span>
+              <h3>{categoryStats.total}</h3>
+            </div>
+          </div>
+
+          <div className="cat-stat-card">
+            <div className="cat-stat-icon icon-teal">
+              <span className="material-symbols-outlined">account_tree</span>
+            </div>
+            <div className="cat-stat-info">
+              <span>{t('admin.categories.stat_root_cat')}</span>
+              <h3>{categoryStats.root}</h3>
+            </div>
+          </div>
+
+          <div className="cat-stat-card">
+            <div className="cat-stat-icon icon-blue">
+              <span className="material-symbols-outlined">subdirectory_arrow_right</span>
+            </div>
+            <div className="cat-stat-info">
+              <span>{t('admin.categories.stat_child_cat')}</span>
+              <h3>{categoryStats.child}</h3>
+            </div>
+          </div>
+
+          <div className="cat-stat-card">
+            <div className="cat-stat-icon icon-amber">
+              <span className="material-symbols-outlined">tune</span>
+            </div>
+            <div className="cat-stat-info">
+              <span>{t('admin.categories.stat_total_attr')}</span>
+              <h3>{categoryStats.totalAttrs}</h3>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={`category-grid ${isAdminView ? 'admin-full-width' : ''}`}>
         <div className="category-card">
           <div className="search-filter-box">
             <input 
               type="text" 
               className="category-search-input" 
-              placeholder="Search categories..."
+              placeholder={t('admin.categories.search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -466,7 +663,7 @@ export default function Category() {
           {isAdminView && (
             <div className="admin-filter-toolbar">
               <div className="filter-group-status">
-                <span className="filter-toolbar-label">Status:</span>
+                <span className="filter-toolbar-label">{t('common.status')}:</span>
                 <div className="status-btn-group">
                   {['All', 'Active', 'Pending', 'Inactive'].map((status) => (
                     <button
@@ -475,7 +672,7 @@ export default function Category() {
                       className={`status-filter-btn ${statusFilter === status ? 'active' : ''}`}
                       onClick={() => setStatusFilter(status)}
                     >
-                      {status}
+                      {formatStatus(status)}
                     </button>
                   ))}
                 </div>
@@ -487,7 +684,7 @@ export default function Category() {
                     checked={isRootOnly}
                     onChange={(e) => setIsRootOnly(e.target.checked)}
                   />
-                  <span>Root only</span>
+                  <span>{t('admin.categories.root_only')}</span>
                 </label>
                 <div className="sort-selector-wrapper">
                   <span className="material-symbols-outlined sort-icon">sort</span>
@@ -496,10 +693,10 @@ export default function Category() {
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
-                    <option value="NameAsc">Name A-Z</option>
-                    <option value="NameDesc">Name Z-A</option>
-                    <option value="Newest">Newest</option>
-                    <option value="Oldest">Oldest</option>
+                    <option value="NameAsc">{t('admin.categories.sort_name_asc')}</option>
+                    <option value="NameDesc">{t('admin.categories.sort_name_desc')}</option>
+                    <option value="Newest">{t('admin.categories.sort_newest')}</option>
+                    <option value="Oldest">{t('admin.categories.sort_oldest')}</option>
                   </select>
                 </div>
               </div>
@@ -509,10 +706,126 @@ export default function Category() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <span className="btn-spinner"></span>
-              <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>Loading list...</p>
+              <p style={{ marginTop: '12px', color: 'var(--text-muted)' }}>{t('common.loading')}</p>
             </div>
           ) : filteredCategories.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No categories found.</p>
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>{t('common.no_data')}</p>
+          ) : isAdminView ? (
+            <div className="category-diagram-canvas">
+              <div className="diagram-top-bar">
+                <div className="diagram-legend">
+                  <span className="legend-item"><span className="legend-dot root-dot"></span> {t('admin.categories.stat_root_cat')}</span>
+                  <span className="legend-item"><span className="legend-dot child-dot"></span> {t('admin.categories.stat_child_cat')}</span>
+                  <span className="legend-item"><span className="legend-dot attr-dot"></span> {t('admin.categories.stat_total_attr')}</span>
+                </div>
+              </div>
+
+              <div className="diagram-nodes-grid">
+                {categoryTree.map((rootCat) => {
+                  const childCount = rootCat.children?.length || 0;
+                  const validAttrs = rootCat.attributes?.filter((a) => !a.isDeleted) || [];
+
+                  return (
+                    <div 
+                      key={rootCat.categoryId} 
+                      className="diagram-node-card root-card"
+                      onClick={() => openCategoryDetail(rootCat)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="diagram-node-header">
+                        <div className="diagram-node-identity">
+                          {rootCat.imageUrl ? (
+                            <img src={rootCat.imageUrl} alt={rootCat.name} className="cat-avatar-img" />
+                          ) : (
+                            <div className="cat-avatar-placeholder">
+                              <span className="material-symbols-outlined">folder</span>
+                            </div>
+                          )}
+                          <div className="cat-name-block">
+                            <strong>{rootCat.name}</strong>
+                            <span>ID: {rootCat.categoryId}</span>
+                          </div>
+                        </div>
+
+                        {renderActionButtons(rootCat)}
+                      </div>
+
+                      <div className="diagram-node-body">
+                        {validAttrs.length > 0 && (
+                          <div className="diagram-attrs-block">
+                            <div className="diagram-attrs-title">
+                              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>tune</span>
+                              <span>{t('admin.categories.specifications')} ({validAttrs.length})</span>
+                            </div>
+                            <div className="diagram-attr-chips">
+                              {validAttrs.map((attr) => (
+                                <span key={attr.attributeId} className="diagram-attr-chip">
+                                  <span>{attr.name}</span>
+                                  <span className="attr-type-badge">{attr.dataType}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {childCount > 0 && (
+                          <div className="diagram-children-branch">
+                            <div className="diagram-attrs-title" style={{ color: '#0f766e', marginBottom: '10px' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>subdirectory_arrow_right</span>
+                              <span>{t('admin.categories.stat_child_cat')} ({childCount})</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {rootCat.children.map((child) => {
+                                const childAttrs = child.attributes?.filter((a) => !a.isDeleted) || [];
+                                return (
+                                  <div 
+                                    key={child.categoryId} 
+                                    className="diagram-node-card child-card"
+                                    onClick={(e) => { e.stopPropagation(); openCategoryDetail(child); }}
+                                    style={{ cursor: 'pointer' }}
+                                  >
+                                    <div className="diagram-node-header" style={{ padding: '12px 14px' }}>
+                                      <div className="diagram-node-identity">
+                                        {child.imageUrl ? (
+                                          <img src={child.imageUrl} alt={child.name} className="cat-avatar-img" style={{ width: '32px', height: '32px' }} />
+                                        ) : (
+                                          <div className="cat-avatar-placeholder" style={{ width: '32px', height: '32px' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>category</span>
+                                          </div>
+                                        )}
+                                        <div className="cat-name-block">
+                                          <strong style={{ fontSize: '13px' }}>{child.name}</strong>
+                                          <span>ID: {child.categoryId}</span>
+                                        </div>
+                                      </div>
+
+                                      {renderActionButtons(child)}
+                                    </div>
+
+                                    {childAttrs.length > 0 && (
+                                      <div className="diagram-node-body" style={{ padding: '0 14px 12px' }}>
+                                        <div className="diagram-attr-chips">
+                                          {childAttrs.map((attr) => (
+                                            <span key={attr.attributeId} className="diagram-attr-chip" style={{ fontSize: '10.5px' }}>
+                                              <span>{attr.name}</span>
+                                              <span className="attr-type-badge">{attr.dataType}</span>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
             <div className="category-list-container">
               <div className="category-list-group">
@@ -526,207 +839,157 @@ export default function Category() {
                       <span className={`status-indicator ${cat.status?.toLowerCase() === 'active' ? 'active' : 'inactive'}`}></span>
                       <span className="category-item-name">{cat.name}</span>
                     </div>
-                    {isAdminView && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{cat.categoryId}</span>}
                   </div>
                 ))}
               </div>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Right Column: Details Panel */}
-        <div className="category-card glass-panel" style={{ minHeight: '400px' }}>
-          {selectedCategory ? (
-            <div>
-              <div className="detail-header-card">
-                <div className="detail-header-with-image">
-                  <div className="category-image-container">
-                    {selectedCategory.imageUrl ? (
-                      <img src={selectedCategory.imageUrl} alt={selectedCategory.name} className="category-detail-img" />
-                    ) : (
-                      <div className="category-detail-img-placeholder">
-                        <span className="material-symbols-outlined" style={{ fontSize: '48px' }}>category</span>
-                      </div>
-                    )}
-                    {isAdminView && (
-                      <div className="category-image-overlay" onClick={handleChooseImage}>
-                        <span className="material-symbols-outlined">photo_camera</span>
-                        <span>Update Image</span>
-                      </div>
-                    )}
+      {/* Category Detail & Attributes Modal */}
+      {showDetailModal && detailCategory && createPortal(
+        <div className="cat-detail-modal-overlay" onClick={closeCategoryDetail}>
+          <div className="cat-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="cat-detail-modal-header">
+              <div className="cat-detail-header-left">
+                {detailCategory.imageUrl ? (
+                  <img src={detailCategory.imageUrl} alt={detailCategory.name} className="cat-detail-header-img" />
+                ) : (
+                  <div className="cat-avatar-placeholder">
+                    <span className="material-symbols-outlined">category</span>
                   </div>
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={handleImageChange}
-                  />
-                  <div className="detail-title-block">
-                    {isAdminView && (
-                      <span className={`badge ${
-                        selectedCategory.status === 'Active' ? 'badge-success' : 
-                        selectedCategory.status === 'Pending' ? 'badge-warning' : 'badge-danger'
-                      }`} style={{ marginBottom: '8px' }}>
-                        {selectedCategory.status}
-                      </span>
-                    )}
-                    <h2>{selectedCategory.name}</h2>
-                  </div>
+                )}
+                <div className="cat-detail-header-title">
+                  <span className={`badge ${
+                    detailCategory.status === 'Active' ? 'badge-success' : 
+                    detailCategory.status === 'Pending' ? 'badge-warning' : 'badge-danger'
+                  }`} style={{ marginBottom: '4px', fontSize: '11px' }}>
+                    {formatStatus(detailCategory.status)}
+                  </span>
+                  <h3>{detailCategory.name}</h3>
                 </div>
-                {isAdminView && (
-                  <div className="details-actions-bar" style={{ marginTop: 0 }}>
-                    <button className="btn btn-outline" onClick={() => handleOpenEditModal(selectedCategory)}>
-                      <span className="material-symbols-outlined">edit</span>
-                      Edit
-                    </button>
-                    {selectedCategory.status === 'Pending' ? (
-                      <>
-                        <button 
-                          className="btn btn-success"
-                          onClick={() => handleApproveCategory(selectedCategory)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
-                          Approve
-                        </button>
-                        <button 
-                          className="btn btn-danger"
-                          onClick={() => handleRejectCategory(selectedCategory)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>cancel</span>
-                          Reject
-                        </button>
-                      </>
-                    ) : (
-                      <button 
-                        className={`btn ${selectedCategory.status === 'Active' ? 'btn-secondary' : 'btn-primary'}`}
-                        onClick={() => handleToggleStatus(selectedCategory)}
-                      >
-                        <span className="material-symbols-outlined">
-                          {selectedCategory.status === 'Active' ? 'do_not_disturb_on' : 'check_circle'}
-                        </span>
-                        {selectedCategory.status === 'Active' ? 'Deactivate' : 'Restore'}
-                      </button>
-                    )}
+              </div>
+              <button type="button" className="admin-confirm-close" onClick={closeCategoryDetail}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="cat-detail-modal-body">
+              <div className="cat-detail-meta-grid">
+                <div className="cat-detail-meta-item">
+                  <span>{t('admin.categories.cat_id')}</span>
+                  <strong>{detailCategory.categoryId}</strong>
+                </div>
+                <div className="cat-detail-meta-item">
+                  <span>{t('admin.categories.parent_id')}</span>
+                  <strong>{detailCategory.parentId || t('admin.categories.root_category')}</strong>
+                </div>
+                <div className="cat-detail-meta-item">
+                  <span>{t('admin.categories.created_at')}</span>
+                  <strong>{detailCategory.createdAt ? new Date(detailCategory.createdAt).toLocaleString() : 'N/A'}</strong>
+                </div>
+                <div className="cat-detail-meta-item">
+                  <span>{t('admin.categories.updated_at')}</span>
+                  <strong>{detailCategory.updatedAt ? new Date(detailCategory.updatedAt).toLocaleString() : 'N/A'}</strong>
+                </div>
+              </div>
+
+              <div className="description-section">
+                <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 6px', color: '#0f172a' }}>{t('admin.categories.description')}</h4>
+                <p className="description-text" style={{ fontSize: '13.5px', color: '#475569', margin: 0, lineHeight: 1.6 }}>{detailCategory.description || t('admin.categories.no_description')}</p>
+              </div>
+
+              <div className="attributes-section">
+                <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 12px', color: '#0f172a' }}>{t('admin.categories.specifications')}</h4>
+                {!detailCategory.attributes || detailCategory.attributes.filter(a => !a.isDeleted).length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '13px' }}>{t('admin.categories.no_attributes')}</p>
+                ) : (
+                  <div className="attributes-table-wrapper" style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                    <table className="attributes-table" style={{ width: '100%', margin: 0 }}>
+                      <thead>
+                        <tr>
+                          <th>{t('admin.categories.th_order')}</th>
+                          <th>{t('admin.categories.th_attr_id')}</th>
+                          <th>{t('admin.categories.th_name')}</th>
+                          <th>{t('admin.categories.th_data_type')}</th>
+                          <th>{t('admin.categories.th_required')}</th>
+                          <th>{t('admin.categories.th_unit')}</th>
+                          <th>{t('admin.categories.th_validation')}</th>
+                          <th>{t('admin.categories.th_ui_controls')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...(detailCategory.attributes || [])]
+                          .filter(attr => !attr.isDeleted)
+                          .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                          .map((attr) => (
+                            <tr key={attr.attributeId}>
+                              <td><strong>#{attr.displayOrder || '-'}</strong></td>
+                              <td><code>{attr.attributeId}</code></td>
+                              <td style={{ fontWeight: 600 }}>{attr.name}</td>
+                              <td>
+                                <span className="badge badge-success" style={{ background: 'rgba(11, 148, 133, 0.08)', color: 'var(--accent)', border: 'none' }}>
+                                  {attr.dataType}
+                                </span>
+                              </td>
+                              <td>{attr.isRequired ? t('admin.categories.attr_required_yes') : t('admin.categories.attr_required_no')}</td>
+                              <td>{attr.unit || '-'}</td>
+                              <td>
+                                {attr.dataType === 'Number' && (attr.minValue !== null || attr.maxValue !== null) ? (
+                                  <span style={{ fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                                    {attr.minValue !== null && `Min: ${attr.minValue}`}
+                                    {attr.minValue !== null && attr.maxValue !== null && <br />}
+                                    {attr.maxValue !== null && `Max: ${attr.maxValue}`}
+                                  </span>
+                                ) : (
+                                  '-'
+                                )}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
+                                  {attr.isFilterable && (
+                                    <span className="badge badge-info" style={{ fontSize: '10px', padding: '2px 6px', width: 'fit-content' }}>
+                                      Filterable
+                                    </span>
+                                  )}
+                                  {attr.isSearchable && (
+                                    <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', width: 'fit-content' }}>
+                                      Searchable
+                                    </span>
+                                  )}
+                                  {!attr.isFilterable && !attr.isSearchable && <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
-
-              {isAdminView && (
-                <div className="detail-meta-grid">
-                  <div className="meta-item">
-                    <span className="meta-label">Category ID</span>
-                    <span className="meta-value">{selectedCategory.categoryId}</span>
-                  </div>
-                  <div className="meta-item">
-                    <span className="meta-label">Parent ID</span>
-                    <span className="meta-value">{selectedCategory.parentId || 'None (Root)'}</span>
-                  </div>
-                  <div className="meta-item">
-                    <span className="meta-label">Created At</span>
-                    <span className="meta-value">{selectedCategory.createdAt ? new Date(selectedCategory.createdAt).toLocaleString() : 'N/A'}</span>
-                  </div>
-                  <div className="meta-item">
-                    <span className="meta-label">Updated At</span>
-                    <span className="meta-value">{selectedCategory.updatedAt ? new Date(selectedCategory.updatedAt).toLocaleString() : 'N/A'}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="description-section">
-                <h4>Description</h4>
-                <p className="description-text">{selectedCategory.description || 'No description provided.'}</p>
-              </div>
-
-              {isAdminView && (
-                <div className="attributes-section">
-                  <h4>Specifications & Attributes</h4>
-                  {!selectedCategory.attributes || selectedCategory.attributes.length === 0 ? (
-                    <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No attributes specified for this category.</p>
-                  ) : (
-                    <div className="attributes-table-wrapper" style={{ overflowX: 'auto' }}>
-                      <table className="attributes-table">
-                        <thead>
-                          <tr>
-                            <th>Order</th>
-                            <th>Attribute ID</th>
-                            <th>Name</th>
-                            <th>Data Type</th>
-                            <th>Required</th>
-                            <th>Unit</th>
-                            <th>Validation (Min/Max)</th>
-                            <th>UI Controls</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[...(selectedCategory.attributes || [])]
-                            .filter(attr => !attr.isDeleted)
-                            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
-                            .map((attr) => (
-                              <tr key={attr.attributeId}>
-                                <td><strong>#{attr.displayOrder || '-'}</strong></td>
-                                <td><code>{attr.attributeId}</code></td>
-                                <td style={{ fontWeight: 600 }}>{attr.name}</td>
-                                <td>
-                                  <span className="badge badge-success" style={{ background: 'rgba(11, 148, 133, 0.08)', color: 'var(--accent)', border: 'none' }}>
-                                    {attr.dataType}
-                                  </span>
-                                </td>
-                                <td>{attr.isRequired ? 'Yes' : 'No'}</td>
-                                <td>{attr.unit || '-'}</td>
-                                <td>
-                                  {attr.dataType === 'Number' && (attr.minValue !== null || attr.maxValue !== null) ? (
-                                    <span style={{ fontSize: '12.5px', whiteSpace: 'nowrap' }}>
-                                      {attr.minValue !== null && `Min: ${attr.minValue}`}
-                                      {attr.minValue !== null && attr.maxValue !== null && <br />}
-                                      {attr.maxValue !== null && `Max: ${attr.maxValue}`}
-                                    </span>
-                                  ) : (
-                                    '-'
-                                  )}
-                                </td>
-                                <td>
-                                  <div style={{ display: 'flex', gap: '4px', flexDirection: 'column' }}>
-                                    {attr.isFilterable && (
-                                      <span className="badge badge-info" style={{ fontSize: '10px', padding: '2px 6px', width: 'fit-content' }}>
-                                        Filterable
-                                      </span>
-                                    )}
-                                    {attr.isSearchable && (
-                                      <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', width: 'fit-content' }}>
-                                        Searchable
-                                      </span>
-                                    )}
-                                    {!attr.isFilterable && !attr.isSearchable && <span style={{ color: 'var(--text-muted)' }}>-</span>}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
-          ) : (
-            <div className="no-selection-card">
-              <span className="material-symbols-outlined no-selection-icon">category</span>
-              <h3>No Category Selected</h3>
-              <p>Choose a category from the left pane to view details, attributes, and options.</p>
+
+            <div className="cat-detail-modal-footer">
+              <button type="button" className="cat-tbl-btn edit" onClick={() => { closeCategoryDetail(); handleOpenEditModal(detailCategory); }}>
+                <span className="material-symbols-outlined">edit</span>
+                <span>{t('admin.categories.edit_category')}</span>
+              </button>
+              <button type="button" className="cat-tbl-btn view" onClick={closeCategoryDetail}>
+                {t('common.close')}
+              </button>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Create / Edit Modal */}
-      {isModalOpen && (
+      {isModalOpen && createPortal(
         <div className="modal-overlay animate-fade-in" onClick={() => setIsModalOpen(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{modalMode === 'create' ? 'Add New Category' : 'Edit Category'}</h3>
+              <h3>{modalMode === 'create' ? t('admin.categories.add_category') : t('admin.categories.edit_category')}</h3>
               <button className="modal-close-btn" onClick={() => setIsModalOpen(false)}>
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -735,7 +998,7 @@ export default function Category() {
             <form onSubmit={handleSaveCategory} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label className="form-label">Category Name</label>
+                  <label className="form-label">{t('admin.categories.category_name')}</label>
                   <input 
                     type="text" 
                     className="form-input" 
@@ -746,7 +1009,7 @@ export default function Category() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Category Image</label>
+                  <label className="form-label">{t('admin.categories.category_image')}</label>
                   <div className="modal-category-image-wrapper">
                     {imagePreview ? (
                       <div className="modal-image-preview-container">
@@ -758,7 +1021,7 @@ export default function Category() {
                     ) : (
                       <div className="modal-image-upload-trigger" onClick={() => modalImageInputRef.current?.click()}>
                         <span className="material-symbols-outlined">add_photo_alternate</span>
-                        <span>Select Category Image</span>
+                        <span>{t('admin.categories.select_image')}</span>
                       </div>
                     )}
                     <input
@@ -772,15 +1035,15 @@ export default function Category() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Parent Category</label>
+                  <label className="form-label">{t('admin.categories.col_parent')}</label>
                   <select 
                     className="form-input" 
                     value={parentId} 
                     onChange={(e) => setParentId(e.target.value)}
                   >
-                    <option value="">None (Root Category)</option>
+                    <option value="">{t('admin.categories.root_category')}</option>
                     {categories
-                      .filter(c => modalMode === 'create' || c.categoryId !== selectedCategory.categoryId) // prevent self-referencing loop
+                      .filter(c => modalMode === 'create' || c.categoryId !== selectedCategory?.categoryId) // prevent self-referencing loop
                       .map(c => (
                         <option key={c.categoryId} value={c.categoryId}>
                           {c.name} ({c.categoryId})
@@ -791,7 +1054,7 @@ export default function Category() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Description</label>
+                  <label className="form-label">{t('admin.categories.description')}</label>
                   <textarea 
                     className="form-input" 
                     rows="3" 
@@ -802,17 +1065,17 @@ export default function Category() {
 
                 <div className="form-group">
                   <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Specifications & Attributes</span>
+                    <span>{t('admin.categories.specifications')}</span>
                     <button type="button" className="add-attr-trigger" onClick={handleAddAttributeRow}>
                       <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
-                      Add Attribute
+                      {t('admin.categories.add_attribute')}
                     </button>
                   </label>
 
                   <div className="attributes-creator-widget">
                     {attributes.length === 0 ? (
                       <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
-                        No attributes configured. Click "Add Attribute" to add specifications.
+                        {t('admin.categories.no_attributes')}
                       </p>
                     ) : (
                       attributes.map((attr, idx) => (
@@ -831,7 +1094,7 @@ export default function Category() {
                             <input 
                               type="text" 
                               className="form-input attr-name-input" 
-                              placeholder="Attribute Name (e.g. Size)" 
+                              placeholder={t('admin.categories.th_name')} 
                               value={attr.name}
                               onChange={(e) => handleAttributeChange(idx, 'name', e.target.value)}
                               required
@@ -854,7 +1117,7 @@ export default function Category() {
                           
                           <div className="attribute-card-settings">
                             <div className="settings-field">
-                              <label>Unit</label>
+                              <label>{t('admin.categories.th_unit')}</label>
                               <input 
                                 type="text" 
                                 className="form-input input-sm" 
@@ -898,7 +1161,7 @@ export default function Category() {
                                   checked={attr.isRequired || false}
                                   onChange={(e) => handleAttributeChange(idx, 'isRequired', e.target.checked)}
                                 />
-                                <span>Required</span>
+                                <span>{t('admin.categories.th_required')}</span>
                               </label>
                               
                               <label className="checkbox-label">
@@ -907,7 +1170,7 @@ export default function Category() {
                                   checked={attr.isFilterable || false}
                                   onChange={(e) => handleAttributeChange(idx, 'isFilterable', e.target.checked)}
                                 />
-                                <span>Filterable</span>
+                                <span>{t('admin.categories.attr_filterable')}</span>
                               </label>
                               
                               <label className="checkbox-label">
@@ -916,7 +1179,7 @@ export default function Category() {
                                   checked={attr.isSearchable || false}
                                   onChange={(e) => handleAttributeChange(idx, 'isSearchable', e.target.checked)}
                                 />
-                                <span>Searchable</span>
+                                <span>{t('admin.categories.attr_searchable')}</span>
                               </label>
                             </div>
                           </div>
@@ -939,7 +1202,7 @@ export default function Category() {
                           </div>
                           <button type="button" className="btn btn-outline" onClick={() => handleRestoreAttribute(idx)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '12px', height: 'fit-content' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>restore</span>
-                            Restore
+                            {t('admin.categories.restore')}
                           </button>
                         </div>
                       ))}
@@ -949,12 +1212,61 @@ export default function Category() {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Changes</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary">{t('admin.categories.save_changes')}</button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Confirmation Modal for Status Changes */}
+      {statusConfirmModal.open && createPortal(
+        <div className="cat-detail-modal-overlay" onClick={() => setStatusConfirmModal({ open: false, category: null, actionType: '', message: '' })}>
+          <div className="cat-detail-modal" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="cat-detail-modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="material-symbols-outlined" style={{ color: statusConfirmModal.actionType === 'deactivate' || statusConfirmModal.actionType === 'reject' ? '#dc2626' : '#16a34a', fontSize: '24px' }}>
+                  {statusConfirmModal.actionType === 'deactivate' || statusConfirmModal.actionType === 'reject' ? 'warning' : 'check_circle'}
+                </span>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0f172a' }}>
+                  {t('admin.categories.confirm_title')}
+                </h3>
+              </div>
+              <button type="button" className="cat-detail-close-btn" onClick={() => setStatusConfirmModal({ open: false, category: null, actionType: '', message: '' })}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', fontSize: '14px', color: '#334155', lineHeight: '1.5' }}>
+              {statusConfirmModal.message}
+            </div>
+
+            <div className="cat-detail-modal-footer" style={{ padding: '12px 20px', background: '#fafafa', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setStatusConfirmModal({ open: false, category: null, actionType: '', message: '' })}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{
+                  background: statusConfirmModal.actionType === 'deactivate' || statusConfirmModal.actionType === 'reject' ? '#dc2626' : '#16a34a',
+                  borderColor: statusConfirmModal.actionType === 'deactivate' || statusConfirmModal.actionType === 'reject' ? '#dc2626' : '#16a34a',
+                  color: '#ffffff'
+                }}
+                onClick={executeStatusChange}
+              >
+                {t('common.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

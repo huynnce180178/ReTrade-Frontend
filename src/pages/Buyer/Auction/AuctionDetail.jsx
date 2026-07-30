@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
 import { formatAuctionDateTime, parseAuctionDateTime } from '../../../utils/auctionTime';
@@ -89,20 +90,20 @@ function getApiErrorMessage(error) {
   return data?.message || data?.title || '';
 }
 
-function translateBidError(message) {
+function translateBidError(message, t) {
   const normalized = String(message || '').toLowerCase();
 
-  if (normalized.includes('greater than 0')) return 'Bid amount must be greater than 0.';
-  if (normalized.includes('auction not found')) return 'Auction not found.';
-  if (normalized.includes('own auction')) return 'You cannot bid on your own auction.';
-  if (normalized.includes('active auctions')) return 'Bids can only be placed on active auctions.';
-  if (normalized.includes('paid deposit') || normalized.includes('accepted policy')) return 'A paid deposit and accepted policy are required before bidding.';
-  if (normalized.includes('bidding limit')) return 'Bid amount cannot exceed your bidding limit.';
-  if (normalized.includes('current bid')) return 'Bid amount must be greater than the current bid.';
-  if (normalized.includes('at least')) return 'Bid amount does not meet the minimum required amount.';
-  if (normalized.includes('buy now price')) return 'Bid amount cannot be greater than the buy now price.';
+  if (normalized.includes('greater than 0')) return t('auction.err_greater_than_zero');
+  if (normalized.includes('auction not found')) return t('auction.err_not_found');
+  if (normalized.includes('own auction')) return t('auction.err_own_auction');
+  if (normalized.includes('active auctions')) return t('auction.err_active_only');
+  if (normalized.includes('paid deposit') || normalized.includes('accepted policy')) return t('auction.err_deposit_required');
+  if (normalized.includes('bidding limit')) return t('auction.err_limit_exceeded');
+  if (normalized.includes('current bid')) return t('auction.err_must_be_higher');
+  if (normalized.includes('at least')) return t('auction.err_min_step');
+  if (normalized.includes('buy now price')) return t('auction.err_buy_now_exceeded');
 
-  return message || 'Failed to place bid. Please try again.';
+  return message || t('auction.err_default');
 }
 
 export default function AuctionDetail() {
@@ -110,6 +111,8 @@ export default function AuctionDetail() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const [auction, setAuction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
@@ -169,12 +172,14 @@ export default function AuctionDetail() {
 
       if (effectiveStatus === 'Upcoming' && start > now) {
         const diff = start - now;
-        setTimeLeft(`Starts in: ${formatDuration(diff)}`);
+        const duration = formatDuration(diff);
+        setTimeLeft(t('auction.starts_in', { duration }));
       } else if (effectiveStatus === 'Ongoing' && end > now) {
         const diff = end - now;
-        setTimeLeft(`Ends in: ${formatDuration(diff)}`);
+        const duration = formatDuration(diff);
+        setTimeLeft(t('auction.ends_in', { duration }));
       } else {
-        setTimeLeft('Auction Ended');
+        setTimeLeft(t('auction.status_ended'));
       }
     };
 
@@ -182,14 +187,10 @@ export default function AuctionDetail() {
     const interval = setInterval(calculateTimeLeft, 1000);
 
     return () => clearInterval(interval);
-  }, [auction]);
+  }, [auction, t]);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
 
     const loadAuction = async () => {
       try {
@@ -197,13 +198,15 @@ export default function AuctionDetail() {
         const data = await auctionService.getById(auctionId);
         setAuction(data);
         setActiveImage(data?.images?.find(i => i.isMain)?.imageUrl || data?.images?.[0]?.imageUrl || data?.productImageUrl || '');
-        try {
-          const myDeposit = await auctionService.getMyDeposit(auctionId);
-          setDeposit(myDeposit);
-          setPolicyAccepted(Boolean(myDeposit?.policyAccepted));
-        } catch {
-          setDeposit(null);
-          setPolicyAccepted(false);
+        if (user) {
+          try {
+            const myDeposit = await auctionService.getMyDeposit(auctionId);
+            setDeposit(myDeposit);
+            setPolicyAccepted(Boolean(myDeposit?.policyAccepted));
+          } catch {
+            setDeposit(null);
+            setPolicyAccepted(false);
+          }
         }
       } catch (error) {
         showToast(error?.response?.data || 'Failed to load auction detail.', 'error');
@@ -397,24 +400,13 @@ export default function AuctionDetail() {
       }
       await refreshAuction();
     } catch (error) {
-      showToast(translateBidError(getApiErrorMessage(error)), 'error');
+      showToast(translateBidError(getApiErrorMessage(error), t), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
-  if (!authLoading && !user) {
-    return (
-      <div className="auction-page container animate-fade-in">
-        <section className="auction-auth-panel">
-          <span className="material-symbols-outlined">lock</span>
-          <h1>Auction Detail</h1>
-          <p>Please sign in to view auction details.</p>
-          <Link to="/login" className="auction-auth-link">Sign In</Link>
-        </section>
-      </div>
-    );
-  }
+
 
   if (loading) {
     return (
@@ -438,11 +430,23 @@ export default function AuctionDetail() {
   }
 
   const progress = getProgress(auction);
+  const isLeadingBidder = Boolean(
+    user &&
+    auction?.recentBids &&
+    auction.recentBids.length > 0 &&
+    (auction.recentBids[0]?.userId === user.userId || auction.recentBids[0]?.userId === user.id)
+  );
+
+  const translatedStatusLabel = effectiveStatus === 'Upcoming'
+    ? t('auction.status_upcoming')
+    : (effectiveStatus === 'Ongoing'
+      ? t('auction.status_active')
+      : t('auction.status_ended'));
 
   return (
     <div className="auction-page auction-detail-page container animate-fade-in">
       <div className="auction-detail-breadcrumb">
-        <Link to="/auction">Auctions</Link>
+        <Link to="/auction">{t('auction.auctions_breadcrumb')}</Link>
         <span>/</span>
         <strong>{auction.productName}</strong>
       </div>
@@ -451,11 +455,13 @@ export default function AuctionDetail() {
         <div className="auction-detail-gallery">
           <div className="auction-detail-main-image">
             {activeImage ? (
-              <img src={activeImage} alt={auction.productName || 'Auction product'} />
+              <img src={activeImage} alt={auction.productName || t('nav.product')} />
             ) : (
               <span className="material-symbols-outlined">inventory_2</span>
             )}
-            <em className={`auction-card-status ${String(effectiveStatus || '').toLowerCase()}`}>{effectiveStatus}</em>
+            <em className={`auction-card-status ${isEnded ? 'ended' : String(effectiveStatus || '').toLowerCase()}`}>
+              {translatedStatusLabel}
+            </em>
           </div>
           {(auction.images || []).length > 1 && (
             <div className="auction-detail-thumbs">
@@ -472,21 +478,23 @@ export default function AuctionDetail() {
           <section className="auction-detail-action-card">
             <div className="auction-detail-action-head">
               <div>
-                <span>Minimum Next Bid</span>
+                <span>{t('auction.min_next_bid')}</span>
                 <strong>{formatMoney(minimumNextBid)}</strong>
               </div>
               <div>
-                <span>Your Deposit</span>
+                <span>{t('auction.your_deposit')}</span>
                 <strong>{deposit?.status === 'Paid' ? formatMoney(totalDepositAmount) : '-'}</strong>
               </div>
               <div className={paidDeposit && maxBidAmount <= 0 ? 'auction-limit-empty' : ''}>
-                <span>Bidding Limit</span>
+                <span>{t('auction.bidding_limit')}</span>
                 <strong>{deposit?.status === 'Paid' ? formatMoney(maxBidAmount) : '-'}</strong>
               </div>
             </div>
             {paidDeposit && heldBidAmount > 0 && (
               <p className="auction-limit-note">
-                You already bid {formatMoney(heldBidAmount)}. Remaining bidding limit: {formatMoney(maxBidAmount)}.
+                {isVi
+                  ? `Bạn đã ra giá ${formatMoney(heldBidAmount)}. Hạn mức ra giá còn lại: ${formatMoney(maxBidAmount)}.`
+                  : `You already bid ${formatMoney(heldBidAmount)}. Remaining bidding limit: ${formatMoney(maxBidAmount)}.`}
               </p>
             )}
 
@@ -497,40 +505,40 @@ export default function AuctionDetail() {
                 </span>
                 {isWinner ? (
                   <div>
-                    <h3>You Won!</h3>
-                    <p>Congratulations, you won this auction with a bid of <strong>{formatMoney(auction.currentPrice)}</strong>.</p>
-                    <Link to="/purchase-history" className="btn-view-order">View in Purchase History</Link>
+                    <h3>{isVi ? '🏆 Bạn Đã Thắng Phiên Đấu Giá!' : 'You Won!'}</h3>
+                    <p>{isVi ? `Chúc mừng! Bạn đã thắng phiên đấu giá này với mức giá ${formatMoney(auction.currentPrice)}.` : `Congratulations, you won this auction with a bid of ${formatMoney(auction.currentPrice)}.`}</p>
+                    <Link to="/purchase-history" className="btn-view-order">{isVi ? 'Xem Trong Lịch Sử Mua Hàng' : 'View in Purchase History'}</Link>
                   </div>
                 ) : paidDeposit ? (
                   <div>
-                    <h3>Auction Ended</h3>
-                    <p>Winner: <strong>{auction.winnerName || 'Anonymous'}</strong>.</p>
-                    <small className="refund-notice">Your deposit balance (excluding the 20,000 VND participation fee) will be manually refunded by the administrator.</small>
+                    <h3>{isVi ? 'Phiên Đấu Giá Đã Kết Thúc' : 'Auction Ended'}</h3>
+                    <p>{isVi ? 'Người thắng cuộc:' : 'Winner:'} <strong>{auction.winnerName || (isVi ? 'Ẩn danh' : 'Anonymous')}</strong>.</p>
+                    <small className="refund-notice">{isVi ? 'Số tiền đặt cọc của bạn (trừ phí tham gia 20.000 VNĐ) sẽ được quản trị viên hoàn trả lại.' : 'Your deposit balance (excluding the 20,000 VND participation fee) will be manually refunded by the administrator.'}</small>
                   </div>
                 ) : auction.winnerId ? (
                   <div>
-                    <h3>Auction Ended</h3>
-                    <p>Winner: <strong>{auction.winnerName || 'Anonymous'}</strong>.</p>
+                    <h3>{isVi ? 'Phiên Đấu Giá Đã Kết Thúc' : 'Auction Ended'}</h3>
+                    <p>{isVi ? 'Người thắng cuộc:' : 'Winner:'} <strong>{auction.winnerName || (isVi ? 'Ẩn danh' : 'Anonymous')}</strong>.</p>
                   </div>
                 ) : (
                   <div>
-                    <h3>Auction Ended</h3>
-                    <p>This auction ended with no bids placed.</p>
+                    <h3>{isVi ? 'Phiên Đấu Giá Đã Kết Thúc' : 'Auction Ended'}</h3>
+                    <p>{isVi ? 'Phiên đấu giá này đã kết thúc mà không có lượt ra giá nào.' : 'This auction ended with no bids placed.'}</p>
                   </div>
                 )}
               </div>
             ) : isOwner ? (
-              <div className="auction-detail-notice">You cannot bid on your own auction.</div>
+              <div className="auction-detail-notice">{isVi ? 'Bạn không thể ra giá cho sản phẩm đấu giá của chính mình.' : 'You cannot bid on your own auction.'}</div>
             ) : !paidDeposit ? (
               <form className="auction-deposit-form" onSubmit={handleDepositSubmit} noValidate>
                 <label>
-                  <span>Deposit Amount</span>
+                  <span>{t('auction.deposit_amount')}</span>
                   <input
                     type="number"
                     min="20000"
                     value={depositAmount}
                     onChange={(event) => setDepositAmount(event.target.value)}
-                    placeholder="Min 20000"
+                    placeholder={isVi ? 'Tối thiểu 20.000' : 'Min 20000'}
                     disabled={!canDeposit || actionLoading}
                   />
                 </label>
@@ -541,68 +549,76 @@ export default function AuctionDetail() {
                     onChange={(event) => setPolicyAccepted(event.target.checked)}
                     disabled={!canDeposit || actionLoading}
                   />
-                  <span>I accept the auction policy and deposit terms.</span>
+                  <span>{t('auction.deposit_terms_accept')}</span>
                 </label>
                 <button type="submit" disabled={!canDeposit || actionLoading}>
                   {actionLoading ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">payments</span>}
-                  Pay Deposit
+                  {t('auction.pay_deposit')}
                 </button>
               </form>
             ) : (
               <>
                 <form className="auction-bid-form" onSubmit={handleBidSubmit} noValidate>
                   <label>
-                    <span>Bid Amount</span>
+                    <span>{t('auction.enter_bid_amount')}</span>
                     <input
                       type="number"
                       min={minimumNextBid}
                       max={highestAllowedBid}
                       value={bidAmount}
                       onChange={(event) => setBidAmount(event.target.value)}
-                      placeholder={`Max ${formatMoney(highestAllowedBid)}`}
+                      placeholder={isVi ? `Tối đa ${formatMoney(highestAllowedBid)}` : `Max ${formatMoney(highestAllowedBid)}`}
                       disabled={!canBid || actionLoading}
                     />
                   </label>
                   {auction.buyNowPrice && (
                     <p className="auction-buynow-hint">
-                      Bid exactly {formatMoney(auction.buyNowPrice)} to buy now and end the auction.
-                      {buyNowAmount > maxBidAmount ? ` Add ${formatMoney(additionalDepositNeededForBuyNow)} more deposit to reach the buy now limit.` : ' Your bidding limit covers buy now.'}
+                      {isVi
+                        ? `Ra giá đúng ${formatMoney(auction.buyNowPrice)} để mua ngay và kết thúc phiên đấu giá.`
+                        : `Bid exactly ${formatMoney(auction.buyNowPrice)} to buy now and end the auction.`}
+                      {buyNowAmount > maxBidAmount
+                        ? (isVi ? ` Nạp thêm ${formatMoney(additionalDepositNeededForBuyNow)} cọc để đạt hạn mức mua ngay.` : ` Add ${formatMoney(additionalDepositNeededForBuyNow)} more deposit to reach the buy now limit.`)
+                        : (isVi ? ' Hạn mức ra giá của bạn đủ để mua ngay.' : ' Your bidding limit covers buy now.')}
                     </p>
                   )}
                   {paidDeposit && additionalDepositNeededForNextBid > 0 && (
                     <p className="auction-bid-limit-warning">
-                      Add {formatMoney(additionalDepositNeededForNextBid)} more deposit to reach the next bid.
+                      {isVi
+                        ? `Nạp thêm ${formatMoney(additionalDepositNeededForNextBid)} cọc để đủ ra giá tiếp theo.`
+                        : `Add ${formatMoney(additionalDepositNeededForNextBid)} more deposit to reach the next bid.`}
                     </p>
                   )}
                   {bidExceedsLimit && (
                     <p className="auction-bid-limit-warning">
-                      Current maximum bid: {formatMoney(highestAllowedBid)}.
+                      {isVi
+                        ? `Hạn mức ra giá tối đa hiện tại: ${formatMoney(highestAllowedBid)}.`
+                        : `Current maximum bid: ${formatMoney(highestAllowedBid)}.`}
                     </p>
                   )}
                   <button type="submit" disabled={!canBid || actionLoading}>
                     {actionLoading ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">gavel</span>}
-                    Place Bid
+                    {t('auction.place_bid')}
                   </button>
                 </form>
 
                 <form className="auction-deposit-form auction-topup-form" onSubmit={handleDepositSubmit} noValidate>
                   <label>
-                    <span>Add More Deposit</span>
+                    <span>{t('auction.add_more_deposit')}</span>
                     <input
                       type="number"
                       min="20000"
                       value={depositAmount}
                       onChange={(event) => setDepositAmount(event.target.value)}
-                      placeholder="Min 20000"
+                      placeholder={isVi ? 'Tối thiểu 20.000' : 'Min 20000'}
                       disabled={!canDeposit || actionLoading}
                     />
                   </label>
                   <p className="auction-topup-note">
-                    The 20,000 VND participation fee is only deducted on your first successful deposit. Any extra deposit is added directly to your bidding limit.
+                    {t('auction.topup_note')}
                   </p>
                   <button type="submit" disabled={!canDeposit || actionLoading}>
-                    {actionLoading ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">account_balance_wallet</span>}
-                    Add Deposit
+                    {actionLoading ? <span className="btn-spinner"></span> : <span className="material-symbols-outlined">add_card</span>}
+                    {t('auction.top_up_deposit')}
                   </button>
                 </form>
               </>
@@ -610,30 +626,35 @@ export default function AuctionDetail() {
           </section>
 
           <div className="auction-detail-info">
-            <span className="auction-detail-category">{auction.categoryName || 'Uncategorized'}</span>
+            <span className="auction-detail-category">{auction.categoryName || t('common.none')}</span>
             <h1>{auction.productName}</h1>
-            <p>{auction.productDescription || 'No product description provided.'}</p>
+            <p>{auction.productDescription || t('common.no_data')}</p>
 
             <div className="auction-detail-bidbox">
               <div>
-                <span>Current Highest Bid</span>
-                <strong>{formatMoney(auction.currentPrice)}</strong>
+                <span>{t('auction.current_highest_bid')}</span>
+                <strong key={auction.currentPrice} className="price-flash-up">{formatMoney(auction.currentPrice)}</strong>
+                {isLeadingBidder && (
+                  <span className="leading-bidder-badge">
+                    {t('auction.you_are_leading')}
+                  </span>
+                )}
               </div>
               <div>
-                <span>Starting Price</span>
+                <span>{t('auction.starting_price')}</span>
                 <strong>{formatMoney(auction.startingPrice)}</strong>
               </div>
               <div>
-                <span>Step</span>
+                <span>{t('auction.min_step')}</span>
                 <strong>{formatMoney(auction.minIncrement)}</strong>
               </div>
               <div>
-                <span>Bids</span>
+                <span>{t('auction.bid_count')}</span>
                 <strong>{auction.bidCount || 0}</strong>
               </div>
               {auction.buyNowPrice && (
                 <div className="auction-detail-buynow-item">
-                  <span>Buy Now Price</span>
+                  <span>{t('auction.buy_now_price')}</span>
                   <strong>{formatMoney(auction.buyNowPrice)}</strong>
                 </div>
               )}
@@ -641,7 +662,7 @@ export default function AuctionDetail() {
 
             <div className="auction-detail-progress">
               <div>
-                <span>Time Left</span>
+                <span>{t('auction.time_remaining')}</span>
                 <strong>{timeLeft}</strong>
               </div>
               <i><b style={{ width: `${progress}%` }} /></i>
@@ -649,11 +670,11 @@ export default function AuctionDetail() {
 
             <div className="auction-detail-timeline">
               <div>
-                <span>Start Time</span>
+                <span>{t('auction.start_time')}</span>
                 <strong>{formatDateTime(auction.startTime)}</strong>
               </div>
               <div>
-                <span>End Time</span>
+                <span>{t('auction.end_time')}</span>
                 <strong>{formatDateTime(auction.endTime)}</strong>
               </div>
             </div>
@@ -661,11 +682,11 @@ export default function AuctionDetail() {
             <div className="auction-detail-seller">
               <span className="material-symbols-outlined">storefront</span>
               <div>
-                <small>Seller</small>
-                <strong>{auction.sellerName || 'Unknown seller'}</strong>
+                <small>{t('auction.seller')}</small>
+                <strong>{auction.sellerName || t('auction.unknown_seller')}</strong>
                 <p>{auction.sellerId}</p>
               </div>
-              {auction.sellerId && <Link to={`/sellers/${auction.sellerId}`}>View Seller</Link>}
+              {auction.sellerId && <Link to={`/sellers/${auction.sellerId}`}>{t('auction.view_seller')}</Link>}
             </div>
           </div>
         </aside>
@@ -673,9 +694,9 @@ export default function AuctionDetail() {
 
       <section className="auction-detail-lower">
         <article className="auction-detail-card">
-          <h2>Product Details</h2>
+          <h2>{t('auction.product_details')}</h2>
           {specRows.length === 0 ? (
-            <p>No additional specifications.</p>
+            <p>{t('auction.no_specs')}</p>
           ) : (
             <dl>
               {specRows.map(([label, value]) => (
@@ -689,14 +710,14 @@ export default function AuctionDetail() {
         </article>
 
         <article className="auction-detail-card">
-          <h2>Recent Bids</h2>
+          <h2>{t('auction.recent_bids')}</h2>
           {(auction.recentBids || []).length === 0 ? (
-            <p>No bids have been placed yet.</p>
+            <p>{t('auction.no_bids_yet')}</p>
           ) : (
             <div className="auction-bid-history">
               {auction.recentBids.map((bid) => (
                 <div key={bid.bidId}>
-                  <span>{bid.bidderName || bid.userId || 'Bidder'}</span>
+                  <span>{bid.bidderName || bid.userId || t('auction.bidder')}</span>
                   <strong>{formatMoney(bid.bidAmount)}</strong>
                   <small>{formatDateTime(bid.createdAt)}</small>
                 </div>
@@ -711,38 +732,38 @@ export default function AuctionDetail() {
           <div className="auction-rules-card animate-fade-in">
             <header className="auction-rules-popup-header">
               <span className="material-symbols-outlined">gavel</span>
-              <h2>Auction Rules & Guidelines</h2>
+              <h2>{isVi ? 'Quy Định & Hướng Dẫn Đấu Giá' : 'Auction Rules & Guidelines'}</h2>
             </header>
             
             <div className="auction-rules-content">
               <div className="rules-section">
-                <h3>1. Free to Watch</h3>
-                <p>Viewing ongoing auctions is completely free. No deposit or registration fees are required.</p>
+                <h3>{isVi ? '1. Phù Hợp Cho Mọi Người' : '1. Free to Watch'}</h3>
+                <p>{isVi ? 'Xem các phiên đấu giá hoàn toàn miễn phí. Không yêu cầu phí đăng ký hay đặt cọc để theo dõi.' : 'Viewing ongoing auctions is completely free. No deposit or registration fees are required.'}</p>
               </div>
 
               <div className="rules-section">
-                <h3>2. Participation & Entry Fee</h3>
-                <p>To place bids, a mandatory deposit is required. A non-refundable entry fee of <strong>20,000 VND</strong> is charged immediately upon joining the auction.</p>
+                <h3>{isVi ? '2. Phí Tham Gia & Đặt Cọc' : '2. Participation & Entry Fee'}</h3>
+                <p>{isVi ? 'Để ra giá, bạn cần nạp tiền đặt cọc. Phí tham gia 20.000 VNĐ (không hoàn lại) sẽ được khấu trừ khi bạn tham gia phiên.' : 'To place bids, a mandatory deposit is required. A non-refundable entry fee of 20,000 VND is charged immediately upon joining the auction.'}</p>
               </div>
 
               <div className="rules-section">
-                <h3>3. Bidding Limit</h3>
-                <p>Your maximum allowable bid is calculated as: <br />
-                <strong>Bidding Limit = Total Deposit - 20,000 VND</strong>.</p>
+                <h3>{isVi ? '3. Hạn Mức Ra Giá' : '3. Bidding Limit'}</h3>
+                <p>{isVi ? 'Hạn mức ra giá tối đa được tính theo công thức:' : 'Your maximum allowable bid is calculated as:'} <br />
+                <strong>{isVi ? 'Hạn Mức Ra Giá = Tổng Tiền Cọc - 20.000 VNĐ' : 'Bidding Limit = Total Deposit - 20,000 VND'}</strong>.</p>
               </div>
 
               <div className="rules-section">
-                <h3>4. Refund Policies</h3>
+                <h3>{isVi ? '4. Chính Sách Hoàn Cọc' : '4. Refund Policies'}</h3>
                 <ul>
-                  <li><strong>If you win:</strong> The winning bid amount will be deducted from your deposit. The remaining balance (Deposit - Win Amount - 20,000 VND) will be manually refunded by the administrator.</li>
-                  <li><strong>If you lose:</strong> The remaining deposit (Deposit - 20,000 VND fee) will be manually refunded by the administrator.</li>
+                  <li><strong>{isVi ? 'Nếu bạn thắng:' : 'If you win:'}</strong> {isVi ? 'Số tiền trúng đấu giá sẽ trừ vào khoản cọc. Số dư còn lại sẽ được quản trị viên hoàn trả.' : 'The winning bid amount will be deducted from your deposit. The remaining balance (Deposit - Win Amount - 20,000 VND) will be manually refunded by the administrator.'}</li>
+                  <li><strong>{isVi ? 'Nếu bạn không thắng:' : 'If you lose:'}</strong> {isVi ? 'Khoản tiền cọc còn lại (sau khi trừ 20.000 VNĐ phí tham gia) sẽ được hoàn trả đầy đủ.' : 'The remaining deposit (Deposit - 20,000 VND fee) will be manually refunded by the administrator.'}</li>
                 </ul>
               </div>
             </div>
 
             <footer className="auction-rules-footer">
               <button type="button" onClick={handleCloseRules} className="btn-rules-agree">
-                I Understand & Agree
+                {isVi ? 'Tôi Đã Hiểu & Đồng Ý' : 'I Understand & Agree'}
               </button>
             </footer>
           </div>
@@ -750,33 +771,21 @@ export default function AuctionDetail() {
       )}
 
       {showAuctionEndNotice && (
-        <div className="auction-celebration-overlay" role="dialog" aria-modal="true">
-          <div className="auction-firework firework-one"></div>
-          <div className="auction-firework firework-two"></div>
-          <div className="auction-firework firework-three"></div>
-          <section className="auction-celebration-card">
-            <span className="material-symbols-outlined">{isWinner ? 'emoji_events' : 'verified'}</span>
-            <h2>{isWinner ? 'Congratulations!' : 'Auction Ended'}</h2>
-            {isWinner ? (
-              <p>You won <strong>{auction.productName}</strong> with a bid of {formatMoney(auction.currentPrice)}.</p>
-            ) : auction.winnerId ? (
-              <p><strong>{auction.productName}</strong> ended at {formatMoney(auction.currentPrice)}. Winner: <strong>{auction.winnerName || 'Anonymous'}</strong>.</p>
-            ) : Number(auction.bidCount || 0) > 0 ? (
-              <p><strong>{auction.productName}</strong> has ended. Final results are being confirmed.</p>
-            ) : (
-              <p><strong>{auction.productName}</strong> has ended with no winning bid.</p>
-            )}
-            <div className="auction-celebration-actions">
-              {isWinner && (
-                <Link to="/purchase-history" className="btn-view-order" onClick={closeAuctionEndNotice}>
-                  View Order
-                </Link>
-              )}
-              <button type="button" onClick={closeAuctionEndNotice}>
-                Keep Browsing
-              </button>
-            </div>
-          </section>
+        <div className="auction-end-banner" role="status">
+          <span className="material-symbols-outlined">{isWinner ? 'emoji_events' : 'info'}</span>
+          <span>
+            {isWinner
+              ? (isVi ? `🏆 Bạn đã thắng phiên đấu giá với giá ${formatMoney(auction.currentPrice)}.` : `🏆 You won this auction at ${formatMoney(auction.currentPrice)}.`)
+              : (isVi ? 'Phiên đấu giá đã kết thúc.' : 'This auction has ended.')}
+          </span>
+          {isWinner && (
+            <Link to="/purchase-history" className="auction-end-banner-link" onClick={closeAuctionEndNotice}>
+              {isVi ? 'Xem đơn hàng' : 'View Order'}
+            </Link>
+          )}
+          <button type="button" className="auction-end-banner-close" onClick={closeAuctionEndNotice} aria-label="Dismiss">
+            <span className="material-symbols-outlined">close</span>
+          </button>
         </div>
       )}
     </div>

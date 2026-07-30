@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 const GOOGLE_CLIENT_ID = '743075993817-g2um0aknujbhp10vtfjmtg12gq6iaoid.apps.googleusercontent.com';
@@ -83,7 +84,8 @@ function ScrollToTop() {
 function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
         <NotificationProvider>
           <ToastProvider>
             <BrowserRouter>
@@ -91,10 +93,29 @@ function App() {
               <Routes>
                 <Route path="/" element={<MainLayout />}>
                   <Route index element={<Home />} />
+                  <Route path="login" element={<Login />} />
+                  <Route path="register" element={<Register />} />
+                  <Route path="forgot-password" element={<ForgotPassword />} />
+                  <Route path="reset-password" element={<ResetPassword />} />
+                  <Route path="my-account" element={<MyAccount />} />
+                  <Route path="change-password" element={<ChangePassword />} />
+                  <Route path="address-book" element={<AddressBook />} />
+                  <Route path="purchase-history" element={<PurchaseHistory />} />
+                  <Route path="purchase-history/:orderId" element={<PurchaseDetail />} />
+                  <Route path="bid-history" element={<BidHistory />} />
+                  <Route path="refund-history" element={<RefundHistory />} />
+                  <Route path="offer-history" element={<OfferHistory />} />
+                  <Route path="report-history" element={<ReportHistory />} />
+                  <Route path="my-vouchers" element={<MyVouchers />} />
+                  <Route path="my-subscriptions" element={<MySubscriptions />} />
+                  <Route path="payment-result" element={<PaymentResult />} />
+                  <Route path="payment/vnpay-return" element={<PaymentResult />} />
                   <Route path="product" element={<Product />} />
                   <Route path="product/:productId" element={<ProductDetail />} />
                   <Route path="auction" element={<Auction />} />
                   <Route path="auction/:auctionId" element={<AuctionDetail />} />
+                  <Route path="auctions" element={<Auction />} />
+                  <Route path="auctions/:auctionId" element={<AuctionDetail />} />
                   <Route path="wishlist" element={<Wishlist />} />
                   <Route path="assistant-chat" element={<AssistantChat />} />
                   <Route path="chat" element={<Chat />} />
@@ -102,45 +123,28 @@ function App() {
                   <Route path="checkout" element={<Checkout />} />
                   <Route path="checkout/:productId" element={<Checkout />} />
                   <Route path="notifications" element={<Notifications />} />
-
-                <Route path="support" element={<Support />} />
-                <Route path="users/:userId" element={<UserProfile />} />
-                <Route path="sellers/:sellerId" element={<SellerProfile />} />
-                <Route path="seller-dashboard" element={<SellerLayout />}>
-                  <Route index element={<SellerDashboard />} />
-                  <Route path="products" element={<MyProducts />} />
-                  <Route path="products/new" element={<ProductForm />} />
-                  <Route path="products/edit/:productId" element={<ProductForm />} />
-                  <Route path="sales-statistics" element={<SalesStatistics />} />
-                  <Route path="messages" element={<Chat basePath="/seller-dashboard/messages" />} />
-                  <Route path="messages/:roomId" element={<Chat basePath="/seller-dashboard/messages" />} />
-                  <Route path="auctions" element={<MyAuctions />} />
-                  <Route path="orders" element={<OrderManagement />} />
-                  <Route path="orders/:orderId/status" element={<OrderStatusUpdate />} />
-                  <Route path="orders/:orderId" element={<OrderDetail />} />
-                  <Route path="offers" element={<OfferList />} />
-                  <Route path="reviews" element={<ReviewList />} />
+                  <Route path="support" element={<Support />} />
+                  <Route path="users/:userId" element={<UserProfile />} />
+                  <Route path="sellers/:sellerId" element={<SellerProfile />} />
+                  <Route path="category" element={<CategoryList />} />
+                  <Route path="category/:categoryId" element={<CategoryProductList />} />
                 </Route>
-                <Route path="login" element={<Login />} />
-                <Route path="register" element={<Register />} />
-                <Route path="forgot-password" element={<ForgotPassword />} />
-                <Route path="reset-password" element={<ResetPassword />} />
-                <Route path="profile" element={<MyAccount />} />
-                <Route path="vouchers" element={<MyVouchers />} />
-                <Route path="subscriptions" element={<MySubscriptions />} />
-                <Route path="my-account" element={<Navigate to="/profile" replace />} />
-                <Route path="change-password" element={<ChangePassword />} />
-                <Route path="address-book" element={<AddressBook />} />
-                <Route path="purchase-history" element={<PurchaseHistory />} />
-                <Route path="purchase-history/:orderId" element={<PurchaseDetail />} />
-                <Route path="bid-history" element={<BidHistory />} />
-                <Route path="refund-history" element={<RefundHistory />} />
-                <Route path="offer-history" element={<OfferHistory />} />
-                <Route path="report-history" element={<ReportHistory />} />
-                <Route path="payment/vnpay-return" element={<PaymentResult />} />
-                <Route path="category" element={<CategoryList />} />
-                <Route path="category/:categoryId" element={<CategoryProductList />} />
-                {/* Profile page removed */}
+
+              {/* Seller Dashboard Routes */}
+              <Route path="/seller-dashboard" element={<SellerLayout />}>
+                <Route index element={<SellerDashboard />} />
+                <Route path="products" element={<MyProducts />} />
+                <Route path="products/new" element={<ProductForm />} />
+                <Route path="products/edit/:productId" element={<ProductForm />} />
+                <Route path="sales-statistics" element={<SalesStatistics />} />
+                <Route path="messages" element={<Chat basePath="/seller-dashboard/messages" />} />
+                <Route path="messages/:roomId" element={<Chat basePath="/seller-dashboard/messages" />} />
+                <Route path="auctions" element={<MyAuctions />} />
+                <Route path="orders" element={<OrderManagement />} />
+                <Route path="orders/:orderId/status" element={<OrderStatusUpdate />} />
+                <Route path="orders/:orderId" element={<OrderDetail />} />
+                <Route path="offers" element={<OfferList />} />
+                <Route path="reviews" element={<ReviewList />} />
               </Route>
 
               {/* Admin Panel Routes */}
@@ -168,6 +172,7 @@ function App() {
         </ToastProvider>
         </NotificationProvider>
       </AuthProvider>
+      </LanguageProvider>
     </GoogleOAuthProvider>
   );
 }

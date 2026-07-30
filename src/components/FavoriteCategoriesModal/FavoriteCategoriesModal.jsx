@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import categoryService from '../../services/categoryService';
 import userFavoriteService from '../../services/userFavoriteService';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavorites, onUpdate }) {
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [categories, setCategories] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -19,10 +21,9 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
       try {
         const data = await categoryService.getAllActive("?$filter=Status eq 'Active'&$orderby=Name asc");
         const arr = Array.isArray(data) ? data : (data?.value || []);
-        // Only show root categories (no parentId) for simplicity
         setCategories(arr.filter(c => !c.parentId));
       } catch {
-        showToast('Failed to load categories.', 'error');
+        showToast(t('common.error_occurred'), 'error');
       } finally {
         setLoading(false);
       }
@@ -30,7 +31,7 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
 
     fetchCategories();
     setSelectedIds(new Set(currentFavorites.map(f => f.categoryId)));
-  }, [isOpen]);
+  }, [isOpen, showToast, currentFavorites, t]);
 
   const handleToggle = (categoryId) => {
     setSelectedIds(prev => {
@@ -39,7 +40,7 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
         next.delete(categoryId);
       } else {
         if (next.size >= 3) {
-          showToast('Maximum 3 favorite categories allowed.', 'warning');
+          showToast(t('common.warning'), 'warning');
           return prev;
         }
         next.add(categoryId);
@@ -53,51 +54,65 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
     try {
       const currentIds = new Set(currentFavorites.map(f => f.categoryId));
       
-      // Remove unselected
       for (const fav of currentFavorites) {
         if (!selectedIds.has(fav.categoryId)) {
           await userFavoriteService.removeFavorite(fav.categoryId);
         }
       }
 
-      // Add newly selected
       for (const id of selectedIds) {
         if (!currentIds.has(id)) {
           await userFavoriteService.addFavorite(id);
         }
       }
 
-      showToast('Favorite categories updated!', 'success');
+      showToast(t('toast.saved_success'), 'success');
       onUpdate();
       onClose();
     } catch (err) {
-      showToast(err?.response?.data || 'Failed to update favorites.', 'error');
+      showToast(err?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return createPortal(
     <div className="modal-overlay animate-fade-in" onClick={onClose}>
-      <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
+      <div
+        className="modal-container"
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '550px' }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fav-cat-modal-title"
+      >
         <div className="modal-header">
-          <h3>Choose Favorite Categories</h3>
-          <button className="modal-close-btn" onClick={onClose}>
+          <h3 id="fav-cat-modal-title">{t('home.set_favorite_categories')}</h3>
+          <button className="modal-close-btn" onClick={onClose} aria-label={t('common.close')}>
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
         <div className="modal-body">
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Select up to 3 categories to personalize your homepage. Products from these categories will appear on your feed.
+            {t('home.favorites_subtitle')}
           </p>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <div className="product-loading-spinner" style={{ margin: '0 auto' }} />
-              <p style={{ marginTop: '12px', color: 'var(--text-muted)', fontSize: '14px' }}>Loading categories...</p>
+              <p style={{ marginTop: '12px', color: 'var(--text-muted)', fontSize: '14px' }}>{t('common.loading')}</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto' }}>
@@ -145,11 +160,11 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
 
         <div className="modal-footer">
           <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: 'auto' }}>
-            {selectedIds.size}/3 selected
+            {selectedIds.size}/3 {t('common.select')}
           </span>
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Preferences'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
       </div>

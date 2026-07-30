@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import orderService from '../../../services/orderService';
 import './SalesStatistics.css';
 
@@ -11,19 +12,22 @@ const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   month: '2-digit',
   year: 'numeric',
 });
-const salesPeriodOptions = [
-  { value: 7, label: 'Last 7 Days' },
-  { value: 30, label: 'Last 30 Days' },
-  { value: 90, label: 'Last 90 Days' },
-  { value: 365, label: 'Last 365 Days' },
-];
 
 export default function SalesStatistics() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
+
   const [periodDays, setPeriodDays] = useState(30);
   const [salesStats, setSalesStats] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const salesPeriodOptions = useMemo(() => [
+    { value: 7, label: t('sales_stats.days_7') },
+    { value: 30, label: t('sales_stats.days_30') },
+    { value: 90, label: t('sales_stats.days_90') },
+    { value: 365, label: t('sales_stats.days_365') },
+  ], [t]);
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
@@ -37,11 +41,11 @@ export default function SalesStatistics() {
       const data = await orderService.getSellerSalesStatistics({ sellerId, periodDays });
       setSalesStats(data);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load seller sales statistics.', 'error');
+      showToast(error?.response?.data || t('sales_stats.load_error'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [periodDays, sellerId, showToast]);
+  }, [periodDays, sellerId, showToast, t]);
 
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
@@ -72,23 +76,37 @@ export default function SalesStatistics() {
   const animatedAverageOrderValue = useAnimatedNumber(averageOrderValue);
 
   if (authLoading) {
-    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>Loading sales statistics...</p></div>;
+    return <div className="seller-dashboard-loading"><span className="btn-spinner"></span><p>{t('sales_stats.loading')}</p></div>;
   }
 
   if (!user) return <Navigate to="/login" replace />;
   if (!isSeller && !isAdmin) return <Navigate to="/profile" replace />;
 
+  const breakdownGridItems = [
+    [t('sales_stats.shipping_collected'), formatVnd(salesStats?.shippingCollected || 0)],
+    [t('sales_stats.discount_given'), formatVnd(salesStats?.discountGiven || 0)],
+    [t('sales_stats.awaiting_payment'), salesStats?.awaitingPaymentOrders ?? 0],
+    [t('sales_stats.pending'), salesStats?.pendingOrders ?? 0],
+    [t('sales_stats.confirmed'), salesStats?.confirmedOrders ?? 0],
+    [t('sales_stats.shipping'), salesStats?.shippingOrders ?? 0],
+    [t('sales_stats.delivered'), salesStats?.deliveredOrders ?? 0],
+    [t('sales_stats.completed'), salesStats?.completedOrders ?? 0],
+    [t('sales_stats.delivery_failed'), salesStats?.deliveryFailedOrders ?? 0],
+    [t('sales_stats.cancelled'), salesStats?.cancelledOrders ?? 0],
+    [t('sales_stats.returned'), salesStats?.returnedOrders ?? 0],
+  ];
+
   return (
     <div className="ss-page animate-fade-in">
       <header className="ss-header">
         <div>
-          <span className="ss-eyebrow">Business Analytics</span>
-          <h1>Shop Manager</h1>
-          <p>Review sales performance, delivered revenue, and order movement over a selected period.</p>
+          <span className="ss-eyebrow">{t('sales_stats.eyebrow')}</span>
+          <h1>{t('sales_stats.title')}</h1>
+          <p>{t('sales_stats.desc')}</p>
           {periodRange && <strong className="ss-period-window">{periodRange}</strong>}
         </div>
         <label className="ss-period-select">
-          <span>Period</span>
+          <span>{t('sales_stats.period_label')}</span>
           <select value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))}>
             {salesPeriodOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -100,54 +118,54 @@ export default function SalesStatistics() {
       {loading ? (
         <section className="ss-loading-panel">
           <span className="btn-spinner"></span>
-          <p>Loading analytics...</p>
+          <p>{t('sales_stats.loading')}</p>
         </section>
       ) : (
         <>
           <section className="ss-metric-grid">
             <article className="ss-metric-card ss-metric-card--revenue" style={{ '--delay': '0ms' }}>
               <div>
-                <span>Successful Revenue</span>
+                <span>{t('sales_stats.net_revenue')}</span>
                 <span className="material-symbols-outlined">payments</span>
               </div>
               <strong>{formatVnd(animatedNetSales)}</strong>
-              <p>{formatVnd(animatedGrossSales)} gross before discounts</p>
+              <p>{t('sales_stats.gross_sub', { amount: formatVnd(animatedGrossSales) })}</p>
             </article>
             <article className="ss-metric-card" style={{ '--delay': '70ms' }}>
               <div>
-                <span>Orders In Period</span>
+                <span>{t('sales_stats.total_orders')}</span>
                 <span className="material-symbols-outlined">receipt_long</span>
               </div>
               <strong>{Math.round(animatedTotalOrders)}</strong>
-              <p>{Math.round(animatedSuccessfulOrders)} successful orders</p>
+              <p>{t('sales_stats.success_orders_sub', { count: Math.round(animatedSuccessfulOrders) })}</p>
             </article>
             <article className="ss-metric-card ss-metric-card--rate" style={{ '--delay': '140ms' }}>
               <div>
-                <span>Success Rate</span>
+                <span>{t('sales_stats.success_rate')}</span>
                 <span className="material-symbols-outlined">task_alt</span>
               </div>
               <div className="ss-progress-ring" style={{ '--progress': `${Math.min(100, Math.max(0, animatedFulfillmentRate)) * 3.6}deg` }}>
                 <strong>{Math.round(animatedFulfillmentRate)}%</strong>
               </div>
-              <p>{Math.round(animatedSoldItems)} sold items</p>
+              <p>{t('sales_stats.sold_items_sub', { count: Math.round(animatedSoldItems) })}</p>
             </article>
             <article className="ss-metric-card" style={{ '--delay': '210ms' }}>
               <div>
-                <span>Average Order</span>
+                <span>{t('sales_stats.average_order')}</span>
                 <span className="material-symbols-outlined">monitoring</span>
               </div>
               <strong>{formatVnd(animatedAverageOrderValue)}</strong>
-              <p>Based on delivered and completed orders</p>
+              <p>{t('sales_stats.average_order_sub')}</p>
             </article>
           </section>
 
           <section className="ss-chart-panel">
             <div className="ss-chart-head">
               <div>
-                <span>Revenue Trend</span>
+                <span>{t('sales_stats.revenue_trend')}</span>
                 <strong>{formatCompactVnd(animatedNetSales)}</strong>
               </div>
-              <em><i /> Revenue <b /> Orders</em>
+              <em><i /> {t('sales_stats.revenue_legend')} <b /> {t('sales_stats.orders_legend')}</em>
             </div>
             {hasTrendData ? (
               <div className="ss-chart-bars" style={{ '--bar-count': salesTrend.length || 1 }}>
@@ -158,7 +176,7 @@ export default function SalesStatistics() {
 
                   return (
                     <div key={`${point.label || point.Label}-${index}`} className="ss-chart-bar">
-                      <span title={`${formatVnd(revenue)} - ${orderCount} orders`}>
+                      <span title={`${formatVnd(revenue)} - ${t('sales_stats.orders_count', { count: orderCount })}`}>
                         <i style={{ '--bar-height': `${height}%`, '--bar-delay': `${index * 70}ms` }} />
                       </span>
                       <b>{orderCount}</b>
@@ -170,26 +188,14 @@ export default function SalesStatistics() {
             ) : (
               <div className="ss-empty-chart">
                 <span className="material-symbols-outlined">bar_chart</span>
-                <strong>No successful sales in this period</strong>
-                <p>Revenue appears after an order reaches Delivered or Completed.</p>
+                <strong>{t('sales_stats.empty_title')}</strong>
+                <p>{t('sales_stats.empty_sub')}</p>
               </div>
             )}
           </section>
 
           <section className="ss-breakdown-grid">
-            {[
-              ['Shipping Collected', formatVnd(salesStats?.shippingCollected || 0)],
-              ['Discount Given', formatVnd(salesStats?.discountGiven || 0)],
-              ['Awaiting Payment', salesStats?.awaitingPaymentOrders ?? 0],
-              ['Pending', salesStats?.pendingOrders ?? 0],
-              ['Confirmed', salesStats?.confirmedOrders ?? 0],
-              ['Shipping', salesStats?.shippingOrders ?? 0],
-              ['Delivered', salesStats?.deliveredOrders ?? 0],
-              ['Completed', salesStats?.completedOrders ?? 0],
-              ['Delivery Failed', salesStats?.deliveryFailedOrders ?? 0],
-              ['Cancelled', salesStats?.cancelledOrders ?? 0],
-              ['Returned', salesStats?.returnedOrders ?? 0],
-            ].map(([label, value], index) => (
+            {breakdownGridItems.map(([label, value], index) => (
               <article key={label} style={{ '--delay': `${index * 35}ms` }}>
                 <span>{label}</span>
                 <strong>{value}</strong>

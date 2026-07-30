@@ -203,11 +203,12 @@
   width: min(520px, 100%);
   min-height: 92px;
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: 82px minmax(0, 1fr) auto;
   gap: 12px;
+  align-items: center;
   padding: 10px;
   border: 1px solid rgba(4, 120, 87, 0.16);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #f7faf8;
   color: inherit;
   text-decoration: none;
@@ -218,6 +219,19 @@
   border-color: rgba(4, 120, 87, 0.36);
   background: #eef8f3;
   transform: translateY(-1px);
+}
+
+.assistant-product-action {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #047857;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .assistant-product-image {

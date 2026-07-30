@@ -3,15 +3,24 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/Register.css';
 import VerifyModal from '../../../components/VerifyModal/VerifyModal';
 import TermsModal from '../../../components/TermsModal/TermsModal';
 import bgRegister from '../../../assets/background-register.png';
 
 export default function Register() {
-  const { register, googleLogin } = useAuth();
+  const { user, register, googleLogin } = useAuth();
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
+
   const [googleLoading, setGoogleLoading] = useState(false);
   
   const [showTerms, setShowTerms] = useState(false);
@@ -47,19 +56,20 @@ export default function Register() {
       try {
         const result = await googleLogin(tokenResponse.access_token);
         if (result.success) {
-          showToast('Signed up with Google!', 'success');
+          showToast(t('toast.register_success'), 'success');
           navigate('/');
         } else {
-          showToast(result.error || 'Google sign-up failed.', 'error');
+          showToast(result.error || t('common.error_occurred'), 'error');
         }
       } catch {
-        showToast('Google sign-up failed. Please try again.', 'error');
+        showToast(t('common.error_occurred'), 'error');
       } finally {
         setGoogleLoading(false);
       }
     },
     onError: () => {
-      showToast('Google sign-up was cancelled or failed.', 'error');
+      showToast(t('common.error_occurred'), 'error');
+      setGoogleLoading(false);
     },
     flow: 'implicit',
     scope: 'openid email profile',
@@ -69,30 +79,22 @@ export default function Register() {
     e.preventDefault();
 
     if (!formData.username.trim() || !formData.email.trim() || !formData.password.trim() || !formData.confirmPassword.trim()) {
-      showToast('Please fill in all required fields.', 'error');
+      showToast(t('validation.required'), 'error');
       return;
     }
     
     if (!formData.agreed) {
-      showToast('You must agree to the Terms of Membership.', 'error');
+      showToast(language === 'vi' ? 'Vui lòng đồng ý với Điều khoản & Chính sách dịch vụ.' : 'Please agree to the Terms of Service.', 'error');
       return;
     }
 
     const password = formData.password;
-    if (password.length < 8) {
-      showToast('Password must be at least 8 characters long.', 'error');
-      return;
-    }
-    if (!/[A-Z]/.test(password)) {
-      showToast('Password must contain at least one uppercase letter.', 'error');
-      return;
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      showToast('Password must contain at least one special character.', 'error');
+    if (password.length < 6) {
+      showToast(t('validation.password_min'), 'error');
       return;
     }
     if (password !== formData.confirmPassword) {
-      showToast('Passwords do not match.', 'error');
+      showToast(t('validation.password_mismatch'), 'error');
       return;
     }
 
@@ -108,26 +110,14 @@ export default function Register() {
       });
 
       if (result.success) {
-        showToast('Registration successful!', 'success');
+        showToast(t('toast.register_success'), 'success');
         setRegisteredEmail(formData.email);
         setShowVerifyModal(true);
       } else {
-        const rawError = result.error || '';
-        const lowerError = rawError.toLowerCase();
-        let friendlyMsg;
-        if (lowerError.includes('username') && (lowerError.includes('taken') || lowerError.includes('exist') || lowerError.includes('already') || lowerError.includes('duplicate'))) {
-          friendlyMsg = 'Username already taken. Please choose a different one.';
-        } else if (lowerError.includes('email') && (lowerError.includes('taken') || lowerError.includes('exist') || lowerError.includes('already') || lowerError.includes('duplicate'))) {
-          friendlyMsg = 'Email address is already registered. Please use a different email or log in.';
-        } else if (rawError) {
-          friendlyMsg = rawError;
-        } else {
-          friendlyMsg = 'Registration failed. Username or email might already be taken.';
-        }
-        showToast(friendlyMsg, 'error');
+        showToast(result.error || t('common.error_occurred'), 'error');
       }
     } catch (err) {
-      showToast('Failed to connect to registration service. Try again later.', 'error');
+      showToast(t('common.error_occurred'), 'error');
     } finally {
       setLoading(false);
     }
@@ -140,18 +130,18 @@ export default function Register() {
           
           {/* Left Content: Brand Narrative */}
           <div className="register-left-col">
-            <span className="brand-subtitle">Join ReTrade</span>
-            <h1 className="brand-title">Experience the Future of <br/><span style={{fontStyle: 'italic', fontWeight: '400'}}>Smart Trading.</span></h1>
+            <span className="brand-subtitle">{language === 'vi' ? 'TẠO TÀI KHOẢN MỚI' : t('auth.register_title')}</span>
+            <h1 className="brand-title">{language === 'vi' ? 'Tham Gia Cộng Đồng ReTrade' : 'Join ReTrade Marketplace'}</h1>
             <p className="brand-desc">
-              Create your account to buy, sell, and auction quality pre-owned goods securely. Connect with a trusted community of verified users.
+              {language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day. Secure, verified, and trusted.'}
             </p>
             
             <div className="brand-image-wrapper">
               <img src={bgRegister} alt="ReTrade Platform" />
               <div className="brand-image-overlay">
                 <div className="brand-quote-box">
-                  <p className="brand-quote">"Redefining value through secure and smart second-hand commerce."</p>
-                  <p className="brand-est">EST. 2024 — Trusted Marketplace</p>
+                  <p className="brand-quote">"{language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day.'}"</p>
+                  <p className="brand-est">EST. 2024 — TRUSTED MARKETPLACE</p>
                 </div>
               </div>
             </div>
@@ -160,8 +150,8 @@ export default function Register() {
           {/* Right Content: Registration Form */}
           <div className="register-right-col">
             <div className="register-form-header">
-              <h2>Create Your Account</h2>
-              <p>Join a trusted community for secure and smart trading.</p>
+              <h2>{t('auth.register_title')}</h2>
+              <p>{t('auth.register_subtitle')}</p>
             </div>
 
             <button 
@@ -180,14 +170,14 @@ export default function Register() {
                     <path d="M5.84 14.11c-.22-.66-.35-1.36-.35-2.11s.13-1.45.35-2.11V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.83z" fill="#FBBC05"></path>
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.83c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
                   </svg>
-                  Continue with Google
+                  {t('auth.google_login')}
                 </>
               )}
             </button>
 
             <div className="register-divider">
               <div className="register-divider-line"></div>
-              <span>or register via email</span>
+              <span>{t('auth.or_continue_with')}</span>
               <div className="register-divider-line"></div>
             </div>
 
@@ -195,25 +185,25 @@ export default function Register() {
               
               <div className="form-grid">
                 <div className="input-wrapper-register">
-                  <label htmlFor="firstName">First Name</label>
+                  <label htmlFor="firstName">{t('auth.first_name')}</label>
                   <input type="text" id="firstName" className="input-register" value={formData.firstName} onChange={handleChange} disabled={loading} />
                 </div>
                 <div className="input-wrapper-register">
-                  <label htmlFor="lastName">Last Name</label>
+                  <label htmlFor="lastName">{t('auth.last_name')}</label>
                   <input type="text" id="lastName" className="input-register" value={formData.lastName} onChange={handleChange} disabled={loading} />
                 </div>
                 <div className="input-wrapper-register form-group-full">
-                  <label htmlFor="email">Email Address *</label>
+                  <label htmlFor="email">{t('auth.email')} *</label>
                   <input type="email" id="email" className="input-register" value={formData.email} onChange={handleChange} required disabled={loading} />
                 </div>
 
                 <div className="input-wrapper-register form-group-full">
-                  <label htmlFor="username">Username *</label>
+                  <label htmlFor="username">{t('auth.username_or_email')} *</label>
                   <input type="text" id="username" className="input-register" value={formData.username} onChange={handleChange} required disabled={loading} />
                 </div>
 
                 <div className="input-wrapper-register">
-                  <label htmlFor="password">Password *</label>
+                  <label htmlFor="password">{t('auth.password')} *</label>
                   <div className="password-input-container">
                     <input type={showPassword ? 'text' : 'password'} id="password" className="input-register" value={formData.password} onChange={handleChange} required disabled={loading} />
                     <button type="button" className="password-toggle-register" onClick={() => setShowPassword(!showPassword)} disabled={loading}>
@@ -227,7 +217,7 @@ export default function Register() {
                 </div>
 
                 <div className="input-wrapper-register">
-                  <label htmlFor="confirmPassword">Confirm Password *</label>
+                  <label htmlFor="confirmPassword">{t('auth.confirm_password')} *</label>
                   <div className="password-input-container">
                     <input type={showConfirmPassword ? 'text' : 'password'} id="confirmPassword" className="input-register" value={formData.confirmPassword} onChange={handleChange} required disabled={loading} />
                     <button type="button" className="password-toggle-register" onClick={() => setShowConfirmPassword(!showConfirmPassword)} disabled={loading}>
@@ -244,7 +234,7 @@ export default function Register() {
               <div className="terms-container">
                 <input type="checkbox" id="agreed" checked={formData.agreed} onChange={handleChange} disabled={loading} />
                 <label htmlFor="agreed">
-                  I acknowledge that I have read and agree to the <span onClick={() => setShowTerms(true)} style={{cursor: 'pointer', color: '#02241b', textDecoration: 'underline', fontWeight: '700'}}>Terms of Membership</span>.
+                  {t('auth.agree_terms')} <span onClick={() => setShowTerms(true)} style={{cursor: 'pointer', color: '#02241b', textDecoration: 'underline', fontWeight: '700'}}>{t('auth.agree_terms')}</span>.
                 </label>
               </div>
 
@@ -253,7 +243,7 @@ export default function Register() {
                   <span className="btn-spinner" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></span>
                 ) : (
                   <>
-                    <span>Establish Account</span>
+                    <span>{t('auth.register_button')}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                   </>
                 )}
@@ -263,8 +253,8 @@ export default function Register() {
 
             <div className="login-prompt">
               <p>
-                Already part of our community? 
-                <Link to="/login" className="login-link-register">Login here</Link>
+                {t('auth.have_account')} 
+                <Link to="/login" className="login-link-register"> {t('auth.login_button')}</Link>
               </p>
             </div>
 

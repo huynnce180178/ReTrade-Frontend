@@ -2,34 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
-import { formatAuctionDateTime, parseAuctionDateTime } from '../../../utils/auctionTime';
+import { parseAuctionDateTime } from '../../../utils/auctionTime';
 import './Auction.css';
 
-const moneyFormatter = new Intl.NumberFormat('vi-VN', {
-  style: 'currency',
-  currency: 'VND',
-});
-
-const sortOptions = [
-  { value: 'ending_soon', label: 'Ending Soon' },
-  { value: 'starting_soon', label: 'Starting Soon' },
-  { value: 'newest', label: 'Newest' },
-  { value: 'price_asc', label: 'Current Bid: Low to High' },
-  { value: 'price_desc', label: 'Current Bid: High to Low' },
-];
-
-function formatMoney(value) {
-  if (value == null) return '-';
-  return moneyFormatter.format(Number(value || 0));
-}
-
-function formatDateTime(value) {
-  return formatAuctionDateTime(value, { year: undefined });
-}
-
-function formatDuration(ms) {
+function formatDuration(ms, t, language) {
   if (ms <= 0) return '00:00:00';
   const totalSecs = Math.floor(ms / 1000);
   const days = Math.floor(totalSecs / 86400);
@@ -40,7 +19,9 @@ function formatDuration(ms) {
   const pad = (num) => String(num).padStart(2, '0');
 
   if (days > 0) {
-    return `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+    return language === 'vi'
+      ? `${days} ngày ${pad(hours)}g ${pad(minutes)}p ${pad(seconds)}s`
+      : `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
   }
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
@@ -59,18 +40,23 @@ function getEffectiveAuctionStatus(auction, now = Date.now()) {
   return 'Ongoing';
 }
 
-function getTimeLabel(auction, now) {
+function getTimeLabel(auction, now, t, language) {
   const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
   const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
   const effectiveStatus = getEffectiveAuctionStatus(auction, now);
 
   if (effectiveStatus === 'Upcoming' && start > now) {
     const diff = start - now;
-    return `Starts in ${formatDuration(diff)}`;
+    const duration = formatDuration(diff, t, language);
+    return t('auction.starts_in', { duration });
   }
   if (effectiveStatus === 'Ongoing' && end > now) {
     const diff = end - now;
-    return `Ends in ${formatDuration(diff)}`;
+    const duration = formatDuration(diff, t, language);
+    return t('auction.ends_in', { duration });
+  }
+  if (effectiveStatus === 'Ended') {
+    return t('auction.auction_ended');
   }
   return effectiveStatus || auction.status || 'Auction';
 }
@@ -94,43 +80,53 @@ function CountdownUnit({ value, label }) {
   );
 }
 
-function AuctionCountdown({ auction, now }) {
+function AuctionCountdown({ auction, now: externalNow }) {
+  const { t, language } = useLanguage();
+  const [localNow, setLocalNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setLocalNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const now = externalNow || localNow;
   const start = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
   const end = parseAuctionDateTime(auction.endTime)?.getTime() || 0;
   const effectiveStatus = getEffectiveAuctionStatus(auction, now);
-  const target = effectiveStatus === 'Upcoming' ? start : end;
-  const remaining = target ? target - now : 0;
-  const parts = splitDuration(remaining);
 
-  if (effectiveStatus === 'Upcoming') {
+  if (effectiveStatus === 'Upcoming' && start > now) {
+    const diff = start - now;
+    const parts = splitDuration(diff);
     return (
-      <div className="auction-countdown-panel upcoming">
+      <div className="auction-countdown-panel">
         <div className="auction-countdown-label">
-          <span className="material-symbols-outlined">hourglass_top</span>
-          Opening countdown
+          <span className="material-symbols-outlined">schedule</span>
+          {t('auction.opening_countdown')}
         </div>
         <div className="auction-countdown-grid">
-          {parts.days > 0 && <CountdownUnit value={parts.days} label="Days" />}
-          <CountdownUnit value={parts.hours} label="Hours" />
-          <CountdownUnit value={parts.minutes} label="Mins" />
-          <CountdownUnit value={parts.seconds} label="Secs" />
+          {parts.days > 0 && <CountdownUnit value={parts.days} label={t('auction.days_short', { count: '' }).trim() || 'Days'} />}
+          <CountdownUnit value={parts.hours} label={t('auction.hours_short', { count: '' }).trim() || 'Hours'} />
+          <CountdownUnit value={parts.minutes} label={t('auction.minutes_short', { count: '' }).trim() || 'Mins'} />
+          <CountdownUnit value={parts.seconds} label={t('auction.seconds_short', { count: '' }).trim() || 'Secs'} />
         </div>
       </div>
     );
   }
 
   if (effectiveStatus === 'Ongoing') {
+    const diff = Math.max(0, end - now);
+    const parts = splitDuration(diff);
     return (
       <div className="auction-countdown-panel live">
         <div className="auction-countdown-label">
           <span className="material-symbols-outlined">bolt</span>
-          Live now
+          {t('auction.status_active')}
         </div>
         <div className="auction-countdown-grid compact">
-          {parts.days > 0 && <CountdownUnit value={parts.days} label="Days" />}
-          <CountdownUnit value={parts.hours} label="Hours" />
-          <CountdownUnit value={parts.minutes} label="Mins" />
-          <CountdownUnit value={parts.seconds} label="Secs" />
+          {parts.days > 0 && <CountdownUnit value={parts.days} label={t('auction.days_short', { count: '' }).trim() || 'Days'} />}
+          <CountdownUnit value={parts.hours} label={t('auction.hours_short', { count: '' }).trim() || 'Hours'} />
+          <CountdownUnit value={parts.minutes} label={t('auction.minutes_short', { count: '' }).trim() || 'Mins'} />
+          <CountdownUnit value={parts.seconds} label={t('auction.seconds_short', { count: '' }).trim() || 'Secs'} />
         </div>
       </div>
     );
@@ -143,20 +139,23 @@ export default function Auction() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { t, language, formatCurrency, formatDate } = useLanguage();
+
+  const sortOptions = [
+    { value: 'ending_soon', label: t('product.sort_newest') },
+    { value: 'starting_soon', label: t('auction.status_upcoming') },
+    { value: 'newest', label: t('product.sort_newest') },
+    { value: 'price_asc', label: t('product.sort_price_asc') },
+    { value: 'price_desc', label: t('product.sort_price_desc') },
+  ];
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [auctions, setAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [realtimeTick, setRealtimeTick] = useState(0);
-  const [currentTime, setCurrentTime] = useState(Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const currentTime = Date.now();
 
   const page = Number(searchParams.get('page') || 1);
   const searchTerm = searchParams.get('search') || '';
@@ -186,14 +185,14 @@ export default function Auction() {
         setTotalItems(data?.totalItems || 0);
         setTotalPages(data?.totalPages || 1);
       } catch (error) {
-        showToast(error?.response?.data || 'Failed to load auctions.', 'error');
+        showToast(error?.response?.data || t('common.error_occurred'), 'error');
       } finally {
         setLoading(false);
       }
     };
 
     loadAuctions();
-  }, [authLoading, user, page, searchTerm, status, sort, showToast, realtimeTick]);
+  }, [authLoading, user, page, searchTerm, status, sort, showToast, realtimeTick, t]);
 
   useEffect(() => {
     if (authLoading || !user) return undefined;
@@ -256,9 +255,9 @@ export default function Auction() {
     if (totalPages <= 1) return null;
     return (
       <div className="auction-pagination">
-        <button disabled={page <= 1} onClick={() => updateParams({ page: String(page - 1) })}>Prev</button>
+        <button disabled={page <= 1} onClick={() => updateParams({ page: String(page - 1) })}>{t('common.previous')}</button>
         <span>{page} / {totalPages}</span>
-        <button disabled={page >= totalPages} onClick={() => updateParams({ page: String(page + 1) })}>Next</button>
+        <button disabled={page >= totalPages} onClick={() => updateParams({ page: String(page + 1) })}>{t('common.next')}</button>
       </div>
     );
   };
@@ -268,9 +267,9 @@ export default function Auction() {
       <div className="auction-page container animate-fade-in">
         <section className="auction-auth-panel">
           <span className="material-symbols-outlined">gavel</span>
-          <h1>Live Auctions</h1>
-          <p>Please sign in to browse ongoing and upcoming product auctions.</p>
-          <Link to="/login" className="auction-auth-link">Sign In</Link>
+          <h1>{t('auction.title')}</h1>
+          <p>{t('auth.login_subtitle')}</p>
+          <Link to="/login" className="auction-auth-link">{t('auth.login_title')}</Link>
         </section>
       </div>
     );
@@ -280,25 +279,25 @@ export default function Auction() {
     <div className="auction-page container animate-fade-in">
       <section className="auction-page-hero">
         <div>
-          <span>Auction Room</span>
-          <h1>Live Product Auctions</h1>
-          <p>Browse ongoing and upcoming auction listings from verified sellers on ReTrade.</p>
+          <span>{t('home.live_auction')}</span>
+          <h1>{t('auction.title')}</h1>
+          <p>{t('home.why_choose_subtitle')}</p>
         </div>
       </section>
 
       <section className="auction-filter-panel">
         <form onSubmit={handleSearchSubmit} className="auction-search-box">
           <span className="material-symbols-outlined">search</span>
-          <input name="search" defaultValue={searchTerm} placeholder="Search auction products or sellers..." />
-          <button type="submit">Search</button>
+          <input name="search" defaultValue={searchTerm} placeholder={t('common.search_placeholder')} />
+          <button type="submit">{t('common.search')}</button>
         </form>
 
         <div className="auction-filter-actions">
           <div className="auction-status-tabs">
             {[
-              { key: 'All', label: 'All Active' },
-              { key: 'Ongoing', label: 'Ongoing' },
-              { key: 'Upcoming', label: 'Upcoming' }
+              { key: 'All', label: t('common.all') },
+              { key: 'Ongoing', label: t('auction.status_active') },
+              { key: 'Upcoming', label: t('auction.status_upcoming') }
             ].map(tab => (
               <button
                 key={tab.key}
@@ -319,7 +318,7 @@ export default function Auction() {
       </section>
 
       <div className="auction-result-line">
-        {loading ? 'Loading auctions...' : <>Showing <strong>{auctions.length}</strong> of <strong>{totalItems}</strong> auctions</>}
+        {loading ? t('common.loading') : <>{t('common.page')} <strong>{page}</strong> {t('common.of')} <strong>{totalPages}</strong> ({totalItems} {t('nav.auction')})</>}
       </div>
 
       {loading ? (
@@ -329,58 +328,60 @@ export default function Auction() {
       ) : auctions.length === 0 ? (
         <div className="auction-empty">
           <span className="material-symbols-outlined">search_off</span>
-          <h3>No auctions found</h3>
-          <p>Try a different search term or check back when sellers launch new auctions.</p>
+          <h3>{t('common.no_data')}</h3>
+          <p>{t('common.error_occurred')}</p>
         </div>
       ) : (
         <div className="auction-grid">
           {auctions.map((auction) => {
             const effectiveStatus = getEffectiveAuctionStatus(auction, currentTime);
+            const translatedStatusLabel = effectiveStatus === 'Upcoming' ? t('auction.status_upcoming') : (effectiveStatus === 'Ongoing' ? t('auction.status_active') : t('auction.status_ended'));
+
             return (
-            <article
-              key={auction.auctionId}
-              className={`auction-card ${effectiveStatus === 'Upcoming' ? 'is-upcoming' : ''} ${effectiveStatus === 'Ongoing' ? 'is-live' : ''}`}
-              onClick={() => navigate(`/auction/${auction.auctionId}`)}
-            >
-              <div className="auction-card-image">
-                {auction.productImageUrl ? (
-                  <img src={auction.productImageUrl} alt={auction.productName || 'Auction product'} loading="lazy" />
-                ) : (
-                  <span className="material-symbols-outlined">inventory_2</span>
-                )}
-                <em className={`auction-card-status ${String(effectiveStatus || '').toLowerCase()}`}>{effectiveStatus}</em>
-                {effectiveStatus === 'Upcoming' && (
-                  <div className="auction-card-watch-badge">
-                    <span className="material-symbols-outlined">notifications_active</span>
-                    Starting soon
+              <article
+                key={auction.auctionId}
+                className={`auction-card ${effectiveStatus === 'Upcoming' ? 'is-upcoming' : ''} ${effectiveStatus === 'Ongoing' ? 'is-live' : ''}`}
+                onClick={() => navigate(`/auction/${auction.auctionId}`)}
+              >
+                <div className="auction-card-image">
+                  {auction.productImageUrl ? (
+                    <img src={auction.productImageUrl} alt={auction.productName || 'Auction product'} loading="lazy" />
+                  ) : (
+                    <span className="material-symbols-outlined">inventory_2</span>
+                  )}
+                  <em className={`auction-card-status ${String(effectiveStatus || '').toLowerCase()}`}>{translatedStatusLabel}</em>
+                  {effectiveStatus === 'Upcoming' && (
+                    <div className="auction-card-watch-badge">
+                      <span className="material-symbols-outlined">notifications_active</span>
+                      {t('auction.status_upcoming')}
+                    </div>
+                  )}
+                </div>
+                <div className="auction-card-body">
+                  <span className="auction-card-category">{auction.categoryName || t('common.none')}</span>
+                  <h2>{auction.productName || 'Auction'}</h2>
+                  <p>{auction.sellerName || auction.sellerId || 'Seller'}</p>
+                  <AuctionCountdown auction={auction} now={currentTime} />
+                  <div className="auction-bid-panel">
+                    <div>
+                      <small>{t('auction.current_bid')}</small>
+                      <strong>{formatCurrency(auction.currentPrice)}</strong>
+                    </div>
+                    <div>
+                      <small>{t('auction.min_step')}</small>
+                      <strong>{formatCurrency(auction.minIncrement)}</strong>
+                    </div>
                   </div>
-                )}
-              </div>
-              <div className="auction-card-body">
-                <span className="auction-card-category">{auction.categoryName || 'Uncategorized'}</span>
-                <h2>{auction.productName || 'Unnamed auction'}</h2>
-                <p>{auction.sellerName || auction.sellerId || 'Unknown seller'}</p>
-                <AuctionCountdown auction={auction} now={currentTime} />
-                <div className="auction-bid-panel">
-                  <div>
-                    <small>Current Bid</small>
-                    <strong>{formatMoney(auction.currentPrice)}</strong>
+                  <div className="auction-card-footer">
+                    <span>{getTimeLabel(auction, currentTime, t, language)}</span>
+                    <span>{auction.bidCount || 0} {t('auction.bid_count')}</span>
                   </div>
-                  <div>
-                    <small>Step</small>
-                    <strong>{formatMoney(auction.minIncrement)}</strong>
+                  <div className="auction-card-dates">
+                    <span>{formatDate(auction.startTime)}</span>
+                    <span>{formatDate(auction.endTime)}</span>
                   </div>
                 </div>
-                <div className="auction-card-footer">
-                  <span>{getTimeLabel(auction, currentTime)}</span>
-                  <span>{auction.bidCount || 0} bids</span>
-                </div>
-                <div className="auction-card-dates">
-                  <span>{formatDateTime(auction.startTime)}</span>
-                  <span>{formatDateTime(auction.endTime)}</span>
-                </div>
-              </div>
-            </article>
+              </article>
             );
           })}
         </div>

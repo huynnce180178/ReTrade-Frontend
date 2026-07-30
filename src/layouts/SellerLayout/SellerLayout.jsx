@@ -1,12 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSwitcher from '../../components/LanguageSwitcher/LanguageSwitcher';
+import Header from '../../components/Header/Header';
 import chatService from '../../services/chatService';
 import { createChatHubConnection } from '../../services/chatRealtimeService';
 import '../../styles/SellerDashboard.css';
 
 export default function SellerLayout() {
   const { user, loading } = useAuth();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [avatarError, setAvatarError] = useState(false);
@@ -90,7 +95,7 @@ export default function SellerLayout() {
     return (
       <div className="seller-dashboard-loading">
         <span className="btn-spinner"></span>
-        <p>Loading Seller Info...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -104,105 +109,122 @@ export default function SellerLayout() {
   const closeSidebar = () => setIsSidebarOpen(false);
 
   return (
-    <div className="seller-dashboard-page">
-      {/* Mobile Top Header */}
-      <div className="seller-mobile-header">
-        <button className="seller-mobile-toggle" onClick={() => setIsSidebarOpen(true)}>
-          <span className="material-symbols-outlined">menu</span>
-        </button>
-        <h2>Seller Dashboard</h2>
-      </div>
-
-      {/* Mobile Overlay */}
-      {isSidebarOpen && (
-        <div className="seller-sidebar-overlay" onClick={closeSidebar}></div>
-      )}
-
-      <aside className={`seller-dash-sidebar ${isSidebarOpen ? 'open' : ''}`}>
-        <button className="seller-sidebar-close" onClick={closeSidebar}>
-          <span className="material-symbols-outlined">close</span>
-        </button>
-        <div className="seller-dash-profile">
-          <div className="seller-dash-avatar">
-            {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
-              <img src={user.avatarUrl} alt={displayName} onError={() => setAvatarError(true)} />
-            ) : (
-              initials
-            )}
-          </div>
-          <h3>{displayName}</h3>
-          <span>Pro Seller</span>
+    <div className="seller-layout-wrapper">
+      <Header />
+      <div className="seller-dashboard-page">
+        {/* Mobile Top Header */}
+        <div className="seller-mobile-header">
+          <button className="seller-mobile-toggle" onClick={() => setIsSidebarOpen(true)}>
+            <span className="material-symbols-outlined">menu</span>
+          </button>
+          <h2>{t('seller.dashboard_title')}</h2>
+          <LanguageSwitcher />
         </div>
 
-        <nav className="seller-dash-menu">
-          <p>Dashboard</p>
-          <NavLink
-            to="/seller-dashboard"
-            end
-            onClick={closeSidebar}
-            className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">dashboard</span>Overview
-          </NavLink>
-          <NavLink
-            to="/seller-dashboard/sales-statistics"
-            onClick={closeSidebar}
-            className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">monitoring</span>Sales Statistics
-          </NavLink>
-          <NavLink
-            to="/seller-dashboard/products"
-            onClick={closeSidebar}
-            className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/products') ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">inventory_2</span>My Products
-          </NavLink>
-          <NavLink
-            to="/seller-dashboard/offers"
-            onClick={closeSidebar}
-            className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/offers') ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">local_offer</span>Offers
-          </NavLink>
-          <NavLink
-            to="/seller-dashboard/messages"
-            onClick={() => { setChatUnreadCount(0); closeSidebar(); }}
-            className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/messages') ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">forum</span>
-            <span className="seller-menu-label">Messages</span>
-            {chatUnreadCount > 0 && <span className="seller-menu-badge">{chatUnreadCount}</span>}
-          </NavLink>
-          <NavLink
-            to="/seller-dashboard/auctions"
-            onClick={closeSidebar}
-            className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">gavel</span>My Auctions
-          </NavLink>
-          <NavLink
-            to="/seller-dashboard/orders"
-            onClick={closeSidebar}
-            className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/orders') ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">orders</span>Order Management
-          </NavLink>
-          <NavLink
-            to="/seller-dashboard/reviews"
-            onClick={closeSidebar}
-            className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
-          >
-            <span className="material-symbols-outlined">rate_review</span>View Reviews
-          </NavLink>
-          <p>Personal</p>
-          <Link to="/profile" onClick={closeSidebar}><span className="material-symbols-outlined">person</span>My Profile</Link>
-        </nav>
-      </aside>
+        {/* Mobile Overlay */}
+        {isSidebarOpen && (
+          <div className="seller-sidebar-overlay" onClick={closeSidebar}></div>
+        )}
 
-      <main className="seller-dash-main">
-        <Outlet context={{ user }} />
-      </main>
+        <aside className={`seller-dash-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+          <button className="seller-sidebar-close" onClick={closeSidebar}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          <div className="seller-dash-profile">
+            <div className="seller-dash-avatar">
+              {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
+                <img src={user.avatarUrl} alt={displayName} onError={() => setAvatarError(true)} />
+              ) : (
+                initials
+              )}
+            </div>
+            <h3>{displayName}</h3>
+            <span>Pro Seller</span>
+            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+              <LanguageSwitcher />
+            </div>
+          </div>
+
+          <nav className="seller-dash-menu">
+            <p>{isVi ? 'Kênh Người Bán' : 'Seller Center'}</p>
+            <NavLink
+              to="/seller-dashboard"
+              end
+              onClick={closeSidebar}
+              className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">dashboard</span>
+              {isVi ? 'Tổng quan' : 'Overview'}
+            </NavLink>
+            <NavLink
+              to="/seller-dashboard/sales-statistics"
+              onClick={closeSidebar}
+              className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">monitoring</span>
+              {isVi ? 'Thống kê doanh số' : 'Sales Statistics'}
+            </NavLink>
+            <NavLink
+              to="/seller-dashboard/products"
+              onClick={closeSidebar}
+              className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/products') ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">inventory_2</span>
+              {isVi ? 'Sản phẩm của tôi' : 'My Products'}
+            </NavLink>
+            <NavLink
+              to="/seller-dashboard/offers"
+              onClick={closeSidebar}
+              className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/offers') ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">local_offer</span>
+              {isVi ? 'Đề xuất trả giá' : 'Offers Received'}
+            </NavLink>
+            <NavLink
+              to="/seller-dashboard/messages"
+              onClick={() => { setChatUnreadCount(0); closeSidebar(); }}
+              className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/messages') ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">forum</span>
+              <span className="seller-menu-label">{isVi ? 'Tin nhắn' : 'Chat'}</span>
+              {chatUnreadCount > 0 && <span className="seller-menu-badge">{chatUnreadCount}</span>}
+            </NavLink>
+            <NavLink
+              to="/seller-dashboard/auctions"
+              onClick={closeSidebar}
+              className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">gavel</span>
+              {isVi ? 'Đấu giá của tôi' : 'My Auctions'}
+            </NavLink>
+            <NavLink
+              to="/seller-dashboard/orders"
+              onClick={closeSidebar}
+              className={({ isActive }) => `seller-menu-btn ${location.pathname.includes('/seller-dashboard/orders') ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">orders</span>
+              {isVi ? 'Quản lý đơn hàng' : 'Order Management'}
+            </NavLink>
+            <NavLink
+              to="/seller-dashboard/reviews"
+              onClick={closeSidebar}
+              className={({ isActive }) => `seller-menu-btn ${isActive ? 'active' : ''}`}
+            >
+              <span className="material-symbols-outlined">rate_review</span>
+              {isVi ? 'Đánh giá từ người mua' : 'Reviews Received'}
+            </NavLink>
+            <p>{isVi ? 'Tài khoản của tôi' : 'My Account'}</p>
+            <Link to="/profile" onClick={closeSidebar}>
+              <span className="material-symbols-outlined">person</span>
+              {isVi ? 'Hồ sơ cá nhân' : 'Profile'}
+            </Link>
+          </nav>
+        </aside>
+
+        <main className="seller-dash-main">
+          <Outlet context={{ user }} />
+        </main>
+      </div>
     </div>
   );
 }

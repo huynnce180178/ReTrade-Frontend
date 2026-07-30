@@ -1,5 +1,14 @@
 const AUCTION_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
+function getActiveLocale() {
+  try {
+    const lang = localStorage.getItem('retrade_language');
+    return lang === 'en' ? 'en-US' : 'vi-VN';
+  } catch {
+    return 'vi-VN';
+  }
+}
+
 const dateTimePartsFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: AUCTION_TIME_ZONE,
   year: 'numeric',
@@ -34,7 +43,9 @@ export function formatAuctionDateTime(value, options = {}) {
   const date = parseAuctionDateTime(value);
   if (!date || Number.isNaN(date.getTime())) return '-';
 
-  return new Intl.DateTimeFormat(options.locale || 'vi-VN', {
+  const locale = options.locale || getActiveLocale();
+
+  return new Intl.DateTimeFormat(locale, {
     timeZone: AUCTION_TIME_ZONE,
     day: options.day || '2-digit',
     month: options.month || '2-digit',

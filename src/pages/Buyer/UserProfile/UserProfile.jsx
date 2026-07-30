@@ -49,7 +49,7 @@ const isValidAvatarUrl = (url) => {
 
 export default function UserProfile() {
   const { userId } = useParams();
-  const { user: currentUser } = useAuth();
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

@@ -1,19 +1,26 @@
 import React, { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import profileService from '../../../services/profileService';
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams();
+  const { language, formatCurrency } = useLanguage();
   const success = searchParams.get('success') === 'true';
-  const message = searchParams.get('message') || 'No transaction information is available.';
+  const rawMessage = searchParams.get('message');
   const paymentId = searchParams.get('paymentId') || '';
   const amount = searchParams.get('amount') || '';
   const transactionNo = searchParams.get('transactionNo') || '';
   const auctionId = searchParams.get('auctionId') || '';
   const { user, setUser } = useAuth();
 
+  const profileRefreshedRef = React.useRef(false);
+
   useEffect(() => {
+    if (profileRefreshedRef.current) return;
+    profileRefreshedRef.current = true;
+
     const refreshProfile = async () => {
       if (success && user) {
         try {
@@ -34,7 +41,26 @@ export default function PaymentResult() {
       }
     };
     refreshProfile();
-  }, [success, user, setUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const displayMessage = (() => {
+    if (!rawMessage) {
+      return language === 'vi' ? 'Không có thông tin chi tiết về giao dịch.' : 'No transaction information is available.';
+    }
+    if (rawMessage === 'Payment completed successfully.') {
+      return language === 'vi' ? 'Thanh toán hoàn tất thành công.' : rawMessage;
+    }
+    return rawMessage;
+  })();
+
+  const titleText = success
+    ? (language === 'vi' ? 'Thanh toán Thành công' : 'Payment Successful')
+    : (language === 'vi' ? 'Thanh toán Thất bại' : 'Payment Not Successful');
+
+  const serviceId = searchParams.get('serviceId') || '';
+  const orderType = searchParams.get('orderType') || '';
+  const isSubscription = searchParams.get('type') === 'subscription' || paymentId.includes('sub_') || paymentId.includes('srv_') || !!serviceId || orderType === 'subscription';
 
   return (
     <div className="container animate-fade-in" style={{ padding: '60px 20px', minHeight: '60vh' }}>
@@ -66,29 +92,58 @@ export default function PaymentResult() {
             {success ? 'OK' : 'X'}
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '28px' }}>
-              {success ? 'Payment Successful' : 'Payment Not Successful'}
+            <h1 style={{ margin: 0, fontSize: '28px', color: '#02241b' }}>
+              {titleText}
             </h1>
-            <p style={{ margin: '8px 0 0', color: 'var(--text-secondary)' }}>{message}</p>
+            <p style={{ margin: '8px 0 0', color: '#5c706b' }}>{displayMessage}</p>
           </div>
         </div>
 
         <div style={{ display: 'grid', gap: '12px', marginTop: '24px' }}>
-          <div><strong>Payment ID:</strong> {paymentId || '-'}</div>
-          <div><strong>Amount:</strong> {amount || '-'} VND</div>
-          <div><strong>VNPay Transaction No:</strong> {transactionNo || '-'}</div>
+          <div>
+            <strong>{language === 'vi' ? 'Mã thanh toán:' : 'Payment ID:'}</strong> {paymentId || '-'}
+          </div>
+          <div>
+            <strong>{language === 'vi' ? 'Số tiền:' : 'Amount:'}</strong>{' '}
+            {amount ? (isNaN(amount) ? `${amount} VND` : formatCurrency(Number(amount))) : '-'}
+          </div>
+          <div>
+            <strong>{language === 'vi' ? 'Mã giao dịch VNPay:' : 'VNPay Transaction No:'}</strong> {transactionNo || '-'}
+          </div>
         </div>
 
         <div style={{ marginTop: '28px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           {auctionId ? (
             <>
-              <Link to={`/auction/${auctionId}`} className="btn btn-primary">Back to Auction</Link>
-              <Link to="/" className="btn btn-secondary">Back to Home</Link>
+              <Link to={`/auction/${auctionId}`} className="btn btn-primary">
+                {language === 'vi' ? 'Quay lại Đấu giá' : 'Back to Auction'}
+              </Link>
+              <Link to="/" className="btn btn-secondary">
+                {language === 'vi' ? 'Về Trang chủ' : 'Back to Home'}
+              </Link>
+            </>
+          ) : isSubscription ? (
+            <>
+              <Link to="/my-subscriptions" className="btn btn-primary">
+                {language === 'vi' ? 'Quản lý Gói dịch vụ' : 'Manage Subscriptions'}
+              </Link>
+              <Link to="/" className="btn btn-secondary">
+                {language === 'vi' ? 'Về Trang chủ' : 'Back to Home'}
+              </Link>
             </>
           ) : (
-            <Link to="/" className="btn btn-primary">Back to Home</Link>
+            <>
+              <Link to="/" className="btn btn-primary">
+                {language === 'vi' ? 'Về Trang chủ' : 'Back to Home'}
+              </Link>
+              <Link to="/purchase-history" className="btn btn-secondary">
+                {language === 'vi' ? 'Xem Lịch sử Mua hàng' : 'View Purchase History'}
+              </Link>
+            </>
           )}
-          <Link to="/purchase-history" className="btn btn-secondary">View Purchase History</Link>
+          <Link to="/my-subscriptions" className="btn btn-secondary">
+            {language === 'vi' ? 'Quản lý Gói dịch vụ' : 'Manage Subscriptions'}
+          </Link>
         </div>
       </div>
     </div>
