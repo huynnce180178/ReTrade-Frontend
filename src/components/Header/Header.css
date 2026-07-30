@@ -1355,6 +1355,12 @@
   background: rgba(11, 148, 133, 0.1);
 }
 
+.search-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
 .search-history-item {
   display: flex;
   align-items: center;
@@ -1429,15 +1435,16 @@
 }
 
 .site-header .search-input-wrapper {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: none;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 50px !important;
+  box-shadow: none !important;
 }
 
 .site-header .search-input-wrapper:focus-within {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12) !important;
 }
 
 .site-header .search-input-wrapper:focus-within .search-input {
@@ -1445,20 +1452,22 @@
 }
 
 .site-header .search-input {
-  color: #ffffff;
+  color: #ffffff !important;
+  background: transparent !important;
 }
 
 .site-header .search-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.65) !important;
 }
 
 .site-header .search-btn-inside {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border: none !important;
 }
 
 .site-header .search-btn-inside:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 .site-header .btn-subscription {

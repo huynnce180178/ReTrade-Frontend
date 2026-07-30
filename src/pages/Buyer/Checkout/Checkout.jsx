@@ -14,7 +14,7 @@ const Checkout = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { language, formatCurrency } = useLanguage();
+  const { t, language, formatCurrency } = useLanguage();
 
   const [product, setProduct] = useState(null);
   const [address, setAddress] = useState(null);
@@ -479,7 +479,7 @@ const Checkout = () => {
                   </div>
                   <div className="flex flex-col justify-center">
                     <h4 className="font-bold text-primary line-clamp-2">{product.name}</h4>
-                    <p className="text-body-sm text-on-surface-variant">{language === 'vi' ? 'Tình trạng:' : 'Condition:'} {product.condition || 'Used'}</p>
+                    <p className="text-body-sm text-on-surface-variant">{t('checkout.condition_label')} {product.condition || t('common.unknown')}</p>
                     <p className="font-bold text-secondary mt-1">{formatCurrency(subtotal)}</p>
                   </div>
                 </div>
@@ -490,12 +490,12 @@ const Checkout = () => {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <label className="font-label-caps text-on-surface-variant font-bold text-xs uppercase tracking-wider">
-                      {language === 'vi' ? 'CHỌN HOẶC NHẬP MÃ GIẢM GIÁ' : 'Select or Enter Voucher'}
+                      {t('checkout.select_or_enter_voucher')}
                     </label>
                     {bestVoucherCode && (
                       <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1 shadow-sm">
                         <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                        {language === 'vi' ? 'Ưu đãi tốt nhất' : 'Best Offer Available'}
+                        {t('checkout.best_offer')}
                       </span>
                     )}
                   </div>

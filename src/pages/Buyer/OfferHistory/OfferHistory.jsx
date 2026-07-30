@@ -115,7 +115,7 @@ function OfferCheckoutModal({ offer, onClose, onSuccess }) {
       onSuccess();
       navigate('/purchase-history');
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Checkout failed.';
+      const msg = err.response?.data || err.message || t('common.checkout_error');
       showToast(typeof msg === 'string' ? msg : 'Checkout failed.', 'error');
     } finally {
       setProcessing(false);
@@ -259,7 +259,7 @@ export default function OfferHistory() {
       showToast('Offer cancelled.', 'success');
       loadOffers();
     } catch (err) {
-      const msg = err.response?.data || err.message || 'Failed to cancel.';
+      const msg = err.response?.data || err.message || t('common.cancel_error');
       showToast(typeof msg === 'string' ? msg : 'Failed to cancel.', 'error');
     } finally {
       setCancelling(null);

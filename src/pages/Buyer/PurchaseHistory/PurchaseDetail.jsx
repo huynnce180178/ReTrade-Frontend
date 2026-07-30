@@ -306,10 +306,10 @@ export default function PurchaseDetail() {
                     <article className="purchase-detail-card">
                       <h2>{language === 'vi' ? 'Sản Phẩm Đã Đặt' : 'Items Ordered'}</h2>
                       <div className="purchase-detail-item">
-                        <img src={purchase.productImageUrl || '/vite.svg'} alt={purchase.productName || 'Purchased product'} />
+                        <img src={purchase.productImageUrl || '/vite.svg'} alt={purchase.productName || t('common.unnamed_product')} />
                         <div>
                           <div className="purchase-detail-item-top">
-                            <h3>{purchase.productName || 'Untitled product'}</h3>
+                            <h3>{purchase.productName || t('common.unnamed_product')}</h3>
                             <em className={`purchase-status ${getStatusClassName(purchase.status)}`}>
                               {getStatusLabel(purchase.status, language)}
                             </em>

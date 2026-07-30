@@ -111,7 +111,8 @@ export default function AuctionDetail() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const [auction, setAuction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
@@ -190,10 +191,6 @@ export default function AuctionDetail() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
 
     const loadAuction = async () => {
       try {
@@ -201,13 +198,15 @@ export default function AuctionDetail() {
         const data = await auctionService.getById(auctionId);
         setAuction(data);
         setActiveImage(data?.images?.find(i => i.isMain)?.imageUrl || data?.images?.[0]?.imageUrl || data?.productImageUrl || '');
-        try {
-          const myDeposit = await auctionService.getMyDeposit(auctionId);
-          setDeposit(myDeposit);
-          setPolicyAccepted(Boolean(myDeposit?.policyAccepted));
-        } catch {
-          setDeposit(null);
-          setPolicyAccepted(false);
+        if (user) {
+          try {
+            const myDeposit = await auctionService.getMyDeposit(auctionId);
+            setDeposit(myDeposit);
+            setPolicyAccepted(Boolean(myDeposit?.policyAccepted));
+          } catch {
+            setDeposit(null);
+            setPolicyAccepted(false);
+          }
         }
       } catch (error) {
         showToast(error?.response?.data || 'Failed to load auction detail.', 'error');
@@ -407,18 +406,7 @@ export default function AuctionDetail() {
     }
   };
 
-  if (!authLoading && !user) {
-    return (
-      <div className="auction-page container animate-fade-in">
-        <section className="auction-auth-panel">
-          <span className="material-symbols-outlined">lock</span>
-          <h1>Auction Detail</h1>
-          <p>Please sign in to view auction details.</p>
-          <Link to="/login" className="auction-auth-link">Sign In</Link>
-        </section>
-      </div>
-    );
-  }
+
 
   if (loading) {
     return (

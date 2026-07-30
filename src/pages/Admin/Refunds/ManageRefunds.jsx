@@ -1,28 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import adminRefundService from '../../../services/adminRefundService';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import './ManageRefunds.css';
-
-const numberFormatter = new Intl.NumberFormat('vi-VN');
-const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-function formatVnd(value) {
-  return `${numberFormatter.format(Number(value || 0))} VND`;
-}
-
-function formatDate(value) {
-  if (!value) return '-';
-  return dateFormatter.format(new Date(value));
-}
 
 export default function ManageRefunds() {
   const { showToast } = useToast();
+  const { t, formatCurrency, formatDateTime } = useLanguage();
   const [refunds, setRefunds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
@@ -38,7 +22,7 @@ export default function ManageRefunds() {
       const data = await adminRefundService.getAll();
       setRefunds(Array.isArray(data) ? data : []);
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load refund requests.', 'error');
+      showToast(error?.response?.data || t('common.load_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -53,11 +37,11 @@ export default function ManageRefunds() {
     try {
       setActionLoading(true);
       await adminRefundService.markDone(processingRefund.refundRequestId);
-      showToast('Refund request marked as done successfully.', 'success');
+      showToast(t('common.saved_success'), 'success');
       setProcessingRefund(null);
       await fetchRefunds();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to mark refund request as done.', 'error');
+      showToast(error?.response?.data || t('common.save_error'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -66,19 +50,19 @@ export default function ManageRefunds() {
   const handleReject = async () => {
     if (!processingRefund) return;
     if (!rejectReason.trim()) {
-      showToast('Please provide a reason for rejection.', 'error');
+      showToast(t('validation.required'), 'error');
       return;
     }
     try {
       setActionLoading(true);
       await adminRefundService.rejectRefund(processingRefund.refundRequestId, { reason: rejectReason.trim() });
-      showToast('Refund request rejected successfully.', 'success');
+      showToast(t('common.saved_success'), 'success');
       setProcessingRefund(null);
       setIsRejecting(false);
       setRejectReason('');
       await fetchRefunds();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to reject refund request.', 'error');
+      showToast(error?.response?.data || t('common.save_error'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -90,7 +74,6 @@ export default function ManageRefunds() {
     setRejectReason('');
   };
 
-  // Calculations for stats
   const stats = useMemo(() => {
     const total = refunds.length;
     const notReady = refunds.filter(r => r.status === 'NotReady').length;
@@ -100,16 +83,13 @@ export default function ManageRefunds() {
     return { total, notReady, pending, processed, completed };
   }, [refunds]);
 
-  // Client-side filtering & search
   const filteredRefunds = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
     return refunds.filter((refund) => {
-      // Filter by status
       if (activeFilter !== 'All' && refund.status !== activeFilter) {
         return false;
       }
       
-      // Filter by keyword
       if (search) {
         const matchesName = refund.userName?.toLowerCase().includes(search);
         const matchesEmail = refund.userEmail?.toLowerCase().includes(search);
@@ -126,31 +106,31 @@ export default function ManageRefunds() {
       <div className="admin-refund-page animate-fade-in">
       <header className="admin-refund-hero">
         <div>
-          <p className="admin-eyebrow" style={{ textTransform: 'uppercase', fontSize: '11px', color: '#0f766e', fontWeight: 800, letterSpacing: '0.08em' }}>Platform Controller</p>
-          <h1>Manage Refund Requests</h1>
-          <p>Supervise and confirm offline deposit refunds back to users.</p>
+          <p className="admin-eyebrow" style={{ textTransform: 'uppercase', fontSize: '11px', color: '#0f766e', fontWeight: 800, letterSpacing: '0.08em' }}>{t('admin.eyebrow')}</p>
+          <h1>{t('admin.refunds.hero_title')}</h1>
+          <p>{t('admin.refunds.hero_sub')}</p>
         </div>
       </header>
 
       <section className="admin-refund-stats-grid">
         <article className="admin-refund-stat-card">
-          <span>Total Requests</span>
+          <span>{t('admin.refunds.stat_total')}</span>
           <strong>{stats.total}</strong>
         </article>
         <article className="admin-refund-stat-card" style={{ borderLeft: '4px solid #6b7280' }}>
-          <span>Not Ready</span>
+          <span>{t('admin.refunds.stat_not_ready')}</span>
           <strong>{stats.notReady}</strong>
         </article>
         <article className="admin-refund-stat-card" style={{ borderLeft: '4px solid #d97706' }}>
-          <span>Pending Done</span>
+          <span>{t('admin.refunds.stat_pending')}</span>
           <strong>{stats.pending}</strong>
         </article>
         <article className="admin-refund-stat-card" style={{ borderLeft: '4px solid #2563eb' }}>
-          <span>Processed (Sent)</span>
+          <span>{t('admin.refunds.stat_processed')}</span>
           <strong>{stats.processed}</strong>
         </article>
         <article className="admin-refund-stat-card" style={{ borderLeft: '4px solid #16a34a' }}>
-          <span>Completed (Received)</span>
+          <span>{t('admin.refunds.stat_completed')}</span>
           <strong>{stats.completed}</strong>
         </article>
       </section>
@@ -165,11 +145,11 @@ export default function ManageRefunds() {
                 className={activeFilter === tab ? 'active' : ''}
                 onClick={() => setActiveFilter(tab)}
               >
-                {tab === 'All' ? `All (${refunds.length})` :
-                 tab === 'NotReady' ? `Not Ready (${stats.notReady})` :
-                 tab === 'Pending' ? `Pending (${stats.pending})` :
-                 tab === 'Processed' ? `Processed (${stats.processed})` :
-                 `Completed (${stats.completed})`}
+                {tab === 'All' ? `${t('admin.listings.tab_all')} (${refunds.length})` :
+                 tab === 'NotReady' ? `${t('admin.refunds.stat_not_ready')} (${stats.notReady})` :
+                 tab === 'Pending' ? `${t('admin.refunds.stat_pending')} (${stats.pending})` :
+                 tab === 'Processed' ? `${t('admin.refunds.stat_processed')} (${stats.processed})` :
+                 `${t('admin.refunds.stat_completed')} (${stats.completed})`}
               </button>
             ))}
           </div>
@@ -180,7 +160,7 @@ export default function ManageRefunds() {
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by name, email, note..."
+                placeholder={t('admin.refunds.search_placeholder')}
               />
             </label>
           </div>
@@ -190,24 +170,24 @@ export default function ManageRefunds() {
           {loading ? (
             <div className="admin-refund-table-empty">
               <span className="page-btn-spinner"></span>
-              <p>Loading refund requests...</p>
+              <p>{t('common.loading')}</p>
             </div>
           ) : filteredRefunds.length === 0 ? (
             <div className="admin-refund-table-empty">
               <span className="material-symbols-outlined">payments</span>
-              <h3>No refund requests found</h3>
-              <p>Adjust your search query or status filter.</p>
+              <h3>{t('admin.listings.no_products')}</h3>
+              <p>{t('admin.listings.no_products_sub')}</p>
             </div>
           ) : (
             <table className="admin-refund-table">
               <thead>
                 <tr>
-                  <th>STT</th>
-                  <th>User Profile</th>
-                  <th>Amount</th>
-                  <th>Request Date</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th>{t('admin.listings.col_stt')}</th>
+                  <th>{t('admin.users.col_info')}</th>
+                  <th>{t('admin.refunds.col_amount')}</th>
+                  <th>{t('admin.refunds.col_request_date')}</th>
+                  <th>{t('admin.users.col_status')}</th>
+                  <th>{t('admin.listings.col_actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,22 +211,22 @@ export default function ManageRefunds() {
                         </div>
                       </td>
                       <td className="refund-amount-cell">
-                        {formatVnd(refund.amount)}
+                        {formatCurrency(refund.amount)}
                       </td>
                       <td style={{ color: '#6b7280' }}>
-                        {formatDate(refund.requestedAt)}
+                        {formatDateTime(refund.requestedAt)}
                       </td>
                       <td>
                         <span className={`refund-status-badge ${refund.status ? refund.status.toLowerCase() : ''}`}>
-                          {refund.status === 'NotReady' ? 'Not Ready' :
-                           refund.status === 'Pending' ? 'Pending' :
-                           refund.status === 'Processed' ? 'Processed' : 'Completed'}
+                          {refund.status === 'NotReady' ? t('admin.refunds.stat_not_ready') :
+                           refund.status === 'Pending' ? t('admin.refunds.stat_pending') :
+                           refund.status === 'Processed' ? t('admin.refunds.stat_processed') : t('admin.refunds.stat_completed')}
                         </span>
                       </td>
                       <td>
                         {refund.status === 'NotReady' && (
                           <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: 600 }}>
-                            Awaiting Info
+                            {t('admin.refunds.awaiting_info')}
                           </span>
                         )}
                         {refund.status === 'Pending' && (
@@ -258,17 +238,17 @@ export default function ManageRefunds() {
                               setProcessingRefund(refund);
                             }}
                           >
-                            Confirm
+                            {t('admin.refunds.confirm')}
                           </button>
                         )}
                         {refund.status === 'Processed' && (
                           <span style={{ fontSize: '13px', color: '#2563eb', fontWeight: 600 }}>
-                            Awaiting Receipt
+                            {t('admin.refunds.awaiting_receipt')}
                           </span>
                         )}
                         {refund.status === 'Completed' && (
                           <span style={{ fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>
-                            Completed
+                            {t('admin.refunds.stat_completed')}
                           </span>
                         )}
                       </td>
@@ -286,7 +266,7 @@ export default function ManageRefunds() {
         <div className="admin-refund-modal-overlay" onClick={handleCloseModal}>
           <div className="admin-refund-modal" onClick={(e) => e.stopPropagation()}>
             <header className="admin-refund-modal-header">
-              <h3>Refund Request Details</h3>
+              <h3>{t('admin.refunds.modal_title')}</h3>
               <button type="button" className="admin-refund-modal-close" onClick={handleCloseModal} disabled={actionLoading}>
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -296,9 +276,9 @@ export default function ManageRefunds() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700 }}>Status</span>
                 <span className={`refund-status-badge ${processingRefund.status.toLowerCase()}`}>
-                  {processingRefund.status === 'NotReady' ? 'Not Ready' :
-                   processingRefund.status === 'Pending' ? 'Pending' :
-                   processingRefund.status === 'Processed' ? 'Processed' : 'Completed'}
+                  {processingRefund.status === 'NotReady' ? t('admin.refunds.stat_not_ready') :
+                   processingRefund.status === 'Pending' ? t('admin.refunds.stat_pending') :
+                   processingRefund.status === 'Processed' ? t('admin.refunds.stat_processed') : t('admin.refunds.stat_completed')}
                 </span>
               </div>
 
@@ -310,8 +290,8 @@ export default function ManageRefunds() {
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Refund Amount</span>
-                  <strong style={{ fontSize: '18px', color: 'var(--primary)' }}>{formatVnd(processingRefund.amount)}</strong>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>{t('admin.refunds.col_amount')}</span>
+                  <strong style={{ fontSize: '18px', color: 'var(--primary)' }}>{formatCurrency(processingRefund.amount)}</strong>
                 </div>
 
                 <div>
@@ -321,13 +301,13 @@ export default function ManageRefunds() {
 
                 {processingRefund.status === 'Rejected' && processingRefund.rejectReason && (
                   <div>
-                    <span style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Reject Reason</span>
+                    <span style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>{t('admin.listings.reject_reason')}</span>
                     <span style={{ fontSize: '13px', color: '#b91c1c', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{processingRefund.rejectReason}</span>
                   </div>
                 )}
 
                 <div>
-                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Transfer Account</span>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>{t('admin.refunds.bank_account')}</span>
                   {processingRefund.bankName ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px', color: '#111827', marginTop: '4px' }}>
                       <span>Bank: <strong>{processingRefund.bankName}</strong></span>
@@ -342,8 +322,8 @@ export default function ManageRefunds() {
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Requested At</span>
-                  <span style={{ fontSize: '13px', color: '#4b5563' }}>{formatDate(processingRefund.requestedAt)}</span>
+                  <span style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>{t('admin.refunds.col_request_date')}</span>
+                  <span style={{ fontSize: '13px', color: '#4b5563' }}>{formatDateTime(processingRefund.requestedAt)}</span>
                 </div>
               </div>
             </div>
@@ -357,7 +337,7 @@ export default function ManageRefunds() {
                     onClick={handleCloseModal}
                     disabled={actionLoading}
                   >
-                    Close
+                    {t('common.close')}
                   </button>
                   {processingRefund.status === 'Pending' && (
                     <>
@@ -368,7 +348,7 @@ export default function ManageRefunds() {
                         onClick={() => setIsRejecting(true)}
                         disabled={actionLoading}
                       >
-                        Reject
+                        {t('admin.reject')}
                       </button>
                       <button
                         type="button"
@@ -376,7 +356,7 @@ export default function ManageRefunds() {
                         onClick={handleMarkDone}
                         disabled={actionLoading}
                       >
-                        {actionLoading ? <span className="page-btn-spinner"></span> : 'Confirm Sent'}
+                        {actionLoading ? <span className="page-btn-spinner"></span> : t('admin.refunds.confirm_sent')}
                       </button>
                     </>
                   )}
@@ -384,10 +364,10 @@ export default function ManageRefunds() {
               ) : (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div>
-                    <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Reject Reason *</label>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>{t('admin.listings.reject_reason')} *</label>
                     <textarea 
                       autoFocus
-                      placeholder="Enter the reason for rejecting this refund..."
+                      placeholder={t('admin.listings.reject_reason_placeholder')}
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       disabled={actionLoading}
@@ -401,7 +381,7 @@ export default function ManageRefunds() {
                       onClick={() => { setIsRejecting(false); setRejectReason(''); }}
                       disabled={actionLoading}
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                     <button
                       type="button"
@@ -410,7 +390,7 @@ export default function ManageRefunds() {
                       onClick={handleReject}
                       disabled={actionLoading || !rejectReason.trim()}
                     >
-                      {actionLoading ? <span className="page-btn-spinner"></span> : 'Submit Reject'}
+                      {actionLoading ? <span className="page-btn-spinner"></span> : t('admin.reject')}
                     </button>
                   </div>
                 </div>
@@ -422,3 +402,4 @@ export default function ManageRefunds() {
     </>
   );
 }
+

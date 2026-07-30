@@ -54,7 +54,7 @@ StarRating.propTypes = {
 };
 
 function getBuyerInitials(name) {
-  const cleanName = String(name || 'Buyer').trim();
+  const cleanName = String(name || 'B').trim();
   const parts = cleanName.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
     return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
@@ -381,10 +381,10 @@ export default function ReviewList() {
                     type="button"
                     className="seller-review-product-media"
                     onClick={() => openPreviewModal(review)}
-                    aria-label={`Preview ${review.productName || 'reviewed product'}`}
+                    aria-label={`Preview ${review.productName || ''}`}
                   >
                     {review.productImageUrl ? (
-                      <img src={review.productImageUrl} alt={review.productName || 'Reviewed product'} loading="lazy" />
+                      <img src={review.productImageUrl} alt={review.productName || t('common.reviewed_product')} loading="lazy" />
                     ) : (
                       <span className="material-symbols-outlined">inventory_2</span>
                     )}
@@ -392,7 +392,7 @@ export default function ReviewList() {
                   <div>
                     <span>{t('my_products.th_product')}</span>
                     <Link to={review.productId ? `/product/${review.productId}` : '#'}>{review.productName || t('nav.product')}</Link>
-                    <small>{review.productId || 'No product id'}</small>
+                    <small>{review.productId || t('common.no_product_id')}</small>
                   </div>
                 </div>
 
@@ -400,14 +400,14 @@ export default function ReviewList() {
                   <div className="seller-review-buyer-strip">
                     <div className="seller-review-buyer-avatar">
                       {review.reviewerAvatarUrl ? (
-                        <img src={review.reviewerAvatarUrl} alt={review.reviewerName || 'Buyer'} loading="lazy" />
+                        <img src={review.reviewerAvatarUrl} alt={review.reviewerName || t('common.unknown_buyer')} loading="lazy" />
                       ) : (
                         getBuyerInitials(review.reviewerName)
                       )}
                     </div>
                     <div>
                       <span>{t('order_management.th_buyer')}</span>
-                      <strong>{review.reviewerName || 'Buyer'}</strong>
+                      <strong>{review.reviewerName || t('common.unknown_buyer')}</strong>
                       <small>{review.reviewerEmail || ''}</small>
                     </div>
                   </div>
@@ -430,15 +430,15 @@ export default function ReviewList() {
                     </div>
                     <div>
                       <dt>{t('common.type')}</dt>
-                      <dd>{review.targetType || 'Review'}</dd>
+                      <dd>{review.targetType || t('common.type')}</dd>
                     </div>
                     <div>
                       <dt>{t('seller.orders_management')}</dt>
-                      <dd>{review.orderCode || review.orderId || 'N/A'}</dd>
+                      <dd>{review.orderCode || review.orderId || t('common.na')}</dd>
                     </div>
                     <div>
                       <dt>{t('order_management.th_buyer')}</dt>
-                      <dd>{review.reviewerName || 'Buyer'}</dd>
+                      <dd>{review.reviewerName || t('common.unknown_buyer')}</dd>
                     </div>
                     <div>
                       <dt>{t('history.order_date')}</dt>
@@ -523,7 +523,7 @@ export default function ReviewList() {
               <div className="seller-review-modal-context">
                 <strong>{reportingReview.productName || t('nav.product')}</strong>
                 <p>&quot;{reportingReview.comment || t('common.no_data')}&quot;</p>
-                <small>{t('order_management.th_buyer')}: {reportingReview.reviewerName || 'Buyer'}</small>
+                <small>{t('order_management.th_buyer')}: {reportingReview.reviewerName || t('common.unknown_buyer')}</small>
               </div>
 
               <div className="seller-review-field">
@@ -577,7 +577,7 @@ export default function ReviewList() {
 
             <div className="seller-review-modal-body">
               {previewReview.productImageUrl ? (
-                <img className="seller-review-preview-img" src={previewReview.productImageUrl} alt={previewReview.productName || 'Product'} />
+                <img className="seller-review-preview-img" src={previewReview.productImageUrl} alt={previewReview.productName || t('nav.product')} />
               ) : null}
               <strong>{previewReview.productName || t('nav.product')}</strong>
               <StarRating value={previewReview.rating} />

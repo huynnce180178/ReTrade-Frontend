@@ -131,7 +131,7 @@ export default function SellerProfile() {
         const data = await profileService.getSellerProfile(sellerId);
         setSeller(data);
       } catch (err) {
-        setError(err.response?.data || t('seller_dashboard.load_error'));
+        setError(typeof err.response?.data === 'string' ? err.response.data : (err.response?.data?.message || t('common.error_occurred')));
       } finally {
         setLoading(false);
       }
@@ -177,10 +177,11 @@ export default function SellerProfile() {
       if (!sellerId) return;
       setProductsLoading(true);
       try {
+        const queryStatus = productStatus !== '' ? productStatus : (activeTab === 'auction' ? 'Ready' : undefined);
         const res = await productService.getSellerProducts(sellerId, {
           page: productPage,
           pageSize: 8,
-          status: productStatus || undefined,
+          status: queryStatus,
         });
         setSellerProducts(res.items || []);
         setProductsTotal(res.totalItems || 0);
@@ -195,7 +196,7 @@ export default function SellerProfile() {
     };
 
     fetchSellerProducts();
-  }, [sellerId, productPage, productStatus]);
+  }, [sellerId, productPage, productStatus, activeTab]);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -345,11 +346,21 @@ export default function SellerProfile() {
 
     if (activeTab === 'auction') {
       return (
-        <div className="buyer-shop-empty">
-          <span className="material-symbols-outlined">gavel</span>
-          <h2>{t('seller_profile.live_auctions')}</h2>
-          <p>{t('seller_profile.live_auctions_sub')}</p>
-        </div>
+        <SellerProductGrid
+          products={sellerProducts}
+          loading={productsLoading}
+          total={visibleProductCount}
+          compact
+          hideStatusTabs
+          productStatus="Ready"
+          setProductStatus={(s) => { setProductStatus(s); setProductPage(1); }}
+          productPage={productPage}
+          setProductPage={setProductPage}
+          totalPages={totalPages}
+          wishlistIds={wishlistIds}
+          togglingId={togglingId}
+          onWishlistToggle={handleWishlistToggle}
+        />
       );
     }
 
@@ -507,7 +518,11 @@ export default function SellerProfile() {
               key={key}
               type="button"
               className={`buyer-shop-tab ${activeTab === key ? 'active' : ''}`}
-              onClick={() => setActiveTab(key)}
+              onClick={() => {
+                setActiveTab(key);
+                setProductPage(1);
+                setProductStatus(key === 'auction' ? 'Ready' : '');
+              }}
             >
               {label}
             </button>
@@ -612,7 +627,7 @@ export default function SellerProfile() {
   );
 }
 
-function SellerProductGrid({ products, loading, total, compact = false, productStatus, setProductStatus, productPage, setProductPage, totalPages, wishlistIds, togglingId, onWishlistToggle }) {
+function SellerProductGrid({ products, loading, total, compact = false, hideStatusTabs = false, productStatus, setProductStatus, productPage, setProductPage, totalPages, wishlistIds, togglingId, onWishlistToggle }) {
   const { t } = useLanguage();
   const statusTabs = [
     { key: '', label: t('common.all') },
@@ -623,18 +638,20 @@ function SellerProductGrid({ products, loading, total, compact = false, productS
 
   return (
     <div className={`seller-products-section ${compact ? 'compact' : ''}`}>
-      <div className="seller-product-status-tabs">
-        {statusTabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={`seller-status-tab ${productStatus === tab.key ? 'active' : ''}`}
-            onClick={() => setProductStatus(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {!hideStatusTabs && (
+        <div className="seller-product-status-tabs">
+          {statusTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`seller-status-tab ${productStatus === tab.key ? 'active' : ''}`}
+              onClick={() => setProductStatus(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="seller-profile-products">

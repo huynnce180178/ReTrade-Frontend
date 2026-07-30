@@ -151,7 +151,7 @@ export default function OrderDetail() {
                   {statusLabels[order.status] || order.status}
                 </em>
               </div>
-              <p>{t('history.order_date')} {formatDateTime(order.createdAt)} • {t('order_detail.buyer_info')} {order.buyerName || 'Buyer'}</p>
+              <p>{t('history.order_date')} {formatDateTime(order.createdAt)} • {t('order_detail.buyer_info')} {order.buyerName || t('common.unknown_buyer')}</p>
             </div>
             <Link className="sod-back-btn" to="/seller-dashboard/orders">
               <span className="material-symbols-outlined">arrow_back</span>
@@ -182,7 +182,7 @@ export default function OrderDetail() {
                 <h2><span className="material-symbols-outlined">inventory_2</span>{t('order_detail.items_info')}</h2>
                 <div className="sod-item-row">
                   <div className="sod-product">
-                    <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
+                    <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || t('nav.product')} />
                     <div>
                       <strong>{order.productName || t('nav.product')}</strong>
                       <small>{order.productId}</small>
@@ -229,7 +229,7 @@ export default function OrderDetail() {
             <aside className="sod-side">
               <article className="sod-side-card">
                 <h3><span className="material-symbols-outlined">person</span>{t('order_detail.buyer_info')}</h3>
-                <strong>{order.buyerName || 'Buyer'}</strong>
+                <strong>{order.buyerName || t('common.unknown_buyer')}</strong>
                 <p><span className="material-symbols-outlined">mail</span>{order.buyerEmail || '-'}</p>
                 <p><span className="material-symbols-outlined">call</span>{order.buyerPhone || getPhoneFromAddressSnapshot(order.addressSnapshot) || '-'}</p>
               </article>

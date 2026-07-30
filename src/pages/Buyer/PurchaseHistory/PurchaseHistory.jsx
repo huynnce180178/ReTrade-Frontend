@@ -154,7 +154,7 @@ export default function PurchaseHistory() {
         }
       }
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to load purchase history.', 'error');
+      showToast(error?.response?.data || t('common.load_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -268,17 +268,17 @@ export default function PurchaseHistory() {
       let updated = null;
       if (action === 'complete') {
         updated = await purchaseService.complete(buyerId, purchase.orderId);
-        showToast('Purchase marked as completed.', 'success');
+        showToast(t('common.purchase_completed'), 'success');
         setReviewTarget(updated ? { ...purchase, ...updated } : purchase);
         setReviewModalOpen(true);
       } else {
         updated = await purchaseService.cancel(buyerId, purchase.orderId);
-        showToast('Purchase cancelled successfully.', 'success');
+        showToast(t('common.purchase_cancelled'), 'success');
       }
       loadPurchases();
       return updated;
     } catch (error) {
-      showToast(error?.response?.data || `Failed to ${action} purchase.`, 'error');
+      showToast(error?.response?.data || t('common.save_error'), 'error');
       return null;
     } finally {
       setUpdatingId('');
@@ -309,7 +309,7 @@ export default function PurchaseHistory() {
 
     const reason = returnReason.trim();
     if (!reason) {
-      showToast('Please enter a return reason.', 'warning');
+      showToast(t('common.return_reason_required'), 'warning');
       return;
     }
 
@@ -317,13 +317,13 @@ export default function PurchaseHistory() {
       setReturnSubmitting(true);
       setUpdatingId(returnTarget.orderId);
       await purchaseService.requestReturn(buyerId, returnTarget.orderId, reason);
-      showToast('Return request submitted.', 'success');
+      showToast(t('common.return_submitted'), 'success');
       setReturnModalOpen(false);
       setReturnTarget(null);
       setReturnReason('');
       loadPurchases();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to submit return request.', 'error');
+      showToast(error?.response?.data || t('common.return_error'), 'error');
     } finally {
       setReturnSubmitting(false);
       setUpdatingId('');
@@ -340,12 +340,12 @@ export default function PurchaseHistory() {
         rating,
         comment,
       });
-      showToast('Review submitted successfully.', 'success');
+      showToast(t('common.review_submitted'), 'success');
       setReviewModalOpen(false);
       setReviewTarget(null);
       loadPurchases();
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to submit review.', 'error');
+      showToast(error?.response?.data || t('common.review_error'), 'error');
     } finally {
       setReviewSubmitting(false);
     }
@@ -369,13 +369,13 @@ export default function PurchaseHistory() {
           : resp?.paymentUrl || resp?.url || resp?.paymentLink || null;
 
       if (!url) {
-        showToast('Payment URL not returned from server.', 'error');
+        showToast(t('common.payment_no_url'), 'error');
         return;
       }
 
       window.location.href = url;
     } catch (error) {
-      showToast(error?.response?.data || 'Failed to create payment link.', 'error');
+      showToast(error?.response?.data || t('common.payment_error'), 'error');
     } finally {
       setUpdatingId('');
     }
@@ -383,8 +383,8 @@ export default function PurchaseHistory() {
 
   const handleSubmitSellerReport = async (payload) => {
     if (!reportTarget?.orderId) return;
-    try { setReportSubmitting(true); await reportService.reportSeller(reportTarget.orderId, payload); showToast('Report submitted successfully.', 'success'); setReportTarget(null); }
-    catch (error) { showToast(error?.response?.data || 'Failed to submit report.', 'error'); }
+    try { setReportSubmitting(true); await reportService.reportSeller(reportTarget.orderId, payload); showToast(t('common.report_submitted'), 'success'); setReportTarget(null); }
+    catch (error) { showToast(error?.response?.data || t('common.report_error'), 'error'); }
     finally { setReportSubmitting(false); }
   };
 
@@ -392,7 +392,7 @@ export default function PurchaseHistory() {
     return (
       <div className="profile-loading-wrapper">
         <span className="btn-spinner"></span>
-        <p>Loading purchase history...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -604,7 +604,7 @@ export default function PurchaseHistory() {
 }
 
 function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain, onReportSeller, language }) {
-  const meta = statusMeta[purchase.status] || { label: purchase.status || 'Unknown', className: 'default' };
+  const meta = statusMeta[purchase.status] || { label: purchase.status || t('common.unknown'), className: 'default' };
   const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
   const canComplete = purchase.status === 'Delivered';
   const canReview = purchase.status === 'Completed' && !purchase.hasReview;
@@ -631,10 +631,10 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
             <img 
               className="purchase-product-img" 
               src={purchase.productImageUrl || '/vite.svg'} 
-              alt={purchase.productName || 'Purchased product'} 
+              alt={purchase.productName || t('common.unnamed_product')} 
             />
             <div className="purchase-product-details">
-              <h3 className="purchase-product-title">{purchase.productName || 'Untitled product'}</h3>
+              <h3 className="purchase-product-title">{purchase.productName || t('common.unnamed_product')}</h3>
               <span className="purchase-product-qty">{language === 'vi' ? 'SL: x' : 'Qty: x'}{purchase.quantity || 0}</span>
             </div>
             <div className="purchase-product-price-info">

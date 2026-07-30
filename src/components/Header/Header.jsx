@@ -43,6 +43,7 @@ export default function Header() {
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   const searchRef = useRef(null);
+  const packagesLoadedRef = useRef(false);
 
   // Close dropdowns on outside click or Escape key
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function Header() {
     setSearchHistory(history);
   }, []);
 
+
   useEffect(() => {
     if (!subscriptionModalOpen) {
       return;
@@ -88,9 +90,10 @@ export default function Header() {
     const loadData = async () => {
       setLoadingPackages(true);
       try {
-        if (packages.length === 0) {
+        if (!packagesLoadedRef.current) {
           const data = await subscriptionService.getAll();
           setPackages(Array.isArray(data) ? data : []);
+          packagesLoadedRef.current = true;
         }
 
         if (user) {
@@ -98,14 +101,15 @@ export default function Header() {
           setActivePackages(Array.isArray(myData) ? myData : []);
         }
       } catch (error) {
-        showToast(t('common.error_occurred'), 'error');
+        console.error('Failed to load subscription packages:', error);
       } finally {
         setLoadingPackages(false);
       }
     };
 
     loadData();
-  }, [subscriptionModalOpen, user, packages.length, showToast, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriptionModalOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -373,18 +377,20 @@ export default function Header() {
 
             {showHistory && searchHistory.length > 0 && (
               <div className="search-history-dropdown">
-                <div className="history-header">
-                  <span>Search History</span>
-                  <button type="button" onClick={handleClearAllHistory} className="clear-history-btn">Clear all</button>
+                <div className="search-history-header">
+                  <span>{language === 'vi' ? 'Lịch sử tìm kiếm' : 'Search History'}</span>
+                  <button type="button" onClick={handleClearAllHistory} className="search-history-clear-all">
+                    {language === 'vi' ? 'Xóa tất cả' : 'Clear all'}
+                  </button>
                 </div>
-                <ul className="history-list">
+                <ul className="search-history-list">
                   {searchHistory.map((term, index) => (
-                    <li key={index} onClick={() => handleSelectHistoryItem(term)}>
+                    <li key={index} className="search-history-item" onClick={() => handleSelectHistoryItem(term)}>
                       <span className="material-symbols-outlined history-icon">history</span>
-                      <span className="history-term">{term}</span>
+                      <span className="search-history-keyword">{term}</span>
                       <button
                         type="button"
-                        className="remove-history-btn"
+                        className="search-history-delete"
                         onClick={(e) => handleRemoveHistoryItem(e, term)}
                         title="Remove"
                       >

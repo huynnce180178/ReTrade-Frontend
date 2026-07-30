@@ -123,8 +123,8 @@ export default function AdminLayout() {
           <LanguageSwitcher />
 
           <Link to="/" className="btn-view-live">
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>open_in_new</span>
-            {t('common.view_all')}
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>home</span>
+            {t('common.view_home')}
           </Link>
 
           <div className="notification-wrapper" ref={notifRef} style={{ position: 'relative' }}>
@@ -308,12 +308,6 @@ export default function AdminLayout() {
                 <span className="material-symbols-outlined admin-menu-item-icon">flag</span>
                 {t('admin.report_management')}
               </NavLink>
-              <div className="admin-report-submenu">
-                <NavLink to="/admin/reports/flagged-users" className={({ isActive }) => isActive ? 'active' : ''}>
-                  <span className="material-symbols-outlined">flag</span>
-                  {t('history.report_history_title')}
-                </NavLink>
-              </div>
             </nav>
           </div>
 

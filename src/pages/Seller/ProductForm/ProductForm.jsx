@@ -10,7 +10,8 @@ export default function ProductForm() {
   const navigate = useNavigate();
   const { productId } = useParams();
   const { showToast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
   const isEdit = Boolean(productId);
 
@@ -153,7 +154,7 @@ export default function ProductForm() {
       setReqAttributes([]);
       setIsCategoryRequestModalOpen(false);
     } catch (err) {
-      const errMsg = err?.response?.data || 'Failed to submit category request.';
+      const errMsg = err?.response?.data || t('common.category_request_error');
       showToast(errMsg, 'error');
     }
   };
@@ -354,7 +355,7 @@ export default function ProductForm() {
           uploadedImages.push({
             id: Date.now().toString() + i,
             imageUrl: res.imageUrl,
-            altText: formData.name || 'Product Image',
+            altText: formData.name || t('common.product_image'),
             isMain: isFirst,
           });
           isFirst = false;
@@ -363,10 +364,10 @@ export default function ProductForm() {
       
       if (uploadedImages.length > 0) {
         setImages((prev) => [...prev, ...uploadedImages]);
-        showToast(`Uploaded ${uploadedImages.length} image(s) successfully.`, 'success');
+        showToast(t('common.upload_success', { count: uploadedImages.length }), 'success');
       }
     } catch (err) {
-      showToast('Failed to upload image.', 'error');
+      showToast(t('common.upload_error'), 'error');
     } finally {
       setProductsLoading(false);
       e.target.value = '';
@@ -397,11 +398,11 @@ export default function ProductForm() {
     e.preventDefault();
     
     if (!formData.categoryId) {
-      showToast('Please select a product category.', 'warning');
+      showToast(t('common.select_category_warning'), 'warning');
       return;
     }
     if (images.length === 0) {
-      showToast('A product must have at least one image.', 'warning');
+      showToast(t('common.image_required'), 'warning');
       return;
     }
 
@@ -420,7 +421,7 @@ export default function ProductForm() {
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      showToast('Please check and fix input errors.', 'warning');
+      showToast(t('common.fix_errors'), 'warning');
       return;
     }
 
@@ -457,14 +458,14 @@ export default function ProductForm() {
       if (!isEdit) {
         payload.isForAuction = formData.isForAuction;
         await productService.create(payload);
-        showToast('Product listing created successfully. Waiting for admin approval!', 'success');
+        showToast(t('common.product_created'), 'success');
       } else {
         await productService.update(productId, payload);
-        showToast('Product updated successfully!', 'success');
+        showToast(t('common.product_updated'), 'success');
       }
       navigate('/seller-dashboard/products');
     } catch (error) {
-      showToast(error?.response?.data || error?.message || 'An error occurred while saving the product.', 'error');
+      showToast(error?.response?.data || error?.message || t('common.save_error'), 'error');
     } finally {
       setProductsLoading(false);
     }

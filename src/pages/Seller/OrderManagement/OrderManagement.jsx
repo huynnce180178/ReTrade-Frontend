@@ -221,7 +221,11 @@ export default function OrderManagement() {
   const handleUpdateStatus = async (order, targetStatus) => {
     try {
       setUpdatingOrderId(order.orderId);
-      await orderService.updateSellerOrderStatus(order.orderId, { status: targetStatus });
+      await orderService.updateSellerOrderStatus(
+        order.orderId,
+        { status: targetStatus },
+        { sellerId: user.userId }
+      );
       showToast(t('order_status_update.update_success'), 'success');
       await fetchOrders();
     } catch (error) {
@@ -359,7 +363,7 @@ export default function OrderManagement() {
                 </tr>
               ) : (
                 orders.map((order, index) => {
-                  const meta = statusMeta[order.status] || { label: order.status || 'Unknown', className: 'default' };
+                  const meta = statusMeta[order.status] || { label: order.status || t('common.unknown'), className: 'default' };
                   const action = getNextAction(order);
                   const orderNumber = (page - 1) * pageSize + index + 1;
                   const isUpdating = updatingOrderId === order.orderId;
@@ -370,11 +374,11 @@ export default function OrderManagement() {
                         <strong>{orderNumber}</strong>
                       </td>
                       <td>
-                        <strong>{order.buyerName || 'Buyer'}</strong>
+                        <strong>{order.buyerName || t('common.unknown_buyer')}</strong>
                       </td>
                       <td>
                         <div className="om-product">
-                          <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || 'Product'} />
+                          <img src={order.productImageUrl || '/vite.svg'} alt={order.productName || t('nav.product')} />
                           <div>
                             <strong>{order.productName || t('nav.product')}</strong>
                             <span>{t('common.quantity')} {order.quantity || 0}</span>
@@ -461,7 +465,7 @@ export default function OrderManagement() {
           isOpen={Boolean(reportTarget)}
           onClose={() => setReportTarget(null)}
           onSubmit={submitBuyerReport}
-          targetName={reportTarget.buyerName || 'Buyer'}
+          targetName={reportTarget.buyerName || t('common.unknown_buyer')}
           targetType="User"
           reportType="Buyer"
           submitting={reportSubmitting}

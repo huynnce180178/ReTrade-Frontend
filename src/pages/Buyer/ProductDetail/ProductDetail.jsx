@@ -558,7 +558,7 @@ export default function ProductDetail() {
             </div>
             <div className="pd-seller-info">
               <span className="pd-seller-label">{language === 'vi' ? 'Người bán' : 'Seller'}</span>
-              <span className="pd-seller-name">{product.sellerName || 'ReTrade Seller'}</span>
+              <span className="pd-seller-name">{product.sellerName || t('common.unknown_seller')}</span>
             </div>
             {product.sellerId && (
               <span className="pd-seller-link">
@@ -727,7 +727,7 @@ export default function ProductDetail() {
               {attributes.map((attr, idx) => (
                 <div key={attr.attributeId || idx} className="pd-attr-item">
                   <span className="pd-attr-label">
-                    {attr.attributeName || 'Attribute'}
+                    {attr.attributeName || t('common.attribute')}
                     {attr.unit && ` (${attr.unit})`}
                   </span>
                   <span className="pd-attr-value">{attr.value}</span>

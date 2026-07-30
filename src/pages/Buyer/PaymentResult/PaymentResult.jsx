@@ -15,7 +15,12 @@ export default function PaymentResult() {
   const auctionId = searchParams.get('auctionId') || '';
   const { user, setUser } = useAuth();
 
+  const profileRefreshedRef = React.useRef(false);
+
   useEffect(() => {
+    if (profileRefreshedRef.current) return;
+    profileRefreshedRef.current = true;
+
     const refreshProfile = async () => {
       if (success && user) {
         try {
@@ -36,7 +41,8 @@ export default function PaymentResult() {
       }
     };
     refreshProfile();
-  }, [success, user, setUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const displayMessage = (() => {
     if (!rawMessage) {
@@ -118,7 +124,7 @@ export default function PaymentResult() {
             </>
           ) : isSubscription ? (
             <>
-              <Link to="/subscriptions" className="btn btn-primary">
+              <Link to="/my-subscriptions" className="btn btn-primary">
                 {language === 'vi' ? 'Quản lý Gói dịch vụ' : 'Manage Subscriptions'}
               </Link>
               <Link to="/" className="btn btn-secondary">
@@ -135,7 +141,7 @@ export default function PaymentResult() {
               </Link>
             </>
           )}
-          <Link to="/subscriptions" className="btn btn-secondary">
+          <Link to="/my-subscriptions" className="btn btn-secondary">
             {language === 'vi' ? 'Quản lý Gói dịch vụ' : 'Manage Subscriptions'}
           </Link>
         </div>

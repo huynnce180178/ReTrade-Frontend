@@ -385,7 +385,7 @@ export default function MyAuctions() {
                 const progress = getProgress(auction);
                 return (
                   <article key={auction.auctionId} className="seller-auctions-row">
-                    <img src={auction.productImageUrl || 'https://placehold.co/140'} alt={auction.productName || 'Auction'} />
+                    <img src={auction.productImageUrl || 'https://placehold.co/140'} alt={auction.productName || t('nav.auction')} />
                     <div className="seller-auctions-row-main">
                       <div className="seller-auctions-row-top">
                         <div>

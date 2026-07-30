@@ -154,9 +154,11 @@ export default function OrderStatusUpdate() {
 
     try {
       setSaving(true);
-      const updated = await orderService.updateSellerOrderStatus(orderId, {
-        status: selectedStatus,
-      });
+      const updated = await orderService.updateSellerOrderStatus(
+        orderId,
+        { status: selectedStatus },
+        { sellerId: user.userId }
+      );
 
       showToast(t('order_status_update.update_success'), 'success');
       navigate(`/seller-dashboard/orders/${updated?.orderId || orderId}`);
@@ -171,7 +173,7 @@ export default function OrderStatusUpdate() {
     if (!orderId) return;
     try {
       setSaving(true);
-      await orderService.approveReturnRequest(orderId);
+      await orderService.approveReturnRequest(orderId, user.userId);
       showToast(t('toast.saved_success'), 'success');
       navigate(`/seller-dashboard/orders/${orderId}`);
     } catch (error) {
@@ -187,7 +189,7 @@ export default function OrderStatusUpdate() {
     if (reason === null) return;
     try {
       setSaving(true);
-      await orderService.rejectReturnRequest(orderId, reason);
+      await orderService.rejectReturnRequest(orderId, reason, user.userId);
       showToast(t('toast.saved_success'), 'info');
       navigate(`/seller-dashboard/orders/${orderId}`);
     } catch (error) {
@@ -240,7 +242,7 @@ export default function OrderStatusUpdate() {
             <div>
               <span className="osu-eyebrow">{t('seller.orders_management')}</span>
               <h1>{t('order_status_update.title', { id: order.orderCode || order.orderId })}</h1>
-              <p>{t('order_detail.buyer_info')}: {order.buyerName || 'Buyer'}</p>
+              <p>{t('order_detail.buyer_info')}: {order.buyerName || t('common.unknown_buyer')}</p>
             </div>
             <Link className="osu-back-btn" to={`/seller-dashboard/orders/${order.orderId}`}>
               <span className="material-symbols-outlined">visibility</span>
@@ -339,7 +341,7 @@ export default function OrderStatusUpdate() {
             <aside className="osu-side">
               <article className="osu-card">
                 <h3>{t('order_detail.buyer_info')}</h3>
-                <strong>{order.buyerName || 'Buyer'}</strong>
+                <strong>{order.buyerName || t('common.unknown_buyer')}</strong>
               </article>
               <article className="osu-card">
                 <h3>{t('my_products.th_product')}</h3>

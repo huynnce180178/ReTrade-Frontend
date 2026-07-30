@@ -312,7 +312,7 @@ export default function OfferList() {
                                 />
                                 <div>
                                   <span className="font-semibold text-gray-900 line-clamp-1 max-w-[200px]">
-                                    {offer.productName || 'Unnamed Item'}
+                                    {offer.productName || t('common.unnamed_product')}
                                   </span>
                                   <span className="text-xs text-gray-400 block mt-0.5">
                                     {t('offer_list.th_original_price')}: {formatVnd(offer.originalPrice)}
@@ -322,7 +322,7 @@ export default function OfferList() {
                             </td>
 
                             <td className="py-4 px-6">
-                              <div className="font-medium text-gray-800">{offer.buyerName || 'Collector'}</div>
+                              <div className="font-medium text-gray-800">{offer.buyerName || t('common.unknown_buyer')}</div>
                               <div className="text-xs text-gray-400">{offer.buyerEmail || ''}</div>
                             </td>
 
