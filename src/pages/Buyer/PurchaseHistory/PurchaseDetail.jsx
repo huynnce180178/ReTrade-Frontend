@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import ReviewModal from '../../../components/ReviewModal/ReviewModal';
@@ -450,7 +451,7 @@ export default function PurchaseDetail() {
 }
 
 function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onClose, onSubmit, language }) {
-  return (
+  return createPortal(
     <div className="purchase-return-modal-overlay" role="presentation" onMouseDown={onClose}>
       <div className="purchase-return-modal" role="dialog" aria-modal="true" aria-labelledby="return-modal-title" onMouseDown={(event) => event.stopPropagation()}>
         <button type="button" className="purchase-return-modal-close" onClick={onClose} disabled={submitting} aria-label="Close return request form">
@@ -482,7 +483,8 @@ function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onCl
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

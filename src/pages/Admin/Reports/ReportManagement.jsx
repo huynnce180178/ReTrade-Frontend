@@ -15,6 +15,7 @@ import './ReportDetail.css';
 import './CenteredReportDetail.css';
 
 const pageSize = 10;
+const normalizeFilterValue = (value) => String(value || '').trim().toLowerCase().replace(/'/g, "''");
 const toPage = (data) => {
   if (Array.isArray(data)) return { items: data, total: data.length };
   const payload = data?.data || data?.Data || data?.result || data?.Result || data;
@@ -45,7 +46,7 @@ export default function ReportManagement() {
       setLoading(true);
       const filter = [];
       if (status) filter.push(`Status eq '${status}'`);
-      if (targetType) filter.push(`TargetType eq '${targetType}'`);
+      if (targetType) filter.push(`tolower(TargetType) eq '${normalizeFilterValue(targetType)}'`);
       if (search.trim()) filter.push(`contains(ReporterName,'${search.trim().replace(/'/g, "''")}')`);
       
       const data = await reportService.getReports({
@@ -210,7 +211,7 @@ export default function ReportManagement() {
           </div>
         </div>
 
-        <ReportTable reports={reports} loading={loading} onView={view} />
+        <ReportTable reports={reports} loading={loading} onView={view} page={page} pageSize={pageSize} />
 
         <footer className="report-pagination">
           <span>{t('admin.reports.showing_reports', { start: startCount, end: endCount, total })}</span>

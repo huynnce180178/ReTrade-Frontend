@@ -3,7 +3,7 @@
   position: fixed;
   top: 96px; /* Positioned below the 80px header */
   right: 24px;
-  z-index: 999999;
+  z-index: 99999999 !important;
   display: flex;
   flex-direction: column;
 

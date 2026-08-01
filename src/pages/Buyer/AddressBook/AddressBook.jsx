@@ -20,6 +20,7 @@ const emptyForm = {
 const padProvince = (value) => String(value ?? '').padStart(2, '0');
 const padDistrict = (value) => String(value ?? '').padStart(3, '0');
 const padWard = (value) => String(value ?? '').padStart(5, '0');
+const normalizeCode = (value) => String(value ?? '');
 
 export default function AddressBook() {
   const { user, loading: authLoading } = useAuth();
@@ -37,10 +38,14 @@ export default function AddressBook() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [addressLocationNames, setAddressLocationNames] = useState({
+    districts: {},
+    wards: {},
+  });
 
-  const provinceMap = useMemo(() => new Map(provinces.map((item) => [item.code, item.name])), [provinces]);
-  const districtMap = useMemo(() => new Map(districts.map((item) => [item.code, item.name])), [districts]);
-  const wardMap = useMemo(() => new Map(wards.map((item) => [item.code, item.name])), [wards]);
+  const provinceMap = useMemo(() => new Map(provinces.map((item) => [normalizeCode(item.code), item.name])), [provinces]);
+  const districtMap = useMemo(() => new Map(districts.map((item) => [normalizeCode(item.code), item.name])), [districts]);
+  const wardMap = useMemo(() => new Map(wards.map((item) => [normalizeCode(item.code), item.name])), [wards]);
   const defaultAddress = addresses.find((address) => address.isDefault);
 
   const loadAddresses = async () => {
@@ -70,6 +75,60 @@ export default function AddressBook() {
 
     loadProvinces();
   }, [showToast, isVi]);
+
+  useEffect(() => {
+    if (!addresses.length) {
+      setAddressLocationNames({ districts: {}, wards: {} });
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAddressLocationNames = async () => {
+      const provinceCodes = [...new Set(addresses.map((address) => normalizeCode(address.provinceId)).filter(Boolean))];
+      const districtCodes = [...new Set(addresses.map((address) => normalizeCode(address.districtId)).filter(Boolean))];
+
+      const districtGroups = await Promise.all(
+        provinceCodes.map(async (provinceCode) => {
+          try {
+            return await vietnamAddressService.getDistricts(provinceCode);
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      const wardGroups = await Promise.all(
+        districtCodes.map(async (districtCode) => {
+          try {
+            return await vietnamAddressService.getWards(districtCode);
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      const districts = {};
+      districtGroups.flat().forEach((district) => {
+        districts[normalizeCode(district.code)] = district.name;
+      });
+
+      const wards = {};
+      wardGroups.flat().forEach((ward) => {
+        wards[normalizeCode(ward.code)] = ward.name;
+      });
+
+      setAddressLocationNames({ districts, wards });
+    };
+
+    loadAddressLocationNames();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addresses]);
 
   const loadDistricts = async (provinceCode) => {
     if (!provinceCode) {
@@ -211,12 +270,12 @@ export default function AddressBook() {
   };
 
   const formatAddressLine = (address) => {
-    const provinceCode = padProvince(address.provinceId);
-    const districtCode = padDistrict(address.districtId);
-    const wardCode = padWard(address.wardCode);
+    const provinceCode = normalizeCode(address.provinceId);
+    const districtCode = normalizeCode(address.districtId);
+    const wardCode = normalizeCode(address.wardCode);
     const locationParts = [
-      wardMap.get(wardCode) || `${isVi ? 'Phường/Xã' : 'Ward'} ${wardCode}`,
-      districtMap.get(districtCode) || `${isVi ? 'Quận/Huyện' : 'District'} ${districtCode}`,
+      addressLocationNames.wards[wardCode] || wardMap.get(wardCode) || `${isVi ? 'Phường/Xã' : 'Ward'} ${wardCode}`,
+      addressLocationNames.districts[districtCode] || districtMap.get(districtCode) || `${isVi ? 'Quận/Huyện' : 'District'} ${districtCode}`,
       provinceMap.get(provinceCode) || `${isVi ? 'Tỉnh/Thành' : 'Province'} ${provinceCode}`,
     ];
     return `${address.streetAddress || address.street || ''}, ${locationParts.join(', ')}`;

@@ -29,11 +29,13 @@ export const ToastProvider = ({ children }) => {
     setTimeout(() => {
       removeToast(id);
     }, duration);
+
+    return id;
   }, [removeToast]);
 
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={{ showToast, removeToast }}>
       {children}
       <div className="toast-container">
         {toasts.map((toast) => (

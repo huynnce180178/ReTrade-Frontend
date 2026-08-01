@@ -37,6 +37,7 @@
     "info": "Thông tin",
     "page": "Trang",
     "showing": "Hiển thị",
+    "showing_range": "Hiển thị {start}–{end} trên {total} mục",
     "of": "trên tổng số",
 
     "previous": "Trước",
@@ -86,6 +87,11 @@
     "return_reason_required": "Vui lòng nhập lý do trả hàng.",
     "return_submitted": "Gửi yêu cầu trả hàng thành công.",
     "return_error": "Không thể gửi yêu cầu trả hàng.",
+    "return_request_title": "Yêu cầu trả hàng",
+    "return_order_label": "Đơn hàng #{id}",
+    "return_reason_label": "Lý do trả hàng",
+    "return_reason_placeholder": "Mô tả lý do bạn muốn trả lại sản phẩm này...",
+    "return_submit_button": "Gửi yêu cầu",
     "review_submitted": "Gửi đánh giá thành công.",
     "review_error": "Không thể gửi đánh giá.",
     "report_submitted": "Gửi báo cáo thành công.",
@@ -233,6 +239,7 @@
   },
   "product": {
     "title": "Danh sách sản phẩm",
+    "specifications": "Thông số kỹ thuật",
     "condition": "Tình trạng",
     "condition_new": "Mới 100%",
     "condition_like_new": "Như mới (99%)",
@@ -242,6 +249,7 @@
     "min_price": "Giá tối thiểu",
     "max_price": "Giá tối đa",
     "sort_newest": "Mới nhất",
+    "sort_oldest": "Cũ nhất",
     "sort_price_asc": "Giá: Thấp đến Cao",
     "sort_price_desc": "Giá: Cao đến Thấp",
     "sort_popular": "Phổ biến nhất",
@@ -249,9 +257,13 @@
     "chat_with_seller": "Nhắn tin với người bán",
     "make_offer": "Đề xuất trả giá",
     "buy_now": "Mua ngay",
+    "out_of_stock": "Hết hàng",
     "add_to_wishlist": "Thêm vào yêu thích",
     "remove_from_wishlist": "Xóa khỏi yêu thích",
     "reviews": "Đánh giá từ người mua",
+    "write_review": "Viết đánh giá sản phẩm",
+    "review_placeholder": "Hãy chia sẻ cảm nhận của bạn về chất lượng sản phẩm và dịch vụ của người bán...",
+    "attach_photos": "Hình ảnh minh họa (Tối đa 5 ảnh)",
     "no_reviews": "Chưa có đánh giá nào.",
     "related_products": "Sản phẩm tương tự",
     "offer_modal_title": "Đề xuất trả giá cho sản phẩm",
@@ -321,6 +333,7 @@
     "err_not_found": "Không tìm thấy phiên đấu giá.",
     "err_own_auction": "Bạn không thể ra giá cho sản phẩm của chính mình.",
     "err_active_only": "Chỉ có thể ra giá cho phiên đấu giá đang diễn ra.",
+    "err_future_start": "Thời gian bắt đầu phải ở tương lai.",
     "err_deposit_required": "Bạn cần đặt cọc và đồng ý với điều khoản trước khi ra giá.",
     "err_limit_exceeded": "Số tiền ra giá vượt quá hạn mức đặt cọc của bạn.",
     "err_must_be_higher": "Số tiền ra giá phải cao hơn giá hiện tại.",
@@ -450,6 +463,8 @@
 
   "seller": {
     "dashboard_title": "Kênh Người Bán",
+    "dashboard": "Kênh Người Bán",
+    "reviews": "Kênh Người Bán",
     "total_revenue": "Tổng doanh thu",
     "total_orders": "Tổng đơn hàng",
     "total_products": "Tổng sản phẩm",
@@ -462,7 +477,7 @@
     "orders_management": "Quản lý đơn bán",
     "sales_stats": "Thống kê bán hàng",
     "offers_received": "Danh sách trả giá từ khách hàng",
-    "reviews_received": "Đánh giá từ người mua"
+    "reviews_received": "Đánh giá chất lượng sản phẩm & Người bán"
   },
   "admin": {
     "dashboard_title": "Bảng Điều Khiển Admin",
@@ -952,12 +967,17 @@
       "report_num": "Báo cáo {num}",
       "no_reports": "Không có báo cáo",
       "view_detail": "Xem Chi Tiết",
-      "review_action": "Thao Tác Xem Xét",
-      "accept_report": "Chấp Nhận",
-      "reject_report": "Từ Chối",
-      "confirm_accept_report": "Chấp nhận báo cáo này và áp dụng thao tác kiểm duyệt liên quan?",
-      "confirm_reject_report": "Từ chối báo cáo này và giữ nguyên đối tượng bị báo cáo?",
-      "accepted_review": "Đã Chấp Nhận Đánh Giá",
+      "review_action": "Hành Động Xử Lý Báo Cáo",
+      "accept_report": "Duyệt Báo Cáo",
+      "reject_report": "Từ Chối Báo Cáo",
+      "confirm_accept_title": "Xác Nhận Phê Duyệt Báo Cáo",
+      "confirm_reject_title": "Xác Nhận Từ Chối Báo Cáo",
+      "confirm_accept_report": "Bạn có chắc chắn muốn phê duyệt báo cáo vi phạm này và áp dụng hình thức xử lý?",
+      "confirm_reject_report": "Bạn có chắc chắn muốn từ chối báo cáo vi phạm này?",
+      "confirm_accept_btn": "Xác nhận phê duyệt",
+      "confirm_reject_btn": "Xác nhận từ chối",
+      "note_placeholder": "Ghi chú xử lý của Admin (tùy chọn)...",
+      "accepted_review": "Đã Phê Duyệt Đánh Giá",
       "accepted_buyer": "Đã Chấp Nhận Người Mua",
       "accepted_seller": "Đã Chấp Nhận Người Bán",
       "status_unknown": "Không Rõ",
@@ -1083,6 +1103,10 @@
     "phone": "Số điện thoại",
     "location": "Địa chỉ",
     "seller_reference": "Mã định danh",
+    "seller_code": "Mã người bán",
+    "account_code": "Mã tài khoản",
+    "district": "Quận/Huyện",
+    "province": "Tỉnh/TP",
     "about_shop": "Giới thiệu Cửa hàng",
     "about_shop_desc": "{name} đã tham gia ReTrade từ năm {year}, cung cấp các sản phẩm đã qua sử dụng chất lượng.",
     "shop_snapshot": "Tổng quan Cửa hàng",
@@ -1243,30 +1267,32 @@
   "reports": {
     "history_title": "Lịch sử báo cáo vi phạm",
     "report_button": "Báo cáo vi phạm",
+    "report_title": "Báo cáo đánh giá vi phạm",
     "target_user": "Người dùng",
     "target_product": "Sản phẩm",
     "target_auction": "Phiên đấu giá",
     "reason": "Lý do báo cáo",
+    "reason_label": "Lý do báo cáo",
+    "desc_label": "Mô tả chi tiết (Tùy chọn)",
     "description": "Chi tiết phản ánh",
+    "desc_placeholder": "Mô tả chi tiết hành vi vi phạm...",
     "status_pending": "Đang chờ xử lý",
     "status_reviewed": "Đã xem xét",
     "status_resolved": "Đã xử lý",
     "status_rejected": "Đã từ chối",
     "submit_report": "Gửi báo cáo",
     "submit_btn": "Gửi báo cáo",
-    "report_success": "Đã gửi báo cáo thành công. Cảm ơn sự đóng góp của bạn!",
-    "reason_spam": "Nội dung rác hoặc quảng cáo",
-    "reason_prohibited": "Nội dung vi phạm tiêu chuẩn",
-    "reason_fraud": "Thông tin gian lận hoặc sai sự thật",
-    "reason_counterfeit": "Hàng giả hoặc vi phạm bản quyền",
-    "reason_harassment": "Quấy rối hoặc ngôn từ xúc phạm",
-    "reason_other": "Lý do khác",
-    "select_reason": "Vui lòng chọn lý do báo cáo.",
+    "report_success": "Báo cáo đánh giá đã được gửi thành công và đang chờ Admin kiểm tra, xử lý.",
+    "already_reported": "Báo cáo đánh giá này đã được ghi nhận và đang chờ Admin kiểm tra, xử lý.",
+    "select_reason": "Vui lòng chọn lý do báo cáo",
+    "reason_spam": "Spam hoặc quảng cáo không phù hợp",
+    "reason_prohibited": "Ngôn từ thô tục, lăng mạ hoặc xúc phạm",
+    "reason_fraud": "Thông tin sai sự thật hoặc gian lận",
+    "reason_counterfeit": "Nghi ngờ hàng giả / hàng nhái",
+    "reason_harassment": "Quấy rối hoặc tiết lộ thông tin cá nhân",
+    "reason_other": "Lý do vi phạm khác",
     "modal_title": "Báo cáo đánh giá vi phạm",
-    "modal_desc": "Báo cáo đánh giá này nếu bạn tin rằng nó vi phạm quy tắc cộng đồng.",
-    "reason_label": "Lý do báo cáo (*)",
-    "desc_label": "Mô tả chi tiết (Tùy chọn)",
-    "desc_placeholder": "Mô tả cụ thể nội dung vi phạm..."
+    "modal_desc": "Báo cáo đánh giá này nếu bạn tin rằng nó vi phạm quy tắc cộng đồng."
   },
 
   "address": {
@@ -1557,19 +1583,9 @@
     "success_msg": "Cập nhật mật khẩu mới thành công!",
     "failed_msg": "Không thể đổi mật khẩu."
   },
-  "seller": {
-    "reviews": "Kênh Người Bán",
-    "dashboard": "Kênh Người Bán",
-    "orders_management": "Quản lý đơn hàng",
-    "total_revenue": "Tổng doanh thu",
-    "reviews_received": "Đánh giá chất lượng sản phẩm & Người bán"
-  },
-
-
   "review_list": {
     "title": "Quản Lý Đánh Giá Từ Người Mua",
     "subtitle": "Quản lý và xem tất cả phản hồi, đánh giá từ người mua đối với sản phẩm của bạn.",
-
     "total_reviews": "Tổng số đánh giá",
     "average_rating": "Đánh giá trung bình",
     "reported_reviews": "Đánh giá đã báo cáo",
@@ -1581,21 +1597,16 @@
     "status_reported": "Đã báo cáo",
     "status_unreported": "Chưa báo cáo",
     "no_reviews_title": "Chưa có đánh giá nào",
-    "no_reviews_desc": "Hiện chưa có đánh giá nào từ người mua phù hợp với bộ lọc tìm kiếm của bạn."
-  },
-  "product": {
-    "reviews": "Nội dung đánh giá",
-    "write_review": "Viết đánh giá sản phẩm",
-    "review_placeholder": "Hãy chia sẻ cảm nhận của bạn về chất lượng sản phẩm và dịch vụ của người bán...",
-    "attach_photos": "Hình ảnh minh họa (Tối đa 5 ảnh)",
-    "sort_newest": "Mới nhất",
-    "sort_oldest": "Cũ nhất",
-    "sort_price_desc": "Giá giảm dần",
-    "sort_price_asc": "Giá tăng dần"
+    "no_reviews_desc": "Hiện chưa có đánh giá nào từ người mua phù hợp với bộ lọc tìm kiếm của bạn.",
+    "status_violated_removed": "Đã vi phạm (Gỡ)",
+    "status_processing": "Đang xử lý",
+    "removed_tag": "ĐÃ GỠ",
+    "report_approved_notice": "Báo cáo vi phạm đã được Admin phê duyệt",
+    "status_report_rejected": "Báo cáo bị từ chối",
+    "report_rejected_notice": "Báo cáo vi phạm đã bị Admin từ chối",
+    "violation_modal_title": "Đánh giá vi phạm - Báo cáo đã được phê duyệt",
+    "violation_modal_desc": "Đánh giá này đã bị Admin phê duyệt báo cáo vi phạm và gỡ khỏi danh sách hiển thị công khai."
   }
 }
-
-
-
 
 

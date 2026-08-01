@@ -8,6 +8,13 @@ import './AssistantChatWidget.css';
 
 const SESSION_KEY = 'retrade_assistant_session_id';
 
+const isProductUnavailable = (product) => (
+  product?.status === 'SoldOut' ||
+  product?.status === 'Sold' ||
+  product?.status === 'Inactive' ||
+  Number(product?.stockQuantity ?? 0) <= 0
+);
+
 function formatTextNode(text) {
   if (!text) return null;
   const lines = text.split('\n');
@@ -95,7 +102,7 @@ export default function AssistantChatWidget() {
   
   const bottomRef = useRef(null);
   const navigate = useNavigate();
-  const toast = useToast();
+  const { showToast } = useToast();
 
   const QUICK_SUGGESTIONS = language === 'vi' ? [
     { label: t('history.purchase_title'), query: 'Kiểm tra lịch sử mua hàng của tôi trên ReTrade' },
@@ -141,9 +148,11 @@ export default function AssistantChatWidget() {
     }
   }, [messages.length, open, sending]);
 
-  const handleToggleWishlist = async (e, productId) => {
+  const handleToggleWishlist = async (e, product) => {
     e.preventDefault();
     e.stopPropagation();
+    const productId = product?.productId;
+    if (!productId) return;
     try {
       if (wishlistSet.has(productId)) {
         setWishlistSet((prev) => {
@@ -151,21 +160,29 @@ export default function AssistantChatWidget() {
           next.delete(productId);
           return next;
         });
-        toast?.info?.(t('product.remove_from_wishlist'));
+        showToast(t('product.remove_from_wishlist'), 'info');
       } else {
+        if (isProductUnavailable(product)) {
+          showToast(t('product.out_of_stock'), 'warning');
+          return;
+        }
         await wishlistService.addToWishlist(productId);
         setWishlistSet((prev) => new Set(prev).add(productId));
-        toast?.success?.(t('product.add_to_wishlist'));
+        showToast(t('product.add_to_wishlist'), 'success');
       }
     } catch {
-      toast?.error?.(t('auth.login_title'));
+      showToast(t('auth.login_title'), 'error');
     }
   };
 
-  const handleBuyNow = (e, productId) => {
+  const handleBuyNow = (e, product) => {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/checkout/${productId}`);
+    if (isProductUnavailable(product)) {
+      showToast(t('product.out_of_stock'), 'warning');
+      return;
+    }
+    navigate(`/checkout/${product.productId}`);
   };
 
   const sendQuery = async (textToSend) => {
@@ -280,8 +297,10 @@ export default function AssistantChatWidget() {
                         <span className="material-symbols-outlined">shopping_bag</span>
                         {t('product.related_products')}
                       </div>
-                      {message.products.slice(0, 5).map((product) => (
-                        <div key={product.productId} className="assistant-widget-product-card-container">
+                      {message.products.slice(0, 5).map((product) => {
+                        const outOfStock = isProductUnavailable(product);
+                        return (
+                        <div key={product.productId} className={`assistant-widget-product-card-container ${outOfStock ? 'out-of-stock' : ''}`}>
                           <Link to={`/product/${product.productId}`} className="assistant-widget-product-card">
                             <div className="assistant-widget-product-img">
                               {product.mainImageUrl ? (
@@ -296,7 +315,7 @@ export default function AssistantChatWidget() {
                               <span className="product-title">{product.name || 'ReTrade Product'}</span>
                               <span className="product-price">{formatCurrency(product.price)}</span>
                               <small style={{ color: '#059669', fontWeight: 600, fontSize: '11px', marginTop: '2px' }}>
-                                {t('common.view_detail')} &rarr;
+                                {outOfStock ? t('product.out_of_stock') : `${t('common.view_detail')} →`}
                               </small>
                             </div>
                           </Link>
@@ -304,8 +323,9 @@ export default function AssistantChatWidget() {
                             <button
                               type="button"
                               className={`assistant-widget-action-icon wishlist-btn ${wishlistSet.has(product.productId) ? 'active' : ''}`}
-                              title={wishlistSet.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
-                              onClick={(e) => handleToggleWishlist(e, product.productId)}
+                              title={outOfStock && !wishlistSet.has(product.productId) ? t('product.out_of_stock') : wishlistSet.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
+                              onClick={(e) => handleToggleWishlist(e, product)}
+                              disabled={outOfStock && !wishlistSet.has(product.productId)}
                             >
                               <span className="material-symbols-outlined">
                                 {wishlistSet.has(product.productId) ? 'favorite' : 'favorite_border'}
@@ -314,14 +334,16 @@ export default function AssistantChatWidget() {
                             <button
                               type="button"
                               className="assistant-widget-action-icon buy-btn"
-                              title={t('product.buy_now')}
-                              onClick={(e) => handleBuyNow(e, product.productId)}
+                              title={outOfStock ? t('product.out_of_stock') : t('product.buy_now')}
+                              onClick={(e) => handleBuyNow(e, product)}
+                              disabled={outOfStock}
                             >
                               <span className="material-symbols-outlined">bolt</span>
                             </button>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

@@ -5,6 +5,7 @@ import { useLanguage } from '../../../context/LanguageContext';
 import productService from '../../../services/productService';
 import addressService from '../../../services/addressService';
 import AddressPopup from '../../../components/AddressPopup/AddressPopup';
+import SellerPagination from '../../../components/SellerPagination/SellerPagination';
 import { formatDateGmt7 } from '../../../utils/dateTime';
 import { createNotificationHubConnection } from '../../../services/notificationRealtimeService';
 
@@ -26,8 +27,10 @@ export default function MyProducts() {
   const [sellerStatus, setSellerStatus] = useState('');
   const [sellerSort, setSellerSort] = useState('newest');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
-  const [isAddressPopupOpen, setIsAddressPopupOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 5;
 
   // Detail Modal States
   const [detailModalProduct, setDetailModalProduct] = useState(null);
@@ -53,26 +56,32 @@ export default function MyProducts() {
     }
   };
 
-  const fetchMyProducts = useCallback(async () => {
+  const [isAddressPopupOpen, setIsAddressPopupOpen] = useState(false);
+
+  const fetchMyProducts = useCallback(async (page = currentPage) => {
     if (!user?.userId) return;
     try {
       setProductsLoading(true);
-      const params = { 
+      const params = {
         sellerId: user.userId,
         SortBy: sellerSort,
-        PageSize: 50
+        PageSize: PAGE_SIZE,
+        Page: page,
       };
       if (sellerSearch.trim()) params.SearchTerm = sellerSearch.trim();
       if (sellerStatus) params.Status = sellerStatus;
 
       const res = await productService.getAll(params);
       setMyProducts(res?.items || []);
+      setTotalCount(res?.totalCount ?? res?.totalItems ?? 0);
+      const pages = res?.totalPages ?? (res?.totalCount ? Math.ceil(res.totalCount / PAGE_SIZE) : 1);
+      setTotalPages(Math.max(1, pages));
     } catch {
       showToast(t('my_products.fetch_error'), 'error');
     } finally {
       setProductsLoading(false);
     }
-  }, [user, sellerSort, sellerSearch, sellerStatus, showToast, t]);
+  }, [user, sellerSort, sellerSearch, sellerStatus, currentPage, showToast, t]);
 
   useEffect(() => {
     let disposed = false;
@@ -103,7 +112,24 @@ export default function MyProducts() {
 
   const handleSellerSearchSubmit = (e) => {
     e.preventDefault();
-    fetchMyProducts();
+    setCurrentPage(1);
+    fetchMyProducts(1);
+  };
+
+  const handleStatusChange = (e) => {
+    setSellerStatus(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleSortChange = (e) => {
+    setSellerSort(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    fetchMyProducts(page);
   };
 
   const handleDeleteProduct = async (productId) => {
@@ -187,7 +213,7 @@ export default function MyProducts() {
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <select 
                 value={sellerStatus} 
-                onChange={(e) => setSellerStatus(e.target.value)}
+                onChange={handleStatusChange}
                 style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
               >
                 <option value="">{t('common.all')}</option>
@@ -203,7 +229,7 @@ export default function MyProducts() {
 
               <select 
                 value={sellerSort} 
-                onChange={(e) => setSellerSort(e.target.value)}
+                onChange={handleSortChange}
                 style={{ padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', background: 'var(--bg-primary)', cursor: 'pointer' }}
               >
                 <option value="newest">{t('product.sort_newest')}</option>
@@ -304,6 +330,15 @@ export default function MyProducts() {
               </table>
             )}
           </div>
+
+          <SellerPagination
+            page={currentPage}
+            totalPages={totalPages}
+            pageSize={PAGE_SIZE}
+            totalItems={totalCount}
+            disabled={productsLoading}
+            onPageChange={goToPage}
+          />
         </section>
       </div>
 
@@ -418,7 +453,7 @@ export default function MyProducts() {
 
                   {Array.isArray(detailModalProduct.attributes) && detailModalProduct.attributes.length > 0 && (
                     <div className="seller-detail-attributes">
-                      <h3>{t('product.title')}</h3>
+                      <h3>{t('product.specifications')}</h3>
                       <ul>
                         {detailModalProduct.attributes.map((attr, idx) => (
                           <li key={idx}>

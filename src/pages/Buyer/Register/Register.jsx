@@ -9,6 +9,8 @@ import VerifyModal from '../../../components/VerifyModal/VerifyModal';
 import TermsModal from '../../../components/TermsModal/TermsModal';
 import bgRegister from '../../../assets/background-register.png';
 
+const SPECIAL_CHAR_REGEX = /[!@#$%^&*(),.?":{}|<>_\-]/;
+
 export default function Register() {
   const { user, register, googleLogin } = useAuth();
   const { showToast } = useToast();
@@ -78,7 +80,13 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.username.trim() || !formData.email.trim() || !formData.password.trim() || !formData.confirmPassword.trim()) {
+    const trimmedUsername = formData.username.trim();
+    const trimmedEmail = formData.email.trim();
+    const trimmedFirstName = formData.firstName.trim();
+    const trimmedLastName = formData.lastName.trim();
+    const password = formData.password;
+
+    if (!trimmedUsername || !trimmedEmail || !password.trim() || !formData.confirmPassword.trim()) {
       showToast(t('validation.required'), 'error');
       return;
     }
@@ -88,9 +96,24 @@ export default function Register() {
       return;
     }
 
-    const password = formData.password;
-    if (password.length < 6) {
-      showToast(t('validation.password_min'), 'error');
+    if (password.length < 8 || password.length > 50) {
+      showToast(language === 'vi' ? 'Mật khẩu phải dài từ 8 đến 50 ký tự.' : 'Password must be 8 to 50 characters long.', 'error');
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 chữ cái viết hoa.' : 'Password must contain at least 1 uppercase letter.', 'error');
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 chữ cái viết thường.' : 'Password must contain at least 1 lowercase letter.', 'error');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 chữ số.' : 'Password must contain at least 1 number.', 'error');
+      return;
+    }
+    if (!SPECIAL_CHAR_REGEX.test(password)) {
+      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt.' : 'Password must contain at least 1 special character.', 'error');
       return;
     }
     if (password !== formData.confirmPassword) {
@@ -101,17 +124,17 @@ export default function Register() {
     setLoading(true);
     try {
       const result = await register({
-        username: formData.username,
-        email: formData.email,
+        username: trimmedUsername,
+        email: trimmedEmail,
         password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
         roleId: Number(formData.roleId),
       });
 
       if (result.success) {
         showToast(t('toast.register_success'), 'success');
-        setRegisteredEmail(formData.email);
+        setRegisteredEmail(trimmedEmail);
         setShowVerifyModal(true);
       } else {
         showToast(result.error || t('common.error_occurred'), 'error');

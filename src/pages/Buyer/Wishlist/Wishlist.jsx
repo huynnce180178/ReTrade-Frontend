@@ -6,6 +6,13 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/Wishlist.css';
 
+const isWishlistItemUnavailable = (item) => (
+  item?.status === 'SoldOut' ||
+  item?.status === 'Sold' ||
+  item?.status === 'Inactive' ||
+  (item?.stockQuantity != null && Number(item.stockQuantity) <= 0)
+);
+
 export default function Wishlist() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -61,7 +68,7 @@ export default function Wishlist() {
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       const activeItemIds = wishlist?.items
-        ?.filter(i => i.status !== 'SoldOut' && i.status !== 'Inactive')
+        ?.filter(i => !isWishlistItemUnavailable(i))
         ?.map(i => i.wishlistItemId) || [];
       setSelectedItems(new Set(activeItemIds));
     } else {
@@ -124,7 +131,7 @@ export default function Wishlist() {
   }
 
   const items = wishlist?.items ?? [];
-  const selectableItems = items.filter(i => i.status !== 'SoldOut' && i.status !== 'Inactive');
+  const selectableItems = items.filter(i => !isWishlistItemUnavailable(i));
   const isAllSelected = selectableItems.length > 0 && selectedItems.size === selectableItems.length;
 
   const selectedProducts = items.filter(i => selectedItems.has(i.wishlistItemId));
@@ -189,7 +196,7 @@ export default function Wishlist() {
 
                   <div className="wl-items-stack">
                     {groupItems.map(item => {
-                      const isSoldOut = item.status === 'SoldOut' || item.status === 'Inactive';
+                      const isSoldOut = isWishlistItemUnavailable(item);
                       const isChecked = selectedItems.has(item.wishlistItemId);
 
                       return (
@@ -295,7 +302,7 @@ export default function Wishlist() {
                     disabled={selectedItems.size !== 1}
                     onClick={() => {
                       const firstSelected = items.find(i => selectedItems.has(i.wishlistItemId));
-                      if (firstSelected) {
+                      if (firstSelected && !isWishlistItemUnavailable(firstSelected)) {
                         navigate(`/checkout/${firstSelected.productId}`, { state: { product: firstSelected } });
                       }
                     }}

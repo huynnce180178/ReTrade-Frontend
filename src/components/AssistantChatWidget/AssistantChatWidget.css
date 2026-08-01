@@ -299,6 +299,16 @@
   transform: translateY(-1px);
 }
 
+.assistant-widget-product-card-container.out-of-stock {
+  opacity: 0.65;
+  filter: grayscale(0.75);
+}
+
+.assistant-widget-product-card-container.out-of-stock:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .assistant-widget-product-card {
   display: flex;
   align-items: center;
@@ -334,6 +344,19 @@
 
 .assistant-widget-action-icon:hover {
   transform: scale(1.1);
+}
+
+.assistant-widget-action-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.assistant-widget-action-icon:disabled:hover {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: var(--at-border);
+  transform: none;
 }
 
 .assistant-widget-action-icon.wishlist-btn:hover,

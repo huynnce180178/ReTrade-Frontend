@@ -287,6 +287,16 @@
   color: #10251f;
 }
 
+.pd-meta-tag.out-of-stock {
+  background: #fff1f2;
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.pd-meta-tag.out-of-stock .meta-icon,
+.pd-meta-tag.out-of-stock .meta-val {
+  color: #dc2626;
+}
+
 /* Seller info */
 .pd-seller-card {
   display: flex;
@@ -386,6 +396,21 @@
   background: #0f7b5f !important;
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(15, 123, 95, 0.15);
+}
+
+.pd-btn-buy:disabled,
+.pd-btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.pd-btn-buy:disabled:hover,
+.pd-btn-icon:disabled:hover {
+  background: #d1d5db !important;
+  border-color: #d1d5db !important;
+  color: #4b5563 !important;
 }
 
 .pd-btn-buy:active {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import './ReportModal.css';
 
@@ -26,7 +27,7 @@ export default function ReportModal({ isOpen, title, targetLabel, submitting, on
     if (reason) onSubmit?.({ reason, description: description.trim() || null });
   };
 
-  return (
+  return createPortal(
     <div className="report-modal-overlay" onMouseDown={onClose}>
       <form className="report-modal-card" onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
         <header>
@@ -54,6 +55,7 @@ export default function ReportModal({ isOpen, title, targetLabel, submitting, on
           <button className="report-btn primary" disabled={!reason || submitting}>{submitting ? t('common.submitting') : t('common.submit')}</button>
         </footer>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }

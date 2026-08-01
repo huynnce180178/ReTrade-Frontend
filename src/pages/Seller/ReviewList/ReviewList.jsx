@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { Link, useOutletContext } from 'react-router-dom';
 import reviewService from '../../../services/reviewService';
 import reportService from '../../../services/reportService';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import SellerPagination from '../../../components/SellerPagination/SellerPagination';
 import './ReviewList.css';
 
 const PAGE_SIZE = 8;
@@ -18,29 +20,13 @@ function formatDate(dateStr) {
   });
 }
 
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 5) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  if (currentPage <= 3) {
-    return [1, 2, 3, 4, 'end-ellipsis', totalPages];
-  }
-
-  if (currentPage >= totalPages - 2) {
-    return [1, 'start-ellipsis', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-  }
-
-  return [1, 'start-ellipsis', currentPage - 1, currentPage, currentPage + 1, 'end-ellipsis', totalPages];
-}
-
 function StarRating({ value = 0, compact = false }) {
   const rating = Number(value || 0);
 
   return (
     <div className={`seller-review-stars ${compact ? 'compact' : ''}`} aria-label={`${rating} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <span key={star} className={`material-symbols-outlined ${star <= rating ? 'filled' : ''}`}>
+        <span key={star} className={`material-symbols-outlined ${star <= rating ? 'filled' : 'empty'}`}>
           star
         </span>
       ))}
@@ -95,14 +81,20 @@ export default function ReviewList() {
 
   const [previewReview, setPreviewReview] = useState(null);
 
-  const reportReasons = useMemo(() => [
-    t('reports.reason_spam'),
-    t('reports.reason_prohibited'),
-    t('reports.reason_fraud'),
-    t('reports.reason_counterfeit'),
-    t('reports.reason_harassment'),
-    t('reports.reason_other'),
-  ], [t]);
+  const reportReasons = useMemo(() => {
+    const getLabel = (key, fallback) => {
+      const val = t(key);
+      return (!val || val === key) ? fallback : val;
+    };
+    return [
+      getLabel('reports.reason_spam', 'Spam hoặc quảng cáo không phù hợp'),
+      getLabel('reports.reason_prohibited', 'Ngôn từ thô tục, lăng mạ hoặc xúc phạm'),
+      getLabel('reports.reason_fraud', 'Thông tin sai sự thật hoặc gian lận'),
+      getLabel('reports.reason_counterfeit', 'Nghi ngờ hàng giả / hàng nhái'),
+      getLabel('reports.reason_harassment', 'Quấy rối hoặc tiết lộ thông tin cá nhân'),
+      getLabel('reports.reason_other', 'Lý do vi phạm khác'),
+    ];
+  }, [t]);
 
   const ratingFilterOptions = useMemo(() => [
     { value: '', label: t('common.all') },
@@ -140,13 +132,66 @@ export default function ReviewList() {
 
     try {
       setSummaryLoading(true);
-      const data = await reviewService.getSellerSummary(user.userId);
-      setSummary({
-        totalReviews: Number(data?.totalReviews || 0),
-        averageRating: Number(data?.averageRating || 0),
-        reportedReviews: Number(data?.reportedReviews || 0),
-        ratingStats: data?.ratingStats || {},
-      });
+      let allReviews = [];
+      try {
+        const res = await reviewService.getSellerReviews(user.userId, { pageSize: 1000 });
+        allReviews = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+      } catch {
+        const res = await reviewService.getPublicSellerReviews(user.userId, { pageSize: 1000 });
+        allReviews = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+      }
+
+      if (allReviews.length > 0) {
+        const activeReviews = allReviews.filter((r) => {
+          const normStatus = (r?.latestReportStatus || '').toLowerCase();
+          const isRemoved = Boolean(
+            r?.isReportApproved ||
+            r?.IsReportApproved ||
+            r?.isRemoved ||
+            r?.IsRemoved ||
+            ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(normStatus) ||
+            ['hidden', 'removed', 'deleted'].includes(r?.status?.toLowerCase())
+          );
+          return !isRemoved;
+        });
+
+        const reportedCount = allReviews.filter((r) => {
+          const normStatus = (r?.latestReportStatus || '').toLowerCase();
+          return Boolean(
+            r?.reportCount > 0 ||
+            r?.reportedByCurrentUser ||
+            r?.latestReportReason ||
+            ['accepted', 'approved', 'resolved', 'pending', 'acceptedreview'].includes(normStatus)
+          );
+        }).length;
+
+        const totalActive = activeReviews.length;
+        const sumRating = activeReviews.reduce((sum, r) => sum + Number(r.rating || 0), 0);
+        const avgRating = totalActive > 0 ? sumRating / totalActive : 0;
+
+        const stats = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        activeReviews.forEach((r) => {
+          const star = Math.round(Number(r.rating || 0));
+          if (stats[star] !== undefined) {
+            stats[star] += 1;
+          }
+        });
+
+        setSummary({
+          totalReviews: totalActive,
+          averageRating: avgRating,
+          reportedReviews: reportedCount,
+          ratingStats: stats,
+        });
+      } else {
+        const data = await reviewService.getSellerSummary(user.userId);
+        setSummary({
+          totalReviews: Number(data?.totalReviews || 0),
+          averageRating: Number(data?.averageRating || 0),
+          reportedReviews: Number(data?.reportedReviews || 0),
+          ratingStats: data?.ratingStats || {},
+        });
+      }
     } catch {
       // Quiet fail
     } finally {
@@ -214,11 +259,15 @@ export default function ReviewList() {
     setReportDescription('');
   };
 
-  const closeReportModal = () => {
-    if (reportSubmitting) return;
+  const forceCloseReportModal = () => {
     setReportingReview(null);
     setReportReason('');
     setReportDescription('');
+  };
+
+  const closeReportModal = () => {
+    if (reportSubmitting) return;
+    forceCloseReportModal();
   };
 
   const handleReportSubmit = async (event) => {
@@ -230,20 +279,28 @@ export default function ReviewList() {
 
     try {
       setReportSubmitting(true);
-      await reportService.create({
-        targetId: reportingReview.reviewId,
-        targetType: 'Review',
-        reportType: 'ReviewViolation',
+      await reportService.reportReview(reportingReview.reviewId, {
         reason: reportReason.trim(),
         description: reportDescription.trim() || reportReason.trim(),
       });
 
       showToast(t('reports.report_success'), 'success');
-      closeReportModal();
+      forceCloseReportModal();
       fetchSummary();
       fetchReviews();
     } catch (error) {
-      showToast(error?.response?.data || t('common.error_occurred'), 'error');
+      const rawMsg = String(error?.response?.data?.message || error?.response?.data || error?.message || '');
+      const isAlreadyHandled = rawMsg.toLowerCase().includes('already') || rawMsg.toLowerCase().includes('hidden');
+      
+      const toastType = isAlreadyHandled ? 'info' : 'error';
+      const displayMsg = isAlreadyHandled 
+        ? t('reports.already_reported')
+        : (rawMsg || t('common.error_occurred'));
+
+      showToast(displayMsg, toastType);
+      forceCloseReportModal();
+      fetchSummary();
+      fetchReviews();
     } finally {
       setReportSubmitting(false);
     }
@@ -252,7 +309,6 @@ export default function ReviewList() {
   const openPreviewModal = (review) => setPreviewReview(review);
   const closePreviewModal = () => setPreviewReview(null);
 
-  const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
   const firstItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const lastItem = Math.min(page * PAGE_SIZE, totalItems);
 
@@ -472,157 +528,165 @@ export default function ReviewList() {
           </div>
         ) : (
           <div className="seller-review-list">
-            {reviews.map((review) => (
-              <article className="seller-review-card" key={review.reviewId}>
-                <div className="seller-review-card-header">
-                  <div className="seller-review-buyer-info">
-                    <div className="seller-review-buyer-avatar">
-                      {review.reviewerAvatarUrl ? (
-                        <img src={review.reviewerAvatarUrl} alt={review.reviewerName || t('common.unknown_buyer')} loading="lazy" />
-                      ) : (
-                        getBuyerInitials(review.reviewerName)
+            {reviews.map((review) => {
+              const normStatus = (review.latestReportStatus || '').toLowerCase();
+              const isApprovedReport = Boolean(
+                review.isReportApproved ||
+                review.IsReportApproved ||
+                ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(normStatus)
+              );
+              const isRejectedReport = Boolean(
+                review.isReportRejected ||
+                review.IsReportRejected ||
+                ['rejected', 'declined', 'dismissed', 'refused'].includes(normStatus)
+              );
+              const isPendingReport = review.reportCount > 0 && !isApprovedReport && !isRejectedReport;
+
+              return (
+                <article className={`seller-review-card ${isApprovedReport ? 'report-approved' : ''}`} key={review.reviewId}>
+                  <div className="seller-review-card-header">
+                    <div className="seller-review-buyer-info">
+                      <div className="seller-review-buyer-avatar">
+                        {review.reviewerAvatarUrl ? (
+                          <img src={review.reviewerAvatarUrl} alt={review.reviewerName || t('common.unknown_buyer')} loading="lazy" />
+                        ) : (
+                          getBuyerInitials(review.reviewerName)
+                        )}
+                      </div>
+                      <div className="seller-review-buyer-details">
+                        <div className="buyer-name-row">
+                          <strong>{review.reviewerName || t('common.unknown_buyer')}</strong>
+                          <span className="buyer-tag">{t('order_management.th_buyer')}</span>
+                        </div>
+                        <div className="buyer-sub-row">
+                          {review.reviewerEmail && <small className="buyer-email">{review.reviewerEmail}</small>}
+                          <span className="review-date">
+                            <span className="material-symbols-outlined">calendar_today</span>
+                            {formatDate(review.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="seller-review-card-header-right">
+                      {isApprovedReport ? (
+                        <div className="seller-review-report-badge danger">
+                          <span className="material-symbols-outlined">block</span>
+                          {t('review_list.status_violated_removed')}
+                        </div>
+                      ) : isRejectedReport ? (
+                        <div className="seller-review-report-badge rejected">
+                          <span className="material-symbols-outlined">cancel</span>
+                          {t('review_list.status_report_rejected')}
+                        </div>
+                      ) : isPendingReport ? (
+                        <div className="seller-review-report-badge pending">
+                          <span className="material-symbols-outlined">schedule</span>
+                          {t('review_list.status_processing')} ({review.reportCount})
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        className="card-top-icon-btn preview"
+                        title={t('common.view_detail')}
+                        onClick={() => openPreviewModal(review)}
+                      >
+                        <span className="material-symbols-outlined">visibility</span>
+                      </button>
+
+                      {!isApprovedReport && (
+                        <button
+                          type="button"
+                          className={`card-top-icon-btn report ${review.reportedByCurrentUser ? 'reported' : ''}`}
+                          title={review.reportedByCurrentUser ? t('reports.report_success') : t('reports.report_button')}
+                          onClick={() => openReportModal(review)}
+                        >
+                          <span className="material-symbols-outlined">flag</span>
+                        </button>
                       )}
                     </div>
-                    <div className="seller-review-buyer-details">
-                      <div className="buyer-name-row">
-                        <strong>{review.reviewerName || t('common.unknown_buyer')}</strong>
-                        <span className="buyer-tag">{t('order_management.th_buyer')}</span>
-                      </div>
-                      <div className="buyer-sub-row">
-                        {review.reviewerEmail && <small className="buyer-email">{review.reviewerEmail}</small>}
-                        <span className="review-date">
-                          <span className="material-symbols-outlined">calendar_today</span>
-                          {formatDate(review.createdAt)}
-                        </span>
-                      </div>
+                  </div>
+
+                  <div className="seller-review-card-body">
+                    <div className="seller-review-rating-block">
+                      <StarRating value={review.rating} />
+                      <span className="rating-score-pill">{review.rating?.toFixed(1)} / 5.0</span>
                     </div>
-                  </div>
 
-                  <div className="seller-review-card-badges">
-                    <div className={`seller-review-report-badge ${review.reportCount ? 'reported' : ''}`}>
-                      <span className="material-symbols-outlined">flag</span>
-                      {review.reportCount ? `${review.reportCount} ${t('reports.report_button')}` : t('review_list.status_unreported')}
-                    </div>
-                  </div>
-                </div>
+                    {review.comment && (
+                      <blockquote className="seller-review-comment">
+                        &quot;{review.comment}&quot;
+                      </blockquote>
+                    )}
 
-                <div className="seller-review-card-body">
-                  <div className="seller-review-rating-block">
-                    <StarRating value={review.rating} />
-                    <span className="rating-score-pill">{review.rating?.toFixed(1)} / 5.0</span>
-                  </div>
-
-                  {review.comment && (
-                    <blockquote className="seller-review-comment">
-                      &quot;{review.comment}&quot;
-                    </blockquote>
-                  )}
-
-                  <div className="seller-review-product-box">
-                    <button
-                      type="button"
-                      className="seller-review-product-media"
-                      onClick={() => openPreviewModal(review)}
-                      aria-label={`Preview ${review.productName || ''}`}
-                    >
-                      {review.productImageUrl ? (
-                        <img src={review.productImageUrl} alt={review.productName || t('common.reviewed_product')} loading="lazy" />
-                      ) : (
-                        <span className="material-symbols-outlined">inventory_2</span>
-                      )}
-                    </button>
-                    <div className="product-box-info">
-                      <span className="product-label">{t('my_products.th_product')}</span>
-                      <Link to={review.productId ? `/product/${review.productId}` : '#'} className="product-title">
-                        {review.productName || t('nav.product')}
-                      </Link>
-                      <div className="product-order-meta">
-                        {review.orderCode && (
-                          <span className="order-code-chip">
-                            <span className="material-symbols-outlined">receipt_long</span>
-                            {review.orderCode}
+                    <div className="seller-review-product-box">
+                      <button
+                        type="button"
+                        className={`seller-review-product-media ${isApprovedReport ? 'blurred-media' : ''}`}
+                        onClick={() => openPreviewModal(review)}
+                        aria-label={`Preview ${review.productName || ''}`}
+                      >
+                        {review.productImageUrl ? (
+                          <img src={review.productImageUrl} alt={review.productName || t('common.reviewed_product')} loading="lazy" />
+                        ) : (
+                          <span className="material-symbols-outlined">inventory_2</span>
+                        )}
+                        {isApprovedReport && (
+                          <span className="media-removed-overlay">
+                            {t('review_list.removed_tag')}
                           </span>
                         )}
-                        <small className="product-id">{review.productId || ''}</small>
+                      </button>
+                      <div className="product-box-info">
+                        <span className="product-label">{t('my_products.th_product')}</span>
+                        <Link to={review.productId ? `/product/${review.productId}` : '#'} className="product-title">
+                          {review.productName || t('nav.product')}
+                        </Link>
+                        <div className="product-order-meta">
+                          {review.orderCode && (
+                            <span className="order-code-chip">
+                              <span className="material-symbols-outlined">receipt_long</span>
+                              {review.orderCode}
+                            </span>
+                          )}
+                          <small className="product-id">{review.productId || ''}</small>
+                        </div>
                       </div>
                     </div>
+
+                    {review.reportedByCurrentUser && (
+                      <div className={`seller-review-current-report ${isApprovedReport ? 'approved' : isRejectedReport ? 'rejected' : ''}`}>
+                        <span className="material-symbols-outlined">{isApprovedReport ? 'check_circle' : isRejectedReport ? 'cancel' : 'task_alt'}</span>
+                        <p>
+                          {isApprovedReport
+                            ? t('review_list.report_approved_notice')
+                            : isRejectedReport
+                            ? t('review_list.report_rejected_notice')
+                            : t('reports.report_success')}:{' '}
+                          <strong>{review.currentUserReport?.reason || review.latestReportReason || t('reports.report_button')}</strong>.
+                        </p>
+                      </div>
+                    )}
                   </div>
-
-                  {review.reportedByCurrentUser && (
-                    <div className="seller-review-current-report">
-                      <span className="material-symbols-outlined">task_alt</span>
-                      <p>
-                        {t('reports.report_success')}:{' '}
-                        <strong>{review.currentUserReport?.reason || review.latestReportReason || t('reports.report_button')}</strong>.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="seller-review-card-actions">
-                  <button
-                    type="button"
-                    className="seller-review-preview-btn"
-                    onClick={() => openPreviewModal(review)}
-                  >
-                    <span className="material-symbols-outlined">visibility</span>
-                    {t('common.view_detail')}
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`seller-review-report-btn ${review.reportedByCurrentUser ? 'reported' : ''}`}
-                    onClick={() => openReportModal(review)}
-                  >
-                    <span className="material-symbols-outlined">flag</span>
-                    {review.reportedByCurrentUser ? t('reports.report_success') : t('reports.report_button')}
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
 
-        {totalPages > 1 ? (
-          <div className="seller-review-pagination">
-            <button
-              type="button"
-              disabled={page === 1}
-              onClick={() => setPage((curr) => Math.max(1, curr - 1))}
-            >
-              <span className="material-symbols-outlined">chevron_left</span>
-              {t('common.previous')}
-            </button>
-            {paginationItems.map((item, index) => {
-              if (typeof item === 'string') {
-                return <span key={`${item}-${index}`} className="seller-review-pagination-ellipsis">...</span>;
-              }
-
-              return (
-                <button
-                  type="button"
-                  key={item}
-                  className={page === item ? 'active' : ''}
-                  onClick={() => setPage(item)}
-                >
-                  {item}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              disabled={page === totalPages}
-              onClick={() => setPage((curr) => Math.min(totalPages, curr + 1))}
-            >
-              {t('common.next')}
-              <span className="material-symbols-outlined">chevron_right</span>
-            </button>
-          </div>
-        ) : null}
+        <SellerPagination
+          page={page}
+          totalPages={totalPages}
+          pageSize={PAGE_SIZE}
+          totalItems={totalItems}
+          disabled={loading}
+          onPageChange={setPage}
+        />
       </section>
 
       {/* Report Modal */}
-      {reportingReview ? (
+      {reportingReview ? createPortal(
         <div className="seller-review-modal-backdrop animate-fade-in" onClick={closeReportModal}>
           <div className="seller-review-modal-card" onClick={(event) => event.stopPropagation()}>
             <header className="seller-review-modal-head">
@@ -674,34 +738,120 @@ export default function ReviewList() {
               </footer>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
 
-      {/* Preview Modal */}
-      {previewReview ? (
-        <div className="seller-review-modal-backdrop animate-fade-in" onClick={closePreviewModal}>
-          <div className="seller-review-modal-card preview-mode" onClick={(event) => event.stopPropagation()}>
-            <header className="seller-review-modal-head">
-              <h3>{t('common.view_detail')}</h3>
-              <button type="button" onClick={closePreviewModal} aria-label="Close">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </header>
+      {/* Preview Detail Modal */}
+      {previewReview ? (() => {
+        const isApprovedReportModal = Boolean(
+          previewReview.isReportApproved ||
+          previewReview.IsReportApproved ||
+          ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(previewReview.latestReportStatus?.toLowerCase())
+        );
 
-            <div className="seller-review-modal-body">
-              {previewReview.productImageUrl ? (
-                <img className="seller-review-preview-img" src={previewReview.productImageUrl} alt={previewReview.productName || t('nav.product')} />
-              ) : null}
-              <strong>{previewReview.productName || t('nav.product')}</strong>
-              <StarRating value={previewReview.rating} />
-              <p>&quot;{previewReview.comment || t('common.no_data')}&quot;</p>
-              <footer className="seller-review-modal-actions">
-                <button type="button" className="primary" onClick={closePreviewModal}>{t('common.close')}</button>
-              </footer>
+        return createPortal(
+          <div className="seller-review-modal-backdrop animate-fade-in" onClick={closePreviewModal}>
+            <div className="seller-review-modal-card detail-modal" onClick={(event) => event.stopPropagation()}>
+              <header className="seller-review-modal-head">
+                <div className="modal-title-group">
+                  <span className="material-symbols-outlined">rate_review</span>
+                  <h3>{t('common.view_detail')}</h3>
+                </div>
+                <button type="button" onClick={closePreviewModal} aria-label="Close" className="modal-close-btn">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </header>
+
+              <div className="seller-review-modal-body detail-modal-body">
+                {isApprovedReportModal && (
+                  <div className="modal-alert-banner danger">
+                    <span className="material-symbols-outlined">block</span>
+                    <div>
+                      <strong>{t('review_list.violation_modal_title')}</strong>
+                      <p>{t('review_list.violation_modal_desc')}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="modal-buyer-section">
+                  <div className="modal-buyer-avatar">
+                    {previewReview.reviewerAvatarUrl ? (
+                      <img src={previewReview.reviewerAvatarUrl} alt={previewReview.reviewerName || t('common.unknown_buyer')} />
+                    ) : (
+                      getBuyerInitials(previewReview.reviewerName)
+                    )}
+                  </div>
+                  <div className="modal-buyer-info">
+                    <strong>{previewReview.reviewerName || t('common.unknown_buyer')}</strong>
+                    <small>{previewReview.reviewerEmail || ''}</small>
+                    <span className="modal-review-date">
+                      <span className="material-symbols-outlined">calendar_today</span>
+                      {formatDate(previewReview.createdAt)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="modal-rating-section">
+                  <StarRating value={previewReview.rating} />
+                  <span className="modal-rating-score">{previewReview.rating?.toFixed(1)} / 5.0</span>
+                </div>
+
+                <blockquote className="modal-comment-box">
+                  &quot;{previewReview.comment || t('common.no_data')}&quot;
+                </blockquote>
+
+                <div className="modal-product-card">
+                  <div className={`modal-product-image ${isApprovedReportModal ? 'blurred-media' : ''}`}>
+                    {previewReview.productImageUrl ? (
+                      <img src={previewReview.productImageUrl} alt={previewReview.productName || t('nav.product')} />
+                    ) : (
+                      <span className="material-symbols-outlined">inventory_2</span>
+                    )}
+                    {isApprovedReportModal && (
+                      <span className="media-removed-overlay">
+                        {t('review_list.removed_tag')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="modal-product-details">
+                    <span className="product-label">{t('my_products.th_product')}</span>
+                    <strong className="product-title">{previewReview.productName || t('nav.product')}</strong>
+                    {previewReview.orderCode && (
+                      <span className="order-code-chip">
+                        <span className="material-symbols-outlined">receipt_long</span>
+                        {t('seller.orders_management')}: {previewReview.orderCode}
+                      </span>
+                    )}
+                    <small className="product-id">ID: {previewReview.productId || previewReview.reviewId}</small>
+                  </div>
+                </div>
+
+                {previewReview.latestReportReason && (
+                  <div className="modal-report-history">
+                    <span className="material-symbols-outlined">flag</span>
+                    <div>
+                      <strong>{t('reports.reason')}:</strong> {previewReview.latestReportReason}
+                      {previewReview.latestReportStatus && (
+                        <span className={`report-status-tag ${previewReview.latestReportStatus.toLowerCase()}`}>
+                          {t('common.status')}: {previewReview.latestReportStatus}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <footer className="seller-review-modal-actions">
+                  <button type="button" className="secondary-btn" onClick={closePreviewModal}>
+                    {t('common.close')}
+                  </button>
+                </footer>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </div>,
+          document.body
+        );
+      })() : null}
     </div>
   );
 }
