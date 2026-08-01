@@ -270,8 +270,11 @@ export default function ReviewList() {
   return (
     <div className="seller-review-page animate-fade-in">
       <header className="seller-review-header">
-        <div>
-          <span>{t('seller.reviews')}</span>
+        <div className="seller-review-header-title">
+          <span className="seller-review-badge">
+            <span className="material-symbols-outlined">verified</span>
+            {t('seller.reviews')}
+          </span>
           <h1>{t('review_list.title')}</h1>
           <p>{t('review_list.subtitle')}</p>
         </div>
@@ -279,125 +282,200 @@ export default function ReviewList() {
 
       <section className="seller-review-summary-grid" aria-label="Review summary">
         <article className="seller-review-summary-card">
-          <span className="material-symbols-outlined">reviews</span>
-          <div>
+          <div className="summary-icon-wrapper primary">
+            <span className="material-symbols-outlined">rate_review</span>
+          </div>
+          <div className="summary-content">
             <p>{t('review_list.total_reviews')}</p>
-            <strong>{summaryLoading ? '-' : summary.totalReviews}</strong>
+            <strong>{summaryLoading ? '...' : summary.totalReviews}</strong>
           </div>
         </article>
-        <article className="seller-review-summary-card">
-          <span className="material-symbols-outlined">star</span>
-          <div>
+
+        <article className="seller-review-summary-card star-card">
+          <div className="summary-icon-wrapper rating">
+            <span className="material-symbols-outlined">star</span>
+          </div>
+          <div className="summary-content">
             <p>{t('review_list.average_rating')}</p>
-            <strong>{summaryLoading ? '-' : summary.averageRating.toFixed(1)}</strong>
+            <div className="summary-rating-num">
+              <strong>{summaryLoading ? '...' : summary.averageRating.toFixed(1)}</strong>
+              <small>/ 5.0</small>
+            </div>
           </div>
         </article>
-        <article className="seller-review-summary-card warning">
-          <span className="material-symbols-outlined">flag</span>
-          <div>
+
+        <article className={`seller-review-summary-card ${summary.reportedReviews > 0 ? 'warning' : ''}`}>
+          <div className="summary-icon-wrapper flag">
+            <span className="material-symbols-outlined">flag</span>
+          </div>
+          <div className="summary-content">
             <p>{t('review_list.reported_reviews')}</p>
-            <strong>{summaryLoading ? '-' : summary.reportedReviews}</strong>
+            <strong>{summaryLoading ? '...' : summary.reportedReviews}</strong>
           </div>
         </article>
       </section>
 
       <section className="seller-review-rating-strip" aria-label="Rating distribution">
-        {[5, 4, 3, 2, 1].map((rating) => {
-          const count = Number(ratingStats[rating] ?? ratingStats[String(rating)] ?? 0);
-          const width = summary.totalReviews ? Math.round((count / summary.totalReviews) * 100) : 0;
+        <div className="rating-strip-header">
+          <span className="material-symbols-outlined">bar_chart</span>
+          <span>{t('seller_profile.reviews_count')}</span>
+        </div>
+        <div className="rating-strip-grid">
+          {[5, 4, 3, 2, 1].map((rating) => {
+            const count = Number(ratingStats[rating] ?? ratingStats[String(rating)] ?? 0);
+            const width = summary.totalReviews ? Math.round((count / summary.totalReviews) * 100) : 0;
+            const isSelected = ratingFilter === String(rating);
 
-          return (
-            <div className="seller-review-rating-row" key={rating}>
-              <span>{rating}</span>
-              <span className="material-symbols-outlined">star</span>
-              <div>
-                <i style={{ width: `${width}%` }}></i>
-              </div>
-              <strong>{count}</strong>
-            </div>
-          );
-        })}
+            return (
+              <button
+                type="button"
+                className={`seller-review-rating-row ${isSelected ? 'active' : ''}`}
+                key={rating}
+                onClick={() => {
+                  if (isSelected) {
+                    setRatingFilter('');
+                  } else {
+                    setRatingFilter(String(rating));
+                    setStatusFilter('');
+                  }
+                  setPage(1);
+                }}
+              >
+                <span className="rating-num">{rating}</span>
+                <span className="material-symbols-outlined star-icon">star</span>
+                <div className="bar-track">
+                  <i style={{ width: `${width}%` }}></i>
+                </div>
+                <strong className="rating-count">{count}</strong>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
-      <section className="seller-review-toolbar">
-        <div className="seller-review-search">
-          <span className="material-symbols-outlined">search</span>
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder={t('common.search_placeholder')}
-          />
+      <section className="seller-review-filter-bar">
+        <div className="seller-review-pills">
+          <button
+            type="button"
+            className={`pill-btn ${ratingFilter === '' && statusFilter === '' ? 'active' : ''}`}
+            onClick={() => {
+              setRatingFilter('');
+              setStatusFilter('');
+              setPage(1);
+            }}
+          >
+            {t('common.all')} ({summary.totalReviews})
+          </button>
+          {[5, 4, 3, 2, 1].map((stars) => (
+            <button
+              type="button"
+              key={stars}
+              className={`pill-btn ${ratingFilter === String(stars) && statusFilter === '' ? 'active' : ''}`}
+              onClick={() => {
+                setRatingFilter(String(stars));
+                setStatusFilter('');
+                setPage(1);
+              }}
+            >
+              {stars} ★
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`pill-btn warning-pill ${statusFilter === 'reported' ? 'active' : ''}`}
+            onClick={() => {
+              setStatusFilter(statusFilter === 'reported' ? '' : 'reported');
+              setRatingFilter('');
+              setPage(1);
+            }}
+          >
+            <span className="material-symbols-outlined">flag</span>
+            {t('review_list.status_reported')} ({summary.reportedReviews})
+          </button>
         </div>
 
-        <select value={ratingFilter} onChange={handleFilterChange(setRatingFilter)} aria-label="Filter by rating">
-          {ratingFilterOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+        <div className="seller-review-toolbar-right">
+          <div className="seller-review-search">
+            <span className="material-symbols-outlined search-icon">search</span>
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder={t('common.search_placeholder')}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setSearchInput('')}
+                aria-label="Clear search"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            )}
+          </div>
 
-        <select value={statusFilter} onChange={handleFilterChange(setStatusFilter)} aria-label="Filter by report status">
-          {statusFilterOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-
-        <select value={sortBy} onChange={handleFilterChange(setSortBy)} aria-label="Sort reviews">
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+          <div className="seller-review-select-wrapper">
+            <span className="material-symbols-outlined select-icon">sort</span>
+            <select value={sortBy} onChange={handleFilterChange(setSortBy)} aria-label="Sort reviews">
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </section>
 
       <section className="seller-review-results">
         <div className="seller-review-results-head">
-          <span>
+          <span className="results-count">
             {t('common.showing')} <strong>{firstItem}-{lastItem}</strong> {t('common.of')} <strong>{totalItems}</strong> {t('seller.reviews')}
           </span>
-          <span>{t('common.page')} {page} / {totalPages}</span>
+          <span className="results-page-indicator">{t('common.page')} {page} / {totalPages}</span>
         </div>
 
         {loading ? (
           <div className="seller-review-list">
-            {Array.from({ length: 4 }).map((_, index) => (
+            {Array.from({ length: 3 }).map((_, index) => (
               <article className="seller-review-card skeleton" key={index}>
-                <span></span>
-                <div></div>
+                <div className="skeleton-thumb"></div>
+                <div className="skeleton-lines">
+                  <div className="skeleton-line title"></div>
+                  <div className="skeleton-line text"></div>
+                  <div className="skeleton-line text short"></div>
+                </div>
               </article>
             ))}
           </div>
         ) : reviews.length === 0 ? (
           <div className="seller-review-empty">
-            <span className="material-symbols-outlined">rate_review</span>
-            <h2>{t('common.no_data')}</h2>
-            <p>{t('review_list.subtitle')}</p>
+            <div className="empty-icon-circle">
+              <span className="material-symbols-outlined">rate_review</span>
+            </div>
+            <h2>{t('review_list.no_reviews_title')}</h2>
+            <p>{t('review_list.no_reviews_desc')}</p>
+            {(ratingFilter || statusFilter || searchTerm) && (
+              <button
+                type="button"
+                className="reset-filters-btn"
+                onClick={() => {
+                  setRatingFilter('');
+                  setStatusFilter('');
+                  setSearchInput('');
+                  setPage(1);
+                }}
+              >
+                <span className="material-symbols-outlined">refresh</span>
+                {t('common.all')}
+              </button>
+            )}
           </div>
         ) : (
           <div className="seller-review-list">
             {reviews.map((review) => (
               <article className="seller-review-card" key={review.reviewId}>
-                <div className="seller-review-product">
-                  <button
-                    type="button"
-                    className="seller-review-product-media"
-                    onClick={() => openPreviewModal(review)}
-                    aria-label={`Preview ${review.productName || ''}`}
-                  >
-                    {review.productImageUrl ? (
-                      <img src={review.productImageUrl} alt={review.productName || t('common.reviewed_product')} loading="lazy" />
-                    ) : (
-                      <span className="material-symbols-outlined">inventory_2</span>
-                    )}
-                  </button>
-                  <div>
-                    <span>{t('my_products.th_product')}</span>
-                    <Link to={review.productId ? `/product/${review.productId}` : '#'}>{review.productName || t('nav.product')}</Link>
-                    <small>{review.productId || t('common.no_product_id')}</small>
-                  </div>
-                </div>
-
-                <div className="seller-review-content">
-                  <div className="seller-review-buyer-strip">
+                <div className="seller-review-card-header">
+                  <div className="seller-review-buyer-info">
                     <div className="seller-review-buyer-avatar">
                       {review.reviewerAvatarUrl ? (
                         <img src={review.reviewerAvatarUrl} alt={review.reviewerName || t('common.unknown_buyer')} loading="lazy" />
@@ -405,48 +483,72 @@ export default function ReviewList() {
                         getBuyerInitials(review.reviewerName)
                       )}
                     </div>
-                    <div>
-                      <span>{t('order_management.th_buyer')}</span>
-                      <strong>{review.reviewerName || t('common.unknown_buyer')}</strong>
-                      <small>{review.reviewerEmail || ''}</small>
+                    <div className="seller-review-buyer-details">
+                      <div className="buyer-name-row">
+                        <strong>{review.reviewerName || t('common.unknown_buyer')}</strong>
+                        <span className="buyer-tag">{t('order_management.th_buyer')}</span>
+                      </div>
+                      <div className="buyer-sub-row">
+                        {review.reviewerEmail && <small className="buyer-email">{review.reviewerEmail}</small>}
+                        <span className="review-date">
+                          <span className="material-symbols-outlined">calendar_today</span>
+                          {formatDate(review.createdAt)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="seller-review-card-top">
-                    <div>
-                      <StarRating value={review.rating} />
-                      <p>{review.comment || t('common.no_data')}</p>
-                    </div>
+                  <div className="seller-review-card-badges">
                     <div className={`seller-review-report-badge ${review.reportCount ? 'reported' : ''}`}>
                       <span className="material-symbols-outlined">flag</span>
                       {review.reportCount ? `${review.reportCount} ${t('reports.report_button')}` : t('review_list.status_unreported')}
                     </div>
                   </div>
+                </div>
 
-                  <dl className="seller-review-meta-grid">
-                    <div>
-                      <dt>ID</dt>
-                      <dd>{review.reviewId}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('common.type')}</dt>
-                      <dd>{review.targetType || t('common.type')}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('seller.orders_management')}</dt>
-                      <dd>{review.orderCode || review.orderId || t('common.na')}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('order_management.th_buyer')}</dt>
-                      <dd>{review.reviewerName || t('common.unknown_buyer')}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('history.order_date')}</dt>
-                      <dd>{formatDate(review.createdAt)}</dd>
-                    </div>
-                  </dl>
+                <div className="seller-review-card-body">
+                  <div className="seller-review-rating-block">
+                    <StarRating value={review.rating} />
+                    <span className="rating-score-pill">{review.rating?.toFixed(1)} / 5.0</span>
+                  </div>
 
-                  {review.reportedByCurrentUser ? (
+                  {review.comment && (
+                    <blockquote className="seller-review-comment">
+                      &quot;{review.comment}&quot;
+                    </blockquote>
+                  )}
+
+                  <div className="seller-review-product-box">
+                    <button
+                      type="button"
+                      className="seller-review-product-media"
+                      onClick={() => openPreviewModal(review)}
+                      aria-label={`Preview ${review.productName || ''}`}
+                    >
+                      {review.productImageUrl ? (
+                        <img src={review.productImageUrl} alt={review.productName || t('common.reviewed_product')} loading="lazy" />
+                      ) : (
+                        <span className="material-symbols-outlined">inventory_2</span>
+                      )}
+                    </button>
+                    <div className="product-box-info">
+                      <span className="product-label">{t('my_products.th_product')}</span>
+                      <Link to={review.productId ? `/product/${review.productId}` : '#'} className="product-title">
+                        {review.productName || t('nav.product')}
+                      </Link>
+                      <div className="product-order-meta">
+                        {review.orderCode && (
+                          <span className="order-code-chip">
+                            <span className="material-symbols-outlined">receipt_long</span>
+                            {review.orderCode}
+                          </span>
+                        )}
+                        <small className="product-id">{review.productId || ''}</small>
+                      </div>
+                    </div>
+                  </div>
+
+                  {review.reportedByCurrentUser && (
                     <div className="seller-review-current-report">
                       <span className="material-symbols-outlined">task_alt</span>
                       <p>
@@ -454,13 +556,22 @@ export default function ReviewList() {
                         <strong>{review.currentUserReport?.reason || review.latestReportReason || t('reports.report_button')}</strong>.
                       </p>
                     </div>
-                  ) : null}
+                  )}
                 </div>
 
-                <div className="seller-review-actions">
+                <div className="seller-review-card-actions">
                   <button
                     type="button"
-                    className="seller-review-report-btn"
+                    className="seller-review-preview-btn"
+                    onClick={() => openPreviewModal(review)}
+                  >
+                    <span className="material-symbols-outlined">visibility</span>
+                    {t('common.view_detail')}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`seller-review-report-btn ${review.reportedByCurrentUser ? 'reported' : ''}`}
                     onClick={() => openReportModal(review)}
                   >
                     <span className="material-symbols-outlined">flag</span>
@@ -479,11 +590,12 @@ export default function ReviewList() {
               disabled={page === 1}
               onClick={() => setPage((curr) => Math.max(1, curr - 1))}
             >
+              <span className="material-symbols-outlined">chevron_left</span>
               {t('common.previous')}
             </button>
             {paginationItems.map((item, index) => {
               if (typeof item === 'string') {
-                return <span key={`${item}-${index}`}>...</span>;
+                return <span key={`${item}-${index}`} className="seller-review-pagination-ellipsis">...</span>;
               }
 
               return (
@@ -503,6 +615,7 @@ export default function ReviewList() {
               onClick={() => setPage((curr) => Math.min(totalPages, curr + 1))}
             >
               {t('common.next')}
+              <span className="material-symbols-outlined">chevron_right</span>
             </button>
           </div>
         ) : null}

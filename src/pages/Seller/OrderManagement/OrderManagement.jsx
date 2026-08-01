@@ -11,6 +11,15 @@ import reportService from '../../../services/reportService';
 
 const pageSize = 5;
 const numberFormatter = new Intl.NumberFormat('vi-VN');
+const REPORT_ALLOWED_STATUSES = [
+  'Delivered',
+  'DeliveryFailed',
+  'Completed',
+  'ReturnRequested',
+  'ReturnRejected',
+  'Returned',
+];
+
 
 export default function OrderManagement() {
   const { user, loading: authLoading } = useAuth();
@@ -344,8 +353,9 @@ export default function OrderManagement() {
           <table className="om-table">
             <thead>
               <tr>
-                <th>STT</th>
+                <th>{t('common.stt')}</th>
                 <th>{t('order_management.th_buyer')}</th>
+
                 <th>{t('my_products.th_product')}</th>
                 <th>{t('order_management.th_total')}</th>
                 <th>{t('order_management.th_status')}</th>
@@ -420,13 +430,16 @@ export default function OrderManagement() {
                               {t('common.view_detail')}
                             </button>
                           ) : null}
-                          <button
-                            type="button"
-                            className="om-report-btn"
-                            onClick={() => setReportTarget(order)}
-                          >
-                            {t('reports.report_button')}
-                          </button>
+                          {REPORT_ALLOWED_STATUSES.includes(order.status) && (
+                            <button
+                              type="button"
+                              className="om-report-btn"
+                              onClick={() => setReportTarget(order)}
+                            >
+                              {t('reports.report_button')}
+                            </button>
+                          )}
+
                         </div>
                       </td>
                     </tr>

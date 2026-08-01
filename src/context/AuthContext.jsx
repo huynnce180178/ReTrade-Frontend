@@ -98,6 +98,7 @@ export const AuthProvider = ({ children }) => {
           avatarUrl: authData.avatarUrl,
           phone: authData.phone,
           isPasswordSet: authData.isPasswordSet,
+          mustChangePassword: authData.mustChangePassword ?? false,
         };
 
         setToken(authData.token);
@@ -122,7 +123,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  
+  const clearMustChangePassword = () => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, mustChangePassword: false, isPasswordSet: true };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const handleLogout = () => {
     setUser(null);
@@ -147,12 +155,14 @@ export const AuthProvider = ({ children }) => {
           avatarUrl: authData.avatarUrl,
           phone: authData.phone,
           isPasswordSet: authData.isPasswordSet,
+          mustChangePassword: authData.mustChangePassword ?? false,
         };
         setToken(authData.token);
         setUser(userObj);
         localStorage.setItem('user', JSON.stringify(userObj));
-        return { success: true };
+        return { success: true, mustChangePassword: authData.mustChangePassword };
       }
+
       return { success: false, error: 'Google login failed. Please try again.' };
     } catch (err) {
       const data = err.response?.data;

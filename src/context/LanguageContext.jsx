@@ -7,9 +7,10 @@ const translations = { vi, en };
 const LanguageContext = createContext(null);
 
 const STORAGE_KEY = 'retrade_language';
-const DEFAULT_LANG = 'vi';
+const DEFAULT_LANG = 'en';
 
 export const LanguageProvider = ({ children }) => {
+
   const [language, setLanguageState] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);

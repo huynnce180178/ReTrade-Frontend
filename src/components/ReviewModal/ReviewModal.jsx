@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import './ReviewModal.css';
 
@@ -18,39 +19,31 @@ export default function ReviewModal({
   const { t, formatCurrency } = useLanguage();
   const [rating, setRating] = useState(initialRating);
   const [comment, setComment] = useState(initialComment);
-  const [proofs, setProofs] = useState([]);
+  const [closed, setClosed] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setRating(initialRating);
     setComment(initialComment);
-    setProofs([]);
+    setClosed(false);
   }, [initialComment, initialRating, isOpen]);
 
-  useEffect(() => () => {
-    proofs.forEach((proof) => URL.revokeObjectURL(proof.url));
-  }, [proofs]);
+  if (!isOpen || closed) return null;
 
-  if (!isOpen) return null;
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    if (!comment.trim()) return;
-    onSubmit?.({ rating, comment: comment.trim() });
+  const handleClose = () => {
+    setClosed(true);
+    onClose?.();
   };
 
-  const handleProofChange = (event) => {
-    const files = Array.from(event.target.files || []).slice(0, 3);
-    const previews = files.map((file) => ({
-      name: file.name,
-      url: URL.createObjectURL(file),
-    }));
-
-    setProofs((current) => {
-      current.forEach((proof) => URL.revokeObjectURL(proof.url));
-      return previews;
-    });
-    event.target.value = '';
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!comment.trim() || submitting) return;
+    try {
+      await onSubmit?.({ rating, comment: comment.trim() });
+      setClosed(true);
+    } catch (err) {
+      setClosed(true);
+    }
   };
 
   const handleStarPointerMove = (event) => {
@@ -64,17 +57,17 @@ export default function ReviewModal({
   const orderCode = purchase?.orderCode || purchase?.orderId || t('history.order_id');
   const orderAmount = purchase?.finalAmount || purchase?.totalAmount || purchase?.unitPrice || 0;
   const productImage = purchase?.productImageUrl || '/vite.svg';
-  const helperText = subtitle || t('product.reviews');
+  const helperText = subtitle || t('product.review_placeholder');
 
-  return (
-    <div className="review-modal-overlay" role="presentation" onMouseDown={onClose}>
+  return createPortal(
+    <div className="review-modal-overlay" role="presentation" onMouseDown={handleClose}>
       <div className="review-modal-card" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-        <button type="button" className="review-modal-close" onClick={onClose} disabled={submitting} aria-label={t('common.close')}>
+        <button type="button" className="review-modal-close" onClick={handleClose} disabled={submitting} aria-label={t('common.close')}>
           <span className="material-symbols-outlined">close</span>
         </button>
 
         <header className="review-modal-header">
-          <h2 id="review-modal-title">{title || t('product.reviews')}</h2>
+          <h2 id="review-modal-title">{title || t('product.write_review')}</h2>
         </header>
 
         <form className="review-modal-form" onSubmit={handleSubmit}>
@@ -119,30 +112,19 @@ export default function ReviewModal({
             />
           </label>
 
-          <div className="review-proof-group">
-            <span>{t('common.detail')}</span>
-            <div className="review-proof-list">
-              <label className="review-proof-add">
-                <input type="file" accept="image/*" multiple onChange={handleProofChange} disabled={submitting} />
-                <span className="material-symbols-outlined">add_a_photo</span>
-                <strong>{t('common.create')}</strong>
-              </label>
-              {proofs.map((proof) => (
-                <img key={proof.url} src={proof.url} alt={proof.name} />
-              ))}
-            </div>
-          </div>
-
           <div className="review-modal-actions">
-            <button type="button" className="review-secondary-btn" onClick={onClose} disabled={submitting}>
+            <button type="button" className="review-secondary-btn" onClick={handleClose} disabled={submitting}>
               {t('common.cancel')}
             </button>
+
             <button type="submit" className="review-primary-btn" disabled={submitting || !comment.trim()}>
               {submitting ? t('common.submitting') : t('common.submit')}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
+

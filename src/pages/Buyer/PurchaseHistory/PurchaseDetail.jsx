@@ -7,6 +7,8 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import purchaseService from '../../../services/purchaseService';
 import reviewService from '../../../services/reviewService';
+import productService from '../../../services/productService';
+
 import paymentService from '../../../services/paymentService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
 import '../../../styles/MyAccount.css';
@@ -21,16 +23,22 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   minute: '2-digit',
 });
 
-const getJourneySteps = (language) => [
-  { key: 'AwaitingPayment', label: language === 'vi' ? 'Chờ thanh toán' : 'Awaiting Payment', icon: 'receipt_long' },
-  { key: 'Pending', label: language === 'vi' ? 'Đang xử lý' : 'Processing', icon: 'inventory' },
-  { key: 'Confirmed', label: language === 'vi' ? 'Đã xác nhận' : 'Confirmed', icon: 'verified_user' },
-  { key: 'Shipping', label: language === 'vi' ? 'Đang giao' : 'Shipping', icon: 'local_shipping' },
-  { key: 'Delivered', label: language === 'vi' ? 'Đã giao' : 'Delivered', icon: 'package_2' },
-  { key: 'Completed', label: language === 'vi' ? 'Hoàn thành' : 'Completed', icon: 'check_circle' },
-];
+const getJourneySteps = (language, status) => {
+  const isFailed = String(status || '').toLowerCase() === 'deliveryfailed';
+  return [
+    { key: 'AwaitingPayment', label: language === 'vi' ? 'Chờ thanh toán' : 'Awaiting Payment', icon: 'receipt_long' },
+    { key: 'Pending', label: language === 'vi' ? 'Đang xử lý' : 'Processing', icon: 'inventory' },
+    { key: 'Confirmed', label: language === 'vi' ? 'Đã xác nhận' : 'Confirmed', icon: 'verified_user' },
+    { key: 'Shipping', label: language === 'vi' ? 'Đang giao' : 'Shipping', icon: 'local_shipping' },
+    isFailed
+      ? { key: 'DeliveryFailed', label: language === 'vi' ? 'Giao thất bại' : 'Delivery Failed', icon: 'report' }
+      : { key: 'Delivered', label: language === 'vi' ? 'Đã giao' : 'Delivered', icon: 'package_2' },
+    { key: 'Completed', label: language === 'vi' ? 'Hoàn thành' : 'Completed', icon: 'check_circle' },
+  ];
+};
 
 const statusOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered', 'Completed'];
+
 const returnRequestWindowMs = 7 * 24 * 60 * 60 * 1000;
 
 export default function PurchaseDetail() {
@@ -146,26 +154,52 @@ export default function PurchaseDetail() {
     setReviewModalOpen(true);
   };
 
-  const handleSubmitReview = async ({ rating, comment }) => {
+  const handleSubmitReview = async ({ rating, comment, proofs }) => {
     if (!buyerId || !reviewTarget?.orderId) return;
 
     try {
       setReviewSubmitting(true);
+      const proofUrls = [];
+      if (Array.isArray(proofs) && proofs.length > 0) {
+        for (const p of proofs) {
+          if (p?.file) {
+            try {
+              const res = await productService.uploadImage(p.file);
+              const url = res?.url || res?.imageUrl || res?.path || res;
+              if (typeof url === 'string') proofUrls.push(url);
+            } catch {
+              // Ignore single upload failure
+            }
+          }
+        }
+      }
+
       await reviewService.create(buyerId, {
         orderId: reviewTarget.orderId,
         rating,
         comment,
+        proofUrls,
       });
+      setPurchase((prev) => (prev ? { ...prev, hasReview: true, isReviewed: true } : prev));
       showToast(language === 'vi' ? 'Đã gửi đánh giá thành công!' : 'Review submitted successfully.', 'success');
       setReviewModalOpen(false);
       setReviewTarget(null);
       loadPurchase();
+
     } catch (error) {
-      showToast(error?.response?.data || (language === 'vi' ? 'Không thể gửi đánh giá.' : 'Failed to submit review.'), 'error');
+      const errorMsg = error?.response?.data?.message || error?.response?.data || error?.message;
+      showToast(errorMsg || (language === 'vi' ? 'Không thể gửi đánh giá.' : 'Failed to submit review.'), 'error');
+      if (typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('already reviewed')) {
+        setReviewModalOpen(false);
+        setReviewTarget(null);
+        loadPurchase();
+      }
     } finally {
       setReviewSubmitting(false);
     }
   };
+
+
 
   const openReturnModal = () => {
     setReturnReason('');
@@ -466,16 +500,6 @@ function Journey({ status, createdAt, updatedAt, language }) {
     );
   }
 
-  if (String(status).toLowerCase() === 'deliveryfailed') {
-    return (
-      <div className="purchase-empty-state">
-        <span className="material-symbols-outlined">report</span>
-        <h3>{isVi ? 'Giao Hàng Thất Bại' : 'Delivery Failed'}</h3>
-        <p>{isVi ? `Đơn vị vận chuyển không thể hoàn tất giao hàng vào ${formatDateTime(updatedAt || createdAt)}.` : `The carrier could not complete delivery on ${formatDateTime(updatedAt || createdAt)}.`}</p>
-      </div>
-    );
-  }
-
   if (String(status).toLowerCase() === 'returnrequested') {
     return (
       <div className="purchase-empty-state">
@@ -506,8 +530,11 @@ function Journey({ status, createdAt, updatedAt, language }) {
     );
   }
 
-  const steps = getJourneySteps(language);
-  const activeIndex = statusOrder.indexOf(status);
+  const steps = getJourneySteps(language, status);
+  let activeIndex = statusOrder.indexOf(status);
+  if (String(status).toLowerCase() === 'deliveryfailed') {
+    activeIndex = 4;
+  }
   const hasActive = activeIndex >= 0;
 
   return (
@@ -519,7 +546,7 @@ function Journey({ status, createdAt, updatedAt, language }) {
         return (
           <div key={step.key} className={`purchase-journey-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`}>
             <div>
-              <span className="material-symbols-outlined">{isDone ? 'check' : step.icon}</span>
+              <span className="material-symbols-outlined">{isDone ? (step.key === 'DeliveryFailed' ? 'report' : 'check') : step.icon}</span>
             </div>
             <strong>{step.label}</strong>
             <small>{isDone ? formatDateTime(isCurrent ? updatedAt || createdAt : createdAt) : (isVi ? 'Chờ xử lý' : 'Pending')}</small>
@@ -529,6 +556,7 @@ function Journey({ status, createdAt, updatedAt, language }) {
     </div>
   );
 }
+
 
 function isWithinReturnRequestWindow(purchase) {
   const updatedAt = Date.parse(purchase?.updatedAt || '');

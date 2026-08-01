@@ -99,7 +99,7 @@ export default function AccountSidebar() {
 
       <nav className="profile-sidebar-menu">
         <p className="sidebar-group-title">{t('nav.my_account')}</p>
-        <Link to="/profile" className={`menu-item ${isActive('/profile')}`}>
+        <Link to="/my-account" className={`menu-item ${isActive('/my-account')}`}>
           <span className="material-symbols-outlined">account_circle</span>
           {t('nav.profile')}
         </Link>
@@ -136,11 +136,11 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">local_offer</span>
           {t('nav.offer_history')}
         </Link>
-        <Link to="/vouchers" className={`menu-item ${isActive('/vouchers')}`}>
+        <Link to="/my-vouchers" className={`menu-item ${isActive('/my-vouchers')}`}>
           <span className="material-symbols-outlined">local_activity</span>
           {t('nav.my_vouchers')}
         </Link>
-        <Link to="/subscriptions" className={`menu-item ${isActive('/subscriptions')}`}>
+        <Link to="/my-subscriptions" className={`menu-item ${isActive('/my-subscriptions')}`}>
           <span className="material-symbols-outlined">workspace_premium</span>
           {t('nav.my_subscriptions')}
         </Link>
@@ -148,6 +148,7 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">flag</span>
           {t('nav.report_history')}
         </Link>
+
 
         {isAdmin && (
           <>

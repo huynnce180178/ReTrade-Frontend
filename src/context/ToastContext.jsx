@@ -19,13 +19,18 @@ export const ToastProvider = ({ children }) => {
   }, []);
 
   const showToast = useCallback((message, type = 'error', duration = 4000) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    const id = Date.now() + Math.random();
+    const formattedMsg = typeof message === 'string'
+      ? message
+      : (message?.message || message?.title || (typeof message === 'object' ? JSON.stringify(message) : String(message || '')));
+
+    setToasts((prev) => [...prev, { id, message: formattedMsg, type }]);
     
     setTimeout(() => {
       removeToast(id);
     }, duration);
   }, [removeToast]);
+
 
   return (
     <ToastContext.Provider value={{ showToast }}>

@@ -3,9 +3,10 @@
   position: fixed;
   top: 96px; /* Positioned below the 80px header */
   right: 24px;
-  z-index: 99999;
+  z-index: 999999;
   display: flex;
   flex-direction: column;
+
   gap: 12px;
   max-width: 380px;
   width: calc(100% - 48px);

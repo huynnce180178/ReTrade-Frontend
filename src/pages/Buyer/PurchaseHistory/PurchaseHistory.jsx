@@ -8,6 +8,8 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import purchaseService from '../../../services/purchaseService';
 import reviewService from '../../../services/reviewService';
+import productService from '../../../services/productService';
+
 import paymentService from '../../../services/paymentService';
 import reportService from '../../../services/reportService';
 import { createOrderHubConnection } from '../../../services/orderRealtimeService';
@@ -16,6 +18,15 @@ import './PurchaseHistory.css';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 const returnRequestWindowMs = 7 * 24 * 60 * 60 * 1000;
+const REPORT_ALLOWED_STATUSES = [
+  'Delivered',
+  'DeliveryFailed',
+  'Completed',
+  'ReturnRequested',
+  'ReturnRejected',
+  'Returned',
+];
+
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
@@ -54,7 +65,8 @@ const statusMeta = {
 export default function PurchaseHistory() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const { language, formatCurrency } = useLanguage();
+  const { t, language, formatCurrency } = useLanguage();
+
 
   const [purchases, setPurchases] = useState([]);
   const [allPurchases, setAllPurchases] = useState([]);
@@ -330,26 +342,57 @@ export default function PurchaseHistory() {
     }
   };
 
-  const handleSubmitReview = async ({ rating, comment }) => {
+  const handleSubmitReview = async ({ rating, comment, proofs }) => {
     if (!buyerId || !reviewTarget?.orderId) return;
 
     try {
       setReviewSubmitting(true);
+      const proofUrls = [];
+      if (Array.isArray(proofs) && proofs.length > 0) {
+        for (const p of proofs) {
+          if (p?.file) {
+            try {
+              const res = await productService.uploadImage(p.file);
+              const url = res?.url || res?.imageUrl || res?.path || res;
+              if (typeof url === 'string') proofUrls.push(url);
+            } catch {
+              // Ignore single upload failure
+            }
+          }
+        }
+      }
+
       await reviewService.create(buyerId, {
         orderId: reviewTarget.orderId,
         rating,
         comment,
+        proofUrls,
       });
+      setPurchases((prev) =>
+        prev.map((p) => (p.orderId === reviewTarget.orderId ? { ...p, hasReview: true, isReviewed: true } : p))
+      );
+      setAllPurchases((prev) =>
+        prev.map((p) => (p.orderId === reviewTarget.orderId ? { ...p, hasReview: true, isReviewed: true } : p))
+      );
       showToast(t('common.review_submitted'), 'success');
       setReviewModalOpen(false);
       setReviewTarget(null);
       loadPurchases();
+
     } catch (error) {
-      showToast(error?.response?.data || t('common.review_error'), 'error');
+      const errorMsg = error?.response?.data?.message || error?.response?.data || error?.message;
+      showToast(errorMsg || t('common.review_error'), 'error');
+      if (typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('already reviewed')) {
+        setReviewModalOpen(false);
+        setReviewTarget(null);
+        loadPurchases();
+      }
     } finally {
       setReviewSubmitting(false);
     }
   };
+
+
 
   const handlePayAgain = async (purchase) => {
     if (!buyerId || !purchase?.orderId) return;
@@ -604,10 +647,14 @@ export default function PurchaseHistory() {
 }
 
 function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain, onReportSeller, language }) {
-  const meta = statusMeta[purchase.status] || { label: purchase.status || t('common.unknown'), className: 'default' };
+  const { t } = useLanguage();
+  const meta = statusMeta[purchase.status] || { label: purchase.status || (t ? t('common.unknown') : 'Unknown'), className: 'default' };
+
   const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
   const canComplete = purchase.status === 'Delivered';
-  const canReview = purchase.status === 'Completed' && !purchase.hasReview;
+  const isReviewed = Boolean(purchase.hasReview || purchase.isReviewed || purchase.hasReviewed || purchase.isHasReviewed);
+  const canReview = purchase.status === 'Completed' && !isReviewed;
+
   const canRequestReturn = purchase.status === 'Completed' && isWithinReturnRequestWindow(purchase);
   const canPay = purchase.status === 'AwaitingPayment';
 
@@ -690,11 +737,12 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
             {language === 'vi' ? 'Yêu cầu trả hàng' : 'Request Return'}
           </button>
         )}
-        {purchase.status === 'Completed' && (
+        {REPORT_ALLOWED_STATUSES.includes(purchase.status) && (
           <button type="button" className="purchase-detail-btn" disabled={updating} onClick={onReportSeller}>
             {language === 'vi' ? 'Báo cáo người bán' : 'Report Seller'}
           </button>
         )}
+
         <Link to={`/purchase-history/${purchase.orderId}`} className="purchase-detail-btn">
           {language === 'vi' ? 'Chi tiết' : 'Details'}
         </Link>
