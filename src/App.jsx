@@ -98,6 +98,7 @@ function App() {
                   <Route path="forgot-password" element={<ForgotPassword />} />
                   <Route path="reset-password" element={<ResetPassword />} />
                   <Route path="my-account" element={<MyAccount />} />
+                  <Route path="profile" element={<MyAccount />} />
                   <Route path="change-password" element={<ChangePassword />} />
                   <Route path="address-book" element={<AddressBook />} />
                   <Route path="purchase-history" element={<PurchaseHistory />} />
@@ -107,7 +108,10 @@ function App() {
                   <Route path="offer-history" element={<OfferHistory />} />
                   <Route path="report-history" element={<ReportHistory />} />
                   <Route path="my-vouchers" element={<MyVouchers />} />
+                  <Route path="vouchers" element={<MyVouchers />} />
                   <Route path="my-subscriptions" element={<MySubscriptions />} />
+                  <Route path="subscriptions" element={<MySubscriptions />} />
+
                   <Route path="payment-result" element={<PaymentResult />} />
                   <Route path="payment/vnpay-return" element={<PaymentResult />} />
                   <Route path="product" element={<Product />} />

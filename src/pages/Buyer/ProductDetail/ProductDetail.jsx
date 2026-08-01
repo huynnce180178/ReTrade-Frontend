@@ -35,6 +35,13 @@ function getSellerInitials(name) {
   return parts[0][0]?.toUpperCase() || '?';
 }
 
+const isProductUnavailable = (product) => (
+  product?.status === 'SoldOut' ||
+  product?.status === 'Sold' ||
+  product?.status === 'Inactive' ||
+  Number(product?.stockQuantity ?? 0) <= 0
+);
+
 function getOfferStatusConfig(status, language) {
   switch (status) {
     case 'Pending': return { label: language === 'vi' ? 'Chờ duyệt' : 'Pending', color: '#f59e0b', bg: '#fef3c7', icon: 'schedule' };
@@ -51,7 +58,7 @@ function getOfferStatusConfig(status, language) {
    ============================================= */
 function MakeOfferModal({ product, onClose, onSuccess }) {
   const { showToast } = useToast();
-  const { language, formatCurrency } = useLanguage();
+  const { t, language, formatCurrency } = useLanguage();
   const [offerPrice, setOfferPrice] = useState('');
   const [message, setMessage] = useState('');
   const [expiresInHours, setExpiresInHours] = useState(48);
@@ -309,6 +316,10 @@ export default function ProductDetail() {
       showToast(language === 'vi' ? 'Bạn không thể thêm sản phẩm của chính mình vào danh sách yêu thích.' : 'You cannot add your own product to your wishlist.', 'error');
       return;
     }
+    if (!isWishlisted && isProductUnavailable(product)) {
+      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng.' : 'This product is out of stock.', 'warning');
+      return;
+    }
     setTogglingWishlist(true);
     try {
       if (isWishlisted) {
@@ -334,6 +345,10 @@ export default function ProductDetail() {
 
   const handleGoToCheckout = () => {
     if (!product?.productId) return;
+    if (isProductUnavailable(product)) {
+      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng, khÃ´ng thá»ƒ mua ngay.' : 'This product is out of stock and cannot be purchased.', 'warning');
+      return;
+    }
     navigate(`/checkout/${product.productId}`, { state: { product } });
   };
 
@@ -433,6 +448,7 @@ export default function ProductDetail() {
   const mainImage = sortedImages[mainImageIndex] || null;
   const attributes = (product.attributes || []).filter(a => a.value);
   const hasDimensions = product.weightGram || product.lengthCm || product.widthCm || product.heightCm;
+  const isOutOfStock = isProductUnavailable(product);
 
   return (
     <div className="product-detail-page container animate-fade-in">
@@ -526,12 +542,14 @@ export default function ProductDetail() {
               </div>
             )}
             {product.stockQuantity != null && (
-              <div className="pd-meta-tag">
+              <div className={`pd-meta-tag ${isOutOfStock ? 'out-of-stock' : ''}`}>
                 <svg className="meta-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                 </svg>
                 <span className="meta-label">{language === 'vi' ? 'Kho hàng' : 'Stock'}</span>
-                <span className="meta-val">{product.stockQuantity} {language === 'vi' ? 'sản phẩm' : 'available'}</span>
+                <span className="meta-val">
+                  {isOutOfStock ? (language === 'vi' ? 'Hết hàng' : 'Out of stock') : `${product.stockQuantity} ${language === 'vi' ? 'sản phẩm' : 'available'}`}
+                </span>
               </div>
             )}
             {product.status && (
@@ -589,12 +607,12 @@ export default function ProductDetail() {
           {/* Actions */}
           <div className="pd-actions">
             {product.price != null ? (
-              <button className="btn btn-primary pd-btn-buy" onClick={handleGoToCheckout}>
+              <button className="btn btn-primary pd-btn-buy" onClick={handleGoToCheckout} disabled={isOutOfStock}>
                 <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>shopping_cart</span>
-                {language === 'vi' ? 'Mua ngay' : 'Buy Now'}
+                {isOutOfStock ? (language === 'vi' ? 'Hết hàng' : 'Out of Stock') : (language === 'vi' ? 'Mua ngay' : 'Buy Now')}
               </button>
             ) : (
-              <button className="btn btn-primary pd-btn-buy" onClick={handlePlaceBid}>
+              <button className="btn btn-primary pd-btn-buy" onClick={handlePlaceBid} disabled={isOutOfStock}>
                 <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>gavel</span>
                 {language === 'vi' ? 'Đặt giá thầu' : 'Place Bid'}
               </button>
@@ -607,7 +625,7 @@ export default function ProductDetail() {
               <button
                 className={`btn ${isWishlisted ? 'btn-primary' : 'btn-outline'} pd-btn-icon`}
                 onClick={handleToggleWishlist}
-                disabled={togglingWishlist}
+                disabled={togglingWishlist || (!isWishlisted && isOutOfStock)}
                 title={isWishlisted ? (language === 'vi' ? 'Xóa khỏi yêu thích' : 'Remove from Wishlist') : (language === 'vi' ? 'Thêm vào yêu thích' : 'Add to Wishlist')}
               >
                 {togglingWishlist ? (
@@ -622,7 +640,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Offer Actions — shown only to non-seller buyers when product has a price */}
-          {product.price != null && user && !isSeller && (
+          {product.price != null && user && !isSeller && !isOutOfStock && (
             <div className="pd-offer-section">
               <div className="pd-offer-label">
                 <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#0f7b5f' }}>local_offer</span>

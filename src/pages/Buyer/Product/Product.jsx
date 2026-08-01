@@ -34,6 +34,13 @@ function SkeletonCard() {
   );
 }
 
+const isProductUnavailable = (product) => (
+  product?.status === 'SoldOut' ||
+  product?.status === 'Sold' ||
+  product?.status === 'Inactive' ||
+  Number(product?.stockQuantity ?? 0) <= 0
+);
+
 export default function Product() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -133,9 +140,10 @@ export default function Product() {
 
       const data = await productService.getAll(params);
       const itemsList = Array.isArray(data) ? data : (data?.items || data?.value || []);
-      setProducts(itemsList);
-      setTotalItems(data?.totalItems || itemsList.length);
-      setTotalPages(data?.totalPages || Math.ceil((data?.totalItems || itemsList.length) / 12) || 1);
+      const availableItems = itemsList.filter((item) => !isProductUnavailable(item));
+      setProducts(availableItems);
+      setTotalItems(data?.totalItems ?? availableItems.length);
+      setTotalPages(data?.totalPages || Math.ceil((data?.totalItems ?? availableItems.length) / 12) || 1);
     } catch (err) {
       showToast(t('common.error_occurred'), 'error');
     } finally {
@@ -181,6 +189,10 @@ export default function Product() {
     }
     if (product.sellerId === user.userId || product.sellerId === user.id) {
       showToast(t('common.warning'), 'error');
+      return;
+    }
+    if (isProductUnavailable(product)) {
+      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng.' : 'This product is out of stock.', 'warning');
       return;
     }
     setTogglingId(product.productId);

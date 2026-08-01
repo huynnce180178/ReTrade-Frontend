@@ -99,7 +99,22 @@ export default function AccountSidebar() {
 
       <nav className="profile-sidebar-menu">
         <p className="sidebar-group-title">{t('nav.my_account')}</p>
-        <Link to="/profile" className={`menu-item ${isActive('/profile')}`}>
+
+        {isSeller && (
+          <Link to="/seller-dashboard" className={`menu-item menu-item-highlight seller-highlight ${isActiveSection('/seller-dashboard')}`}>
+            <span className="material-symbols-outlined">storefront</span>
+            <strong>{t('nav.seller_center')}</strong>
+          </Link>
+        )}
+
+        {isAdmin && (
+          <Link to="/admin" className={`menu-item menu-item-highlight admin-highlight ${isActiveSection('/admin')}`}>
+            <span className="material-symbols-outlined">admin_panel_settings</span>
+            <strong>{t('nav.admin_center')}</strong>
+          </Link>
+        )}
+
+        <Link to="/my-account" className={`menu-item ${isActive('/my-account')}`}>
           <span className="material-symbols-outlined">account_circle</span>
           {t('nav.profile')}
         </Link>
@@ -111,13 +126,6 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">location_on</span>
           {t('nav.address_book')}
         </Link>
-
-        {isSeller && (
-          <Link to="/seller-dashboard" className={`menu-item ${isActive('/seller-dashboard')}`}>
-            <span className="material-symbols-outlined">storefront</span>
-            {t('nav.seller_center')}
-          </Link>
-        )}
 
         <p className="sidebar-group-title mt-4">{t('history.purchase_title')}</p>
         <Link to="/purchase-history" className={`menu-item ${isActiveSection('/purchase-history')}`}>
@@ -136,11 +144,11 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">local_offer</span>
           {t('nav.offer_history')}
         </Link>
-        <Link to="/vouchers" className={`menu-item ${isActive('/vouchers')}`}>
+        <Link to="/my-vouchers" className={`menu-item ${isActive('/my-vouchers')}`}>
           <span className="material-symbols-outlined">local_activity</span>
           {t('nav.my_vouchers')}
         </Link>
-        <Link to="/subscriptions" className={`menu-item ${isActive('/subscriptions')}`}>
+        <Link to="/my-subscriptions" className={`menu-item ${isActive('/my-subscriptions')}`}>
           <span className="material-symbols-outlined">workspace_premium</span>
           {t('nav.my_subscriptions')}
         </Link>
@@ -148,16 +156,6 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">flag</span>
           {t('nav.report_history')}
         </Link>
-
-        {isAdmin && (
-          <>
-            <p className="sidebar-group-title mt-4">{t('nav.admin_center')}</p>
-            <Link to="/category" className={`menu-item ${isActive('/category')}`}>
-              <span className="material-symbols-outlined">category</span>
-              {t('nav.category')}
-            </Link>
-          </>
-        )}
       </nav>
     </aside>
   );

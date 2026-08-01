@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
@@ -49,6 +49,7 @@ export default function UserAccounts() {
   const { showToast } = useToast();
   const { user: currentUser } = useAuth();
   const { t, formatNumber } = useLanguage();
+  const roleActionInFlightRef = useRef(new Set());
 
   const formatRole = (role) => {
     if (!role || role === 'All') return t('admin.listings.tab_all');
@@ -266,6 +267,10 @@ export default function UserAccounts() {
       return;
     }
 
+    const actionKey = `${selectedUserId}:${role.roleId}`;
+    if (roleActionInFlightRef.current.has(actionKey)) return;
+    roleActionInFlightRef.current.add(actionKey);
+
     setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, loading: true } : r)));
 
     try {
@@ -291,6 +296,8 @@ export default function UserAccounts() {
         showToast(extractErrorMessage(error) || t('common.save_error'), 'error');
         setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, loading: false } : r)));
       }
+    } finally {
+      roleActionInFlightRef.current.delete(actionKey);
     }
   };
 

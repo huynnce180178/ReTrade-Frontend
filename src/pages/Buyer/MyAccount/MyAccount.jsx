@@ -207,14 +207,28 @@ export default function MyAccount() {
 
   const handleSaveChanges = async (e) => {
     e.preventDefault();
+
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedFirstName) {
+      showToast(language === 'vi' ? 'Tên không được để trống hoặc chỉ nhập khoảng trắng.' : 'First name cannot be empty or whitespace.', 'error');
+      return;
+    }
+
+    if (!trimmedLastName) {
+      showToast(language === 'vi' ? 'Họ không được để trống hoặc chỉ nhập khoảng trắng.' : 'Last name cannot be empty or whitespace.', 'error');
+      return;
+    }
+
     try {
-      showToast(language === 'vi' ? 'Đang lưu thay đổi...' : 'Saving changes...', 'info');
       const updatedProfile = await profileService.updateMyProfile({
-        username,
-        firstName,
-        lastName,
-        email,
-        phone,
+        username: username.trim(),
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        email: email.trim(),
+        phone: trimmedPhone,
       });
       if (updatedProfile) {
         setUser((u) => {
@@ -222,7 +236,12 @@ export default function MyAccount() {
           localStorage.setItem('user', JSON.stringify(updated));
           return updated;
         });
+        setFirstName(updatedProfile.firstName ?? trimmedFirstName);
+        setLastName(updatedProfile.lastName ?? trimmedLastName);
+        setPhone(updatedProfile.phone ?? trimmedPhone);
         showToast(language === 'vi' ? 'Đã cập nhật thông tin cá nhân thành công!' : 'Profile updated successfully.', 'success');
+      } else {
+        throw new Error('Profile update returned no data.');
       }
     } catch (err) {
       showToast(err?.response?.data || (language === 'vi' ? 'Không thể cập nhật hồ sơ.' : 'Failed to update profile.'), 'error');

@@ -202,6 +202,10 @@ export default function Home() {
       showToast(t('common.warning'), 'error');
       return;
     }
+    if (product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || Number(product.stockQuantity ?? 0) <= 0) {
+      showToast(t('product.out_of_stock'), 'warning');
+      return;
+    }
     setTogglingId(product.productId);
     const isAdded = wishlistIds.has(product.productId);
     try {

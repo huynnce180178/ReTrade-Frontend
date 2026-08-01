@@ -22,12 +22,15 @@ export default function ChangePassword() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const SPECIAL_CHAR_REGEX = /[!@#$%^&*(),.?":{}|<>_\-]/;
+
   const checks = {
-    length: newPassword.length >= 8,
+    length: newPassword.length >= 8 && newPassword.length <= 50,
     upper: /[A-Z]/.test(newPassword),
     lower: /[a-z]/.test(newPassword),
     number: /[0-9]/.test(newPassword),
-    special: /[^A-Za-z0-9]/.test(newPassword)
+    special: SPECIAL_CHAR_REGEX.test(newPassword),
+    match: newPassword !== '' && confirmPassword !== '' && newPassword === confirmPassword,
   };
 
   const isPasswordValid = Object.values(checks).every(Boolean);
@@ -40,10 +43,6 @@ export default function ChangePassword() {
     }
     if (!isPasswordValid) {
       showToast(language === 'vi' ? 'Vui lòng đáp ứng đầy đủ yêu cầu mật khẩu.' : 'Please satisfy all password requirements.', 'error');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast(t('validation.password_mismatch'), 'error');
       return;
     }
 
@@ -72,14 +71,18 @@ export default function ChangePassword() {
         forceLogout();
       }, 1500);
     } catch (err) {
+      const serverMsg = err?.response?.data?.message || err?.response?.data;
       showToast(
-        err?.response?.data || (language === 'vi' ? `Không thể ${isPasswordSet ? 'đổi' : 'đặt'} mật khẩu.` : `Failed to ${isPasswordSet ? 'change' : 'set'} password.`),
+        typeof serverMsg === 'string'
+          ? serverMsg
+          : (language === 'vi' ? `Không thể ${isPasswordSet ? 'đổi' : 'đặt'} mật khẩu.` : `Failed to ${isPasswordSet ? 'change' : 'set'} password.`),
         'error'
       );
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="profile-page-wrapper container animate-fade-in">

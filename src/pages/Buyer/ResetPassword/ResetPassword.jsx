@@ -1,17 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { useAuth } from '../../../context/AuthContext';
 import accountService from '../../../services/accountService';
 
 import '../../../styles/ResetPassword.css';
 
 export default function ResetPassword() {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { t } = useLanguage();
 
+  useEffect(() => {
+    if (user && !user.mustChangePassword) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
+
   const [email, setEmail] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -24,16 +33,17 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      await accountService.passwordRecovery(email);
+      await accountService.passwordRecovery(email.trim());
       setSent(true);
       showToast(t('forgot_password_page.code_sent'), 'success');
     } catch (err) {
-      const errorMsg = err.response?.data || err.response?.data?.message || t('forgot_password_page.email_not_found');
+      const errorMsg = err.response?.data?.message || err.response?.data;
       showToast(typeof errorMsg === 'string' ? errorMsg : t('forgot_password_page.email_not_found'), 'error');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleBackToLogin = () => {
     navigate('/login');

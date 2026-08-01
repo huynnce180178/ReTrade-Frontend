@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import accountService from '../../services/accountService';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import './ChangePasswordAfterRecoveryModal.css';
 
 export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSuccess }) {
   const { showToast } = useToast();
+  const { t } = useLanguage();
+  const [closed, setClosed] = useState(false);
+
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -13,54 +17,83 @@ export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSu
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || closed) return null;
+
+  const handleClose = () => {
+    setClosed(true);
+    onClose?.();
+  };
+
+  const SPECIAL_CHAR_REGEX = /[!@#$%^&*(),.?":{}|<>_\-]/;
 
   const checks = {
-    length: newPassword.length >= 8,
+    length: newPassword.length >= 8 && newPassword.length <= 50,
     upper: /[A-Z]/.test(newPassword),
     lower: /[a-z]/.test(newPassword),
     number: /[0-9]/.test(newPassword),
-    special: /[^A-Za-z0-9]/.test(newPassword)
+    special: SPECIAL_CHAR_REGEX.test(newPassword),
+    match: newPassword !== '' && confirmPassword !== '' && newPassword === confirmPassword,
   };
 
   const isPasswordValid = Object.values(checks).every(Boolean);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      showToast('Please fill in all fields.', 'error');
+    const cleanOld = oldPassword.trim();
+    const cleanNew = newPassword.trim();
+    if (!cleanOld || !cleanNew || !confirmPassword) {
+      showToast(t('change_password_recovery.fill_all_fields_err'), 'error');
       return;
     }
     if (!isPasswordValid) {
-      showToast('Please satisfy all password requirements.', 'error');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('Passwords do not match.', 'error');
+      showToast(t('change_password_recovery.satisfy_req_err'), 'error');
       return;
     }
 
     setLoading(true);
+    let success = false;
     try {
-      await accountService.changePassword(oldPassword, newPassword);
-      showToast('Password updated successfully. Redirecting...', 'success');
-      onSuccess();
+      await accountService.changePassword(cleanOld, cleanNew);
+      showToast(t('change_password_recovery.success_msg'), 'success');
+      success = true;
     } catch (err) {
-      showToast(err?.response?.data || 'Failed to change password.', 'error');
+      const serverMsg = err?.response?.data?.message || err?.response?.data;
+      showToast(serverMsg || t('change_password_recovery.failed_msg'), 'error');
     } finally {
       setLoading(false);
     }
+
+    if (success) {
+      setClosed(true);
+      try {
+        onSuccess?.();
+      } catch (err) {
+        console.error('Modal onSuccess error:', err);
+      }
+    }
   };
+
+
+
+
+  const requirements = [
+    { key: 'length', label: t('change_password_recovery.req_length') },
+    { key: 'upper', label: t('change_password_recovery.req_upper') },
+    { key: 'lower', label: t('change_password_recovery.req_lower') },
+    { key: 'number', label: t('change_password_recovery.req_number') },
+    { key: 'special', label: t('change_password_recovery.req_special') },
+    { key: 'match', label: t('change_password_recovery.req_match') },
+  ];
 
   return (
     <div className="recovery-modal-overlay">
       <div className="recovery-modal-card">
-        <h3>Change Password</h3>
-        <p className="recovery-modal-subtitle">Please enter your temporary password and set a new secure password.</p>
+        <h3>{t('change_password_recovery.title')}</h3>
+        <p className="recovery-modal-subtitle">{t('change_password_recovery.subtitle')}</p>
 
         <form onSubmit={handleSubmit} className="recovery-modal-form">
           <div className="recovery-form-group">
-            <label>Temporary (Old) Password</label>
+            <label>{t('change_password_recovery.old_password_label')}</label>
             <div className="recovery-input-wrap">
               <input
                 type={showOldPassword ? 'text' : 'password'}
@@ -82,7 +115,7 @@ export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSu
           </div>
 
           <div className="recovery-form-group">
-            <label>New Password</label>
+            <label>{t('change_password_recovery.new_password_label')}</label>
             <div className="recovery-input-wrap">
               <input
                 type={showNewPassword ? 'text' : 'password'}
@@ -104,7 +137,7 @@ export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSu
           </div>
 
           <div className="recovery-form-group">
-            <label>Confirm New Password</label>
+            <label>{t('change_password_recovery.confirm_password_label')}</label>
             <div className="recovery-input-wrap">
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
@@ -127,48 +160,27 @@ export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSu
 
           {/* Checklist */}
           <div className="recovery-checklist-card">
-            <h4>Password Requirements</h4>
+            <h4>{t('change_password_recovery.req_title')}</h4>
             <ul className="recovery-checklist-list">
-              <li className={checks.length ? 'valid' : 'invalid'}>
-                <span className="material-symbols-outlined">
-                  {checks.length ? 'check_circle' : 'circle'}
-                </span>
-                <span>8+ characters</span>
-              </li>
-              <li className={checks.upper ? 'valid' : 'invalid'}>
-                <span className="material-symbols-outlined">
-                  {checks.upper ? 'check_circle' : 'circle'}
-                </span>
-                <span>One uppercase letter</span>
-              </li>
-              <li className={checks.lower ? 'valid' : 'invalid'}>
-                <span className="material-symbols-outlined">
-                  {checks.lower ? 'check_circle' : 'circle'}
-                </span>
-                <span>One lowercase letter</span>
-              </li>
-              <li className={checks.number ? 'valid' : 'invalid'}>
-                <span className="material-symbols-outlined">
-                  {checks.number ? 'check_circle' : 'circle'}
-                </span>
-                <span>One number</span>
-              </li>
-              <li className={checks.special ? 'valid' : 'invalid'}>
-                <span className="material-symbols-outlined">
-                  {checks.special ? 'check_circle' : 'circle'}
-                </span>
-                <span>One special character</span>
-              </li>
+              {requirements.map(({ key, label }) => (
+                <li key={key} className={checks[key] ? 'valid' : 'invalid'}>
+                  <span className="material-symbols-outlined">
+                    {checks[key] ? 'check_circle' : 'circle'}
+                  </span>
+                  <span>{label}</span>
+                </li>
+              ))}
             </ul>
           </div>
 
           <div className="recovery-modal-actions">
             <button type="submit" className="recovery-btn-primary" disabled={loading || !isPasswordValid}>
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? t('change_password_recovery.saving_btn') : t('change_password_recovery.save_btn')}
             </button>
-            <button type="button" className="recovery-btn-secondary" onClick={onClose} disabled={loading}>
-              Cancel
+            <button type="button" className="recovery-btn-secondary" onClick={handleClose} disabled={loading}>
+              {t('change_password_recovery.cancel_btn')}
             </button>
+
           </div>
         </form>
       </div>

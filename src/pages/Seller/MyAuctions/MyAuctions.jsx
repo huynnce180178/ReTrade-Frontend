@@ -6,6 +6,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import { auctionDateTimeLocalToApiValue, formatAuctionDateTime, getFutureAuctionDateTimeLocal, parseAuctionDateTime, toAuctionDateTimeLocal } from '../../../utils/auctionTime';
+import SellerPagination from '../../../components/SellerPagination/SellerPagination';
 import './MyAuctions.css';
 
 const moneyFormatter = new Intl.NumberFormat('vi-VN', {
@@ -14,6 +15,7 @@ const moneyFormatter = new Intl.NumberFormat('vi-VN', {
 });
 
 const DEFAULT_AUCTION_START_OFFSET_MS = 0;
+const AUCTION_PAGE_SIZE = 5;
 
 function isEndedStatus(status) {
   return ['Ended', 'EndedByBuyNow', 'EndedByTime', 'EndedNoBid'].includes(status);
@@ -85,7 +87,7 @@ function validateAuctionForm(form, { requireProduct = false, requireFutureStart 
   if (buyNowPrice <= startingPrice) return t('auction.err_buy_now_exceeded');
   if (!form.startTime || !start || Number.isNaN(start.getTime())) return t('validation.required');
   if (!form.endTime || !end || Number.isNaN(end.getTime())) return t('validation.required');
-  if (requireFutureStart && start <= new Date()) return t('auction.err_active_only');
+  if (requireFutureStart && start <= new Date()) return t('auction.err_future_start');
   if (end <= start) return t('validation.required');
 
   return '';
@@ -101,12 +103,22 @@ export default function MyAuctions() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [submittedSearchTerm, setSubmittedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [realtimeTick, setRealtimeTick] = useState(0);
   const [createForm, setCreateForm] = useState(getDefaultCreateForm);
   const [editingAuction, setEditingAuction] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [auctionPage, setAuctionPage] = useState(1);
+  const [auctionTotalPages, setAuctionTotalPages] = useState(1);
+  const [auctionTotalItems, setAuctionTotalItems] = useState(0);
+  const [auctionStats, setAuctionStats] = useState({
+    total: 0,
+    upcoming: 0,
+    ongoing: 0,
+    ended: 0,
+  });
 
   const statusOptions = useMemo(() => [
     { value: 'All', label: t('common.all') },
@@ -115,29 +127,62 @@ export default function MyAuctions() {
     { value: 'Ended', label: t('my_auctions.tab_ended') },
   ], [t]);
 
-  const stats = useMemo(() => {
-    return {
-      total: auctions.length,
-      upcoming: auctions.filter((auction) => auction.status === 'Upcoming').length,
-      ongoing: auctions.filter((auction) => auction.status === 'Ongoing').length,
-      ended: auctions.filter((auction) => isEndedStatus(auction.status)).length,
-    };
-  }, [auctions]);
+  const stats = auctionStats;
 
-  const loadAuctions = async () => {
+  useEffect(() => {
+    setAuctionPage((current) => Math.min(current, auctionTotalPages));
+  }, [auctionTotalPages]);
+
+  const loadAuctions = useCallback(async (page = 1) => {
     try {
       setLoading(true);
-      const params = { PageSize: 50, SortBy: 'newest' };
-      if (searchTerm.trim()) params.SearchTerm = searchTerm.trim();
+      const params = {
+        PageSize: AUCTION_PAGE_SIZE,
+        Page: page,
+        SortBy: 'newest',
+      };
+      if (submittedSearchTerm) params.SearchTerm = submittedSearchTerm;
       if (statusFilter !== 'All') params.Status = statusFilter;
       const data = await auctionService.getMyAuctions(params);
       setAuctions(data?.items || []);
+      const totalItems = data?.totalItems ?? data?.totalCount ?? 0;
+      setAuctionTotalItems(totalItems);
+      const totalPages = data?.totalPages ?? (totalItems ? Math.ceil(totalItems / AUCTION_PAGE_SIZE) : 1);
+      setAuctionTotalPages(Math.max(1, totalPages));
     } catch (error) {
       showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, submittedSearchTerm, showToast, t]);
+
+  const loadAuctionStats = useCallback(async () => {
+    try {
+      const baseParams = {
+        PageSize: 1,
+        Page: 1,
+        SortBy: 'newest',
+      };
+      if (submittedSearchTerm) baseParams.SearchTerm = submittedSearchTerm;
+
+      const [allData, upcomingData, ongoingData, endedData] = await Promise.all([
+        auctionService.getMyAuctions(baseParams),
+        auctionService.getMyAuctions({ ...baseParams, Status: 'Upcoming' }),
+        auctionService.getMyAuctions({ ...baseParams, Status: 'Ongoing' }),
+        auctionService.getMyAuctions({ ...baseParams, Status: 'Ended' }),
+      ]);
+
+      const getTotal = (data) => data?.totalItems ?? data?.totalCount ?? 0;
+      setAuctionStats({
+        total: getTotal(allData),
+        upcoming: getTotal(upcomingData),
+        ongoing: getTotal(ongoingData),
+        ended: getTotal(endedData),
+      });
+    } catch {
+      setAuctionStats((current) => current);
+    }
+  }, [submittedSearchTerm]);
 
   const loadEligibleProducts = async () => {
     try {
@@ -153,8 +198,12 @@ export default function MyAuctions() {
   }, []);
 
   useEffect(() => {
-    loadAuctions();
-  }, [statusFilter, realtimeTick]);
+    loadAuctions(auctionPage);
+  }, [auctionPage, realtimeTick, loadAuctions]);
+
+  useEffect(() => {
+    loadAuctionStats();
+  }, [realtimeTick, loadAuctionStats]);
 
   useEffect(() => {
     if (authLoading || !user) return undefined;
@@ -192,6 +241,10 @@ export default function MyAuctions() {
     setCreateForm((current) => ({ ...current, [name]: value }));
   };
 
+  const openCreateModal = () => {
+    setIsCreateModalOpen(true);
+  };
+
   const handleEditChange = (event) => {
     const { name, value } = event.target;
     setEditForm((current) => ({ ...current, [name]: value }));
@@ -214,7 +267,8 @@ export default function MyAuctions() {
       showToast(t('toast.saved_success'), 'success');
       setCreateForm(getDefaultCreateForm());
       setIsCreateModalOpen(false);
-      await Promise.all([loadEligibleProducts(), loadAuctions()]);
+      setAuctionPage(1);
+      await Promise.all([loadEligibleProducts(), loadAuctions(1), loadAuctionStats()]);
     } catch (error) {
       showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
@@ -258,7 +312,7 @@ export default function MyAuctions() {
       await auctionService.update(editingAuction.auctionId, toAuctionPayload(editForm));
       showToast(t('toast.saved_success'), 'success');
       closeEditModal();
-      await loadAuctions();
+      await Promise.all([loadAuctions(auctionPage), loadAuctionStats()]);
     } catch (error) {
       showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
@@ -268,7 +322,8 @@ export default function MyAuctions() {
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
-    loadAuctions();
+    setAuctionPage(1);
+    setSubmittedSearchTerm(searchTerm.trim());
   };
 
   const getAuctionStatusText = (status) => {
@@ -298,7 +353,7 @@ export default function MyAuctions() {
           <button
             type="button"
             className="seller-list-btn"
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={openCreateModal}
           >
             <span className="material-symbols-outlined">add</span>{t('my_auctions.create_auction_btn')}
           </button>
@@ -332,7 +387,10 @@ export default function MyAuctions() {
                   <button
                     key={status}
                     type="button"
-                    onClick={() => setStatusFilter(status)}
+                    onClick={() => {
+                      setAuctionPage(1);
+                      setStatusFilter(status);
+                    }}
                     style={{
                       padding: '8px 16px',
                       borderRadius: '999px',
@@ -427,14 +485,22 @@ export default function MyAuctions() {
               })}
             </div>
           )}
+          <SellerPagination
+            page={auctionPage}
+            totalPages={auctionTotalPages}
+            pageSize={AUCTION_PAGE_SIZE}
+            totalItems={auctionTotalItems}
+            disabled={loading}
+            onPageChange={setAuctionPage}
+          />
         </section>
       </div>
     </div>
 
     {/* Create Auction Modal */}
     {isCreateModalOpen && (
-      <div className="seller-auctions-modal-overlay" onClick={() => !saving && setIsCreateModalOpen(false)}>
-        <div className="seller-auctions-modal animate-fade-in" onClick={(e) => e.stopPropagation()}>
+      <div className="seller-auctions-modal-overlay">
+        <div className="seller-auctions-modal-content animate-fade-in">
           <div className="modal-header">
             <h3>{t('my_auctions.create_auction_btn')}</h3>
             <button className="close-btn" onClick={() => !saving && setIsCreateModalOpen(false)}>×</button>
@@ -467,7 +533,6 @@ export default function MyAuctions() {
                   onChange={handleCreateChange}
                   required
                   min="1"
-                  placeholder="e.g. 100000"
                 />
               </div>
               <div className="form-group">
@@ -479,7 +544,6 @@ export default function MyAuctions() {
                   onChange={handleCreateChange}
                   required
                   min="1"
-                  placeholder="e.g. 50000"
                 />
               </div>
             </div>
@@ -493,7 +557,6 @@ export default function MyAuctions() {
                 onChange={handleCreateChange}
                 required
                 min="1"
-                placeholder="e.g. 1000000"
               />
             </div>
 
@@ -515,6 +578,7 @@ export default function MyAuctions() {
                   name="endTime"
                   value={createForm.endTime}
                   onChange={handleCreateChange}
+                  min={createForm.startTime || undefined}
                   required
                 />
               </div>
@@ -528,11 +592,9 @@ export default function MyAuctions() {
         </div>
       </div>
     )}
-
-    {/* Edit Auction Modal */}
     {editingAuction && editForm && (
-      <div className="seller-auctions-modal-overlay" onClick={closeEditModal}>
-        <div className="seller-auctions-modal animate-fade-in" onClick={(e) => e.stopPropagation()}>
+      <div className="seller-auctions-modal-overlay">
+        <div className="seller-auctions-modal-content animate-fade-in">
           <div className="modal-header">
             <h3>{t('common.edit')}</h3>
             <button className="close-btn" onClick={closeEditModal}>×</button>
@@ -593,6 +655,7 @@ export default function MyAuctions() {
                   name="endTime"
                   value={editForm.endTime}
                   onChange={handleEditChange}
+                  min={editForm.startTime || undefined}
                   required
                 />
               </div>

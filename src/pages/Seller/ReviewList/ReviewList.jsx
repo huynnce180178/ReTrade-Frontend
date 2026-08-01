@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { Link, useOutletContext } from 'react-router-dom';
 import reviewService from '../../../services/reviewService';
 import reportService from '../../../services/reportService';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import SellerPagination from '../../../components/SellerPagination/SellerPagination';
 import './ReviewList.css';
 
 const PAGE_SIZE = 8;
@@ -18,29 +20,13 @@ function formatDate(dateStr) {
   });
 }
 
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 5) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  if (currentPage <= 3) {
-    return [1, 2, 3, 4, 'end-ellipsis', totalPages];
-  }
-
-  if (currentPage >= totalPages - 2) {
-    return [1, 'start-ellipsis', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-  }
-
-  return [1, 'start-ellipsis', currentPage - 1, currentPage, currentPage + 1, 'end-ellipsis', totalPages];
-}
-
 function StarRating({ value = 0, compact = false }) {
   const rating = Number(value || 0);
 
   return (
     <div className={`seller-review-stars ${compact ? 'compact' : ''}`} aria-label={`${rating} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <span key={star} className={`material-symbols-outlined ${star <= rating ? 'filled' : ''}`}>
+        <span key={star} className={`material-symbols-outlined ${star <= rating ? 'filled' : 'empty'}`}>
           star
         </span>
       ))}
@@ -95,14 +81,20 @@ export default function ReviewList() {
 
   const [previewReview, setPreviewReview] = useState(null);
 
-  const reportReasons = useMemo(() => [
-    t('reports.reason_spam'),
-    t('reports.reason_prohibited'),
-    t('reports.reason_fraud'),
-    t('reports.reason_counterfeit'),
-    t('reports.reason_harassment'),
-    t('reports.reason_other'),
-  ], [t]);
+  const reportReasons = useMemo(() => {
+    const getLabel = (key, fallback) => {
+      const val = t(key);
+      return (!val || val === key) ? fallback : val;
+    };
+    return [
+      getLabel('reports.reason_spam', 'Spam hoặc quảng cáo không phù hợp'),
+      getLabel('reports.reason_prohibited', 'Ngôn từ thô tục, lăng mạ hoặc xúc phạm'),
+      getLabel('reports.reason_fraud', 'Thông tin sai sự thật hoặc gian lận'),
+      getLabel('reports.reason_counterfeit', 'Nghi ngờ hàng giả / hàng nhái'),
+      getLabel('reports.reason_harassment', 'Quấy rối hoặc tiết lộ thông tin cá nhân'),
+      getLabel('reports.reason_other', 'Lý do vi phạm khác'),
+    ];
+  }, [t]);
 
   const ratingFilterOptions = useMemo(() => [
     { value: '', label: t('common.all') },
@@ -140,13 +132,66 @@ export default function ReviewList() {
 
     try {
       setSummaryLoading(true);
-      const data = await reviewService.getSellerSummary(user.userId);
-      setSummary({
-        totalReviews: Number(data?.totalReviews || 0),
-        averageRating: Number(data?.averageRating || 0),
-        reportedReviews: Number(data?.reportedReviews || 0),
-        ratingStats: data?.ratingStats || {},
-      });
+      let allReviews = [];
+      try {
+        const res = await reviewService.getSellerReviews(user.userId, { pageSize: 1000 });
+        allReviews = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+      } catch {
+        const res = await reviewService.getPublicSellerReviews(user.userId, { pageSize: 1000 });
+        allReviews = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+      }
+
+      if (allReviews.length > 0) {
+        const activeReviews = allReviews.filter((r) => {
+          const normStatus = (r?.latestReportStatus || '').toLowerCase();
+          const isRemoved = Boolean(
+            r?.isReportApproved ||
+            r?.IsReportApproved ||
+            r?.isRemoved ||
+            r?.IsRemoved ||
+            ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(normStatus) ||
+            ['hidden', 'removed', 'deleted'].includes(r?.status?.toLowerCase())
+          );
+          return !isRemoved;
+        });
+
+        const reportedCount = allReviews.filter((r) => {
+          const normStatus = (r?.latestReportStatus || '').toLowerCase();
+          return Boolean(
+            r?.reportCount > 0 ||
+            r?.reportedByCurrentUser ||
+            r?.latestReportReason ||
+            ['accepted', 'approved', 'resolved', 'pending', 'acceptedreview'].includes(normStatus)
+          );
+        }).length;
+
+        const totalActive = activeReviews.length;
+        const sumRating = activeReviews.reduce((sum, r) => sum + Number(r.rating || 0), 0);
+        const avgRating = totalActive > 0 ? sumRating / totalActive : 0;
+
+        const stats = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        activeReviews.forEach((r) => {
+          const star = Math.round(Number(r.rating || 0));
+          if (stats[star] !== undefined) {
+            stats[star] += 1;
+          }
+        });
+
+        setSummary({
+          totalReviews: totalActive,
+          averageRating: avgRating,
+          reportedReviews: reportedCount,
+          ratingStats: stats,
+        });
+      } else {
+        const data = await reviewService.getSellerSummary(user.userId);
+        setSummary({
+          totalReviews: Number(data?.totalReviews || 0),
+          averageRating: Number(data?.averageRating || 0),
+          reportedReviews: Number(data?.reportedReviews || 0),
+          ratingStats: data?.ratingStats || {},
+        });
+      }
     } catch {
       // Quiet fail
     } finally {
@@ -214,11 +259,15 @@ export default function ReviewList() {
     setReportDescription('');
   };
 
-  const closeReportModal = () => {
-    if (reportSubmitting) return;
+  const forceCloseReportModal = () => {
     setReportingReview(null);
     setReportReason('');
     setReportDescription('');
+  };
+
+  const closeReportModal = () => {
+    if (reportSubmitting) return;
+    forceCloseReportModal();
   };
 
   const handleReportSubmit = async (event) => {
@@ -230,20 +279,28 @@ export default function ReviewList() {
 
     try {
       setReportSubmitting(true);
-      await reportService.create({
-        targetId: reportingReview.reviewId,
-        targetType: 'Review',
-        reportType: 'ReviewViolation',
+      await reportService.reportReview(reportingReview.reviewId, {
         reason: reportReason.trim(),
         description: reportDescription.trim() || reportReason.trim(),
       });
 
       showToast(t('reports.report_success'), 'success');
-      closeReportModal();
+      forceCloseReportModal();
       fetchSummary();
       fetchReviews();
     } catch (error) {
-      showToast(error?.response?.data || t('common.error_occurred'), 'error');
+      const rawMsg = String(error?.response?.data?.message || error?.response?.data || error?.message || '');
+      const isAlreadyHandled = rawMsg.toLowerCase().includes('already') || rawMsg.toLowerCase().includes('hidden');
+      
+      const toastType = isAlreadyHandled ? 'info' : 'error';
+      const displayMsg = isAlreadyHandled 
+        ? t('reports.already_reported')
+        : (rawMsg || t('common.error_occurred'));
+
+      showToast(displayMsg, toastType);
+      forceCloseReportModal();
+      fetchSummary();
+      fetchReviews();
     } finally {
       setReportSubmitting(false);
     }
@@ -252,7 +309,6 @@ export default function ReviewList() {
   const openPreviewModal = (review) => setPreviewReview(review);
   const closePreviewModal = () => setPreviewReview(null);
 
-  const paginationItems = useMemo(() => getPaginationItems(page, totalPages), [page, totalPages]);
   const firstItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const lastItem = Math.min(page * PAGE_SIZE, totalItems);
 
@@ -270,8 +326,11 @@ export default function ReviewList() {
   return (
     <div className="seller-review-page animate-fade-in">
       <header className="seller-review-header">
-        <div>
-          <span>{t('seller.reviews')}</span>
+        <div className="seller-review-header-title">
+          <span className="seller-review-badge">
+            <span className="material-symbols-outlined">verified</span>
+            {t('seller.reviews')}
+          </span>
           <h1>{t('review_list.title')}</h1>
           <p>{t('review_list.subtitle')}</p>
         </div>
@@ -279,237 +338,355 @@ export default function ReviewList() {
 
       <section className="seller-review-summary-grid" aria-label="Review summary">
         <article className="seller-review-summary-card">
-          <span className="material-symbols-outlined">reviews</span>
-          <div>
+          <div className="summary-icon-wrapper primary">
+            <span className="material-symbols-outlined">rate_review</span>
+          </div>
+          <div className="summary-content">
             <p>{t('review_list.total_reviews')}</p>
-            <strong>{summaryLoading ? '-' : summary.totalReviews}</strong>
+            <strong>{summaryLoading ? '...' : summary.totalReviews}</strong>
           </div>
         </article>
-        <article className="seller-review-summary-card">
-          <span className="material-symbols-outlined">star</span>
-          <div>
+
+        <article className="seller-review-summary-card star-card">
+          <div className="summary-icon-wrapper rating">
+            <span className="material-symbols-outlined">star</span>
+          </div>
+          <div className="summary-content">
             <p>{t('review_list.average_rating')}</p>
-            <strong>{summaryLoading ? '-' : summary.averageRating.toFixed(1)}</strong>
+            <div className="summary-rating-num">
+              <strong>{summaryLoading ? '...' : summary.averageRating.toFixed(1)}</strong>
+              <small>/ 5.0</small>
+            </div>
           </div>
         </article>
-        <article className="seller-review-summary-card warning">
-          <span className="material-symbols-outlined">flag</span>
-          <div>
+
+        <article className={`seller-review-summary-card ${summary.reportedReviews > 0 ? 'warning' : ''}`}>
+          <div className="summary-icon-wrapper flag">
+            <span className="material-symbols-outlined">flag</span>
+          </div>
+          <div className="summary-content">
             <p>{t('review_list.reported_reviews')}</p>
-            <strong>{summaryLoading ? '-' : summary.reportedReviews}</strong>
+            <strong>{summaryLoading ? '...' : summary.reportedReviews}</strong>
           </div>
         </article>
       </section>
 
       <section className="seller-review-rating-strip" aria-label="Rating distribution">
-        {[5, 4, 3, 2, 1].map((rating) => {
-          const count = Number(ratingStats[rating] ?? ratingStats[String(rating)] ?? 0);
-          const width = summary.totalReviews ? Math.round((count / summary.totalReviews) * 100) : 0;
+        <div className="rating-strip-header">
+          <span className="material-symbols-outlined">bar_chart</span>
+          <span>{t('seller_profile.reviews_count')}</span>
+        </div>
+        <div className="rating-strip-grid">
+          {[5, 4, 3, 2, 1].map((rating) => {
+            const count = Number(ratingStats[rating] ?? ratingStats[String(rating)] ?? 0);
+            const width = summary.totalReviews ? Math.round((count / summary.totalReviews) * 100) : 0;
+            const isSelected = ratingFilter === String(rating);
 
-          return (
-            <div className="seller-review-rating-row" key={rating}>
-              <span>{rating}</span>
-              <span className="material-symbols-outlined">star</span>
-              <div>
-                <i style={{ width: `${width}%` }}></i>
-              </div>
-              <strong>{count}</strong>
-            </div>
-          );
-        })}
+            return (
+              <button
+                type="button"
+                className={`seller-review-rating-row ${isSelected ? 'active' : ''}`}
+                key={rating}
+                onClick={() => {
+                  if (isSelected) {
+                    setRatingFilter('');
+                  } else {
+                    setRatingFilter(String(rating));
+                    setStatusFilter('');
+                  }
+                  setPage(1);
+                }}
+              >
+                <span className="rating-num">{rating}</span>
+                <span className="material-symbols-outlined star-icon">star</span>
+                <div className="bar-track">
+                  <i style={{ width: `${width}%` }}></i>
+                </div>
+                <strong className="rating-count">{count}</strong>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
-      <section className="seller-review-toolbar">
-        <div className="seller-review-search">
-          <span className="material-symbols-outlined">search</span>
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder={t('common.search_placeholder')}
-          />
+      <section className="seller-review-filter-bar">
+        <div className="seller-review-pills">
+          <button
+            type="button"
+            className={`pill-btn ${ratingFilter === '' && statusFilter === '' ? 'active' : ''}`}
+            onClick={() => {
+              setRatingFilter('');
+              setStatusFilter('');
+              setPage(1);
+            }}
+          >
+            {t('common.all')} ({summary.totalReviews})
+          </button>
+          {[5, 4, 3, 2, 1].map((stars) => (
+            <button
+              type="button"
+              key={stars}
+              className={`pill-btn ${ratingFilter === String(stars) && statusFilter === '' ? 'active' : ''}`}
+              onClick={() => {
+                setRatingFilter(String(stars));
+                setStatusFilter('');
+                setPage(1);
+              }}
+            >
+              {stars} ★
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`pill-btn warning-pill ${statusFilter === 'reported' ? 'active' : ''}`}
+            onClick={() => {
+              setStatusFilter(statusFilter === 'reported' ? '' : 'reported');
+              setRatingFilter('');
+              setPage(1);
+            }}
+          >
+            <span className="material-symbols-outlined">flag</span>
+            {t('review_list.status_reported')} ({summary.reportedReviews})
+          </button>
         </div>
 
-        <select value={ratingFilter} onChange={handleFilterChange(setRatingFilter)} aria-label="Filter by rating">
-          {ratingFilterOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+        <div className="seller-review-toolbar-right">
+          <div className="seller-review-search">
+            <span className="material-symbols-outlined search-icon">search</span>
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder={t('common.search_placeholder')}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setSearchInput('')}
+                aria-label="Clear search"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            )}
+          </div>
 
-        <select value={statusFilter} onChange={handleFilterChange(setStatusFilter)} aria-label="Filter by report status">
-          {statusFilterOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-
-        <select value={sortBy} onChange={handleFilterChange(setSortBy)} aria-label="Sort reviews">
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+          <div className="seller-review-select-wrapper">
+            <span className="material-symbols-outlined select-icon">sort</span>
+            <select value={sortBy} onChange={handleFilterChange(setSortBy)} aria-label="Sort reviews">
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </section>
 
       <section className="seller-review-results">
         <div className="seller-review-results-head">
-          <span>
+          <span className="results-count">
             {t('common.showing')} <strong>{firstItem}-{lastItem}</strong> {t('common.of')} <strong>{totalItems}</strong> {t('seller.reviews')}
           </span>
-          <span>{t('common.page')} {page} / {totalPages}</span>
+          <span className="results-page-indicator">{t('common.page')} {page} / {totalPages}</span>
         </div>
 
         {loading ? (
           <div className="seller-review-list">
-            {Array.from({ length: 4 }).map((_, index) => (
+            {Array.from({ length: 3 }).map((_, index) => (
               <article className="seller-review-card skeleton" key={index}>
-                <span></span>
-                <div></div>
+                <div className="skeleton-thumb"></div>
+                <div className="skeleton-lines">
+                  <div className="skeleton-line title"></div>
+                  <div className="skeleton-line text"></div>
+                  <div className="skeleton-line text short"></div>
+                </div>
               </article>
             ))}
           </div>
         ) : reviews.length === 0 ? (
           <div className="seller-review-empty">
-            <span className="material-symbols-outlined">rate_review</span>
-            <h2>{t('common.no_data')}</h2>
-            <p>{t('review_list.subtitle')}</p>
+            <div className="empty-icon-circle">
+              <span className="material-symbols-outlined">rate_review</span>
+            </div>
+            <h2>{t('review_list.no_reviews_title')}</h2>
+            <p>{t('review_list.no_reviews_desc')}</p>
+            {(ratingFilter || statusFilter || searchTerm) && (
+              <button
+                type="button"
+                className="reset-filters-btn"
+                onClick={() => {
+                  setRatingFilter('');
+                  setStatusFilter('');
+                  setSearchInput('');
+                  setPage(1);
+                }}
+              >
+                <span className="material-symbols-outlined">refresh</span>
+                {t('common.all')}
+              </button>
+            )}
           </div>
         ) : (
           <div className="seller-review-list">
-            {reviews.map((review) => (
-              <article className="seller-review-card" key={review.reviewId}>
-                <div className="seller-review-product">
-                  <button
-                    type="button"
-                    className="seller-review-product-media"
-                    onClick={() => openPreviewModal(review)}
-                    aria-label={`Preview ${review.productName || ''}`}
-                  >
-                    {review.productImageUrl ? (
-                      <img src={review.productImageUrl} alt={review.productName || t('common.reviewed_product')} loading="lazy" />
-                    ) : (
-                      <span className="material-symbols-outlined">inventory_2</span>
-                    )}
-                  </button>
-                  <div>
-                    <span>{t('my_products.th_product')}</span>
-                    <Link to={review.productId ? `/product/${review.productId}` : '#'}>{review.productName || t('nav.product')}</Link>
-                    <small>{review.productId || t('common.no_product_id')}</small>
-                  </div>
-                </div>
+            {reviews.map((review) => {
+              const normStatus = (review.latestReportStatus || '').toLowerCase();
+              const isApprovedReport = Boolean(
+                review.isReportApproved ||
+                review.IsReportApproved ||
+                ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(normStatus)
+              );
+              const isRejectedReport = Boolean(
+                review.isReportRejected ||
+                review.IsReportRejected ||
+                ['rejected', 'declined', 'dismissed', 'refused'].includes(normStatus)
+              );
+              const isPendingReport = review.reportCount > 0 && !isApprovedReport && !isRejectedReport;
 
-                <div className="seller-review-content">
-                  <div className="seller-review-buyer-strip">
-                    <div className="seller-review-buyer-avatar">
-                      {review.reviewerAvatarUrl ? (
-                        <img src={review.reviewerAvatarUrl} alt={review.reviewerName || t('common.unknown_buyer')} loading="lazy" />
-                      ) : (
-                        getBuyerInitials(review.reviewerName)
+              return (
+                <article className={`seller-review-card ${isApprovedReport ? 'report-approved' : ''}`} key={review.reviewId}>
+                  <div className="seller-review-card-header">
+                    <div className="seller-review-buyer-info">
+                      <div className="seller-review-buyer-avatar">
+                        {review.reviewerAvatarUrl ? (
+                          <img src={review.reviewerAvatarUrl} alt={review.reviewerName || t('common.unknown_buyer')} loading="lazy" />
+                        ) : (
+                          getBuyerInitials(review.reviewerName)
+                        )}
+                      </div>
+                      <div className="seller-review-buyer-details">
+                        <div className="buyer-name-row">
+                          <strong>{review.reviewerName || t('common.unknown_buyer')}</strong>
+                          <span className="buyer-tag">{t('order_management.th_buyer')}</span>
+                        </div>
+                        <div className="buyer-sub-row">
+                          {review.reviewerEmail && <small className="buyer-email">{review.reviewerEmail}</small>}
+                          <span className="review-date">
+                            <span className="material-symbols-outlined">calendar_today</span>
+                            {formatDate(review.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="seller-review-card-header-right">
+                      {isApprovedReport ? (
+                        <div className="seller-review-report-badge danger">
+                          <span className="material-symbols-outlined">block</span>
+                          {t('review_list.status_violated_removed')}
+                        </div>
+                      ) : isRejectedReport ? (
+                        <div className="seller-review-report-badge rejected">
+                          <span className="material-symbols-outlined">cancel</span>
+                          {t('review_list.status_report_rejected')}
+                        </div>
+                      ) : isPendingReport ? (
+                        <div className="seller-review-report-badge pending">
+                          <span className="material-symbols-outlined">schedule</span>
+                          {t('review_list.status_processing')} ({review.reportCount})
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        className="card-top-icon-btn preview"
+                        title={t('common.view_detail')}
+                        onClick={() => openPreviewModal(review)}
+                      >
+                        <span className="material-symbols-outlined">visibility</span>
+                      </button>
+
+                      {!isApprovedReport && (
+                        <button
+                          type="button"
+                          className={`card-top-icon-btn report ${review.reportedByCurrentUser ? 'reported' : ''}`}
+                          title={review.reportedByCurrentUser ? t('reports.report_success') : t('reports.report_button')}
+                          onClick={() => openReportModal(review)}
+                        >
+                          <span className="material-symbols-outlined">flag</span>
+                        </button>
                       )}
                     </div>
-                    <div>
-                      <span>{t('order_management.th_buyer')}</span>
-                      <strong>{review.reviewerName || t('common.unknown_buyer')}</strong>
-                      <small>{review.reviewerEmail || ''}</small>
-                    </div>
                   </div>
 
-                  <div className="seller-review-card-top">
-                    <div>
+                  <div className="seller-review-card-body">
+                    <div className="seller-review-rating-block">
                       <StarRating value={review.rating} />
-                      <p>{review.comment || t('common.no_data')}</p>
+                      <span className="rating-score-pill">{review.rating?.toFixed(1)} / 5.0</span>
                     </div>
-                    <div className={`seller-review-report-badge ${review.reportCount ? 'reported' : ''}`}>
-                      <span className="material-symbols-outlined">flag</span>
-                      {review.reportCount ? `${review.reportCount} ${t('reports.report_button')}` : t('review_list.status_unreported')}
+
+                    {review.comment && (
+                      <blockquote className="seller-review-comment">
+                        &quot;{review.comment}&quot;
+                      </blockquote>
+                    )}
+
+                    <div className="seller-review-product-box">
+                      <button
+                        type="button"
+                        className={`seller-review-product-media ${isApprovedReport ? 'blurred-media' : ''}`}
+                        onClick={() => openPreviewModal(review)}
+                        aria-label={`Preview ${review.productName || ''}`}
+                      >
+                        {review.productImageUrl ? (
+                          <img src={review.productImageUrl} alt={review.productName || t('common.reviewed_product')} loading="lazy" />
+                        ) : (
+                          <span className="material-symbols-outlined">inventory_2</span>
+                        )}
+                        {isApprovedReport && (
+                          <span className="media-removed-overlay">
+                            {t('review_list.removed_tag')}
+                          </span>
+                        )}
+                      </button>
+                      <div className="product-box-info">
+                        <span className="product-label">{t('my_products.th_product')}</span>
+                        <Link to={review.productId ? `/product/${review.productId}` : '#'} className="product-title">
+                          {review.productName || t('nav.product')}
+                        </Link>
+                        <div className="product-order-meta">
+                          {review.orderCode && (
+                            <span className="order-code-chip">
+                              <span className="material-symbols-outlined">receipt_long</span>
+                              {review.orderCode}
+                            </span>
+                          )}
+                          <small className="product-id">{review.productId || ''}</small>
+                        </div>
+                      </div>
                     </div>
+
+                    {review.reportedByCurrentUser && (
+                      <div className={`seller-review-current-report ${isApprovedReport ? 'approved' : isRejectedReport ? 'rejected' : ''}`}>
+                        <span className="material-symbols-outlined">{isApprovedReport ? 'check_circle' : isRejectedReport ? 'cancel' : 'task_alt'}</span>
+                        <p>
+                          {isApprovedReport
+                            ? t('review_list.report_approved_notice')
+                            : isRejectedReport
+                            ? t('review_list.report_rejected_notice')
+                            : t('reports.report_success')}:{' '}
+                          <strong>{review.currentUserReport?.reason || review.latestReportReason || t('reports.report_button')}</strong>.
+                        </p>
+                      </div>
+                    )}
                   </div>
-
-                  <dl className="seller-review-meta-grid">
-                    <div>
-                      <dt>ID</dt>
-                      <dd>{review.reviewId}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('common.type')}</dt>
-                      <dd>{review.targetType || t('common.type')}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('seller.orders_management')}</dt>
-                      <dd>{review.orderCode || review.orderId || t('common.na')}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('order_management.th_buyer')}</dt>
-                      <dd>{review.reviewerName || t('common.unknown_buyer')}</dd>
-                    </div>
-                    <div>
-                      <dt>{t('history.order_date')}</dt>
-                      <dd>{formatDate(review.createdAt)}</dd>
-                    </div>
-                  </dl>
-
-                  {review.reportedByCurrentUser ? (
-                    <div className="seller-review-current-report">
-                      <span className="material-symbols-outlined">task_alt</span>
-                      <p>
-                        {t('reports.report_success')}:{' '}
-                        <strong>{review.currentUserReport?.reason || review.latestReportReason || t('reports.report_button')}</strong>.
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="seller-review-actions">
-                  <button
-                    type="button"
-                    className="seller-review-report-btn"
-                    onClick={() => openReportModal(review)}
-                  >
-                    <span className="material-symbols-outlined">flag</span>
-                    {review.reportedByCurrentUser ? t('reports.report_success') : t('reports.report_button')}
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
 
-        {totalPages > 1 ? (
-          <div className="seller-review-pagination">
-            <button
-              type="button"
-              disabled={page === 1}
-              onClick={() => setPage((curr) => Math.max(1, curr - 1))}
-            >
-              {t('common.previous')}
-            </button>
-            {paginationItems.map((item, index) => {
-              if (typeof item === 'string') {
-                return <span key={`${item}-${index}`}>...</span>;
-              }
-
-              return (
-                <button
-                  type="button"
-                  key={item}
-                  className={page === item ? 'active' : ''}
-                  onClick={() => setPage(item)}
-                >
-                  {item}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              disabled={page === totalPages}
-              onClick={() => setPage((curr) => Math.min(totalPages, curr + 1))}
-            >
-              {t('common.next')}
-            </button>
-          </div>
-        ) : null}
+        <SellerPagination
+          page={page}
+          totalPages={totalPages}
+          pageSize={PAGE_SIZE}
+          totalItems={totalItems}
+          disabled={loading}
+          onPageChange={setPage}
+        />
       </section>
 
       {/* Report Modal */}
-      {reportingReview ? (
+      {reportingReview ? createPortal(
         <div className="seller-review-modal-backdrop animate-fade-in" onClick={closeReportModal}>
           <div className="seller-review-modal-card" onClick={(event) => event.stopPropagation()}>
             <header className="seller-review-modal-head">
@@ -561,34 +738,120 @@ export default function ReviewList() {
               </footer>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
 
-      {/* Preview Modal */}
-      {previewReview ? (
-        <div className="seller-review-modal-backdrop animate-fade-in" onClick={closePreviewModal}>
-          <div className="seller-review-modal-card preview-mode" onClick={(event) => event.stopPropagation()}>
-            <header className="seller-review-modal-head">
-              <h3>{t('common.view_detail')}</h3>
-              <button type="button" onClick={closePreviewModal} aria-label="Close">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </header>
+      {/* Preview Detail Modal */}
+      {previewReview ? (() => {
+        const isApprovedReportModal = Boolean(
+          previewReview.isReportApproved ||
+          previewReview.IsReportApproved ||
+          ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(previewReview.latestReportStatus?.toLowerCase())
+        );
 
-            <div className="seller-review-modal-body">
-              {previewReview.productImageUrl ? (
-                <img className="seller-review-preview-img" src={previewReview.productImageUrl} alt={previewReview.productName || t('nav.product')} />
-              ) : null}
-              <strong>{previewReview.productName || t('nav.product')}</strong>
-              <StarRating value={previewReview.rating} />
-              <p>&quot;{previewReview.comment || t('common.no_data')}&quot;</p>
-              <footer className="seller-review-modal-actions">
-                <button type="button" className="primary" onClick={closePreviewModal}>{t('common.close')}</button>
-              </footer>
+        return createPortal(
+          <div className="seller-review-modal-backdrop animate-fade-in" onClick={closePreviewModal}>
+            <div className="seller-review-modal-card detail-modal" onClick={(event) => event.stopPropagation()}>
+              <header className="seller-review-modal-head">
+                <div className="modal-title-group">
+                  <span className="material-symbols-outlined">rate_review</span>
+                  <h3>{t('common.view_detail')}</h3>
+                </div>
+                <button type="button" onClick={closePreviewModal} aria-label="Close" className="modal-close-btn">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </header>
+
+              <div className="seller-review-modal-body detail-modal-body">
+                {isApprovedReportModal && (
+                  <div className="modal-alert-banner danger">
+                    <span className="material-symbols-outlined">block</span>
+                    <div>
+                      <strong>{t('review_list.violation_modal_title')}</strong>
+                      <p>{t('review_list.violation_modal_desc')}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="modal-buyer-section">
+                  <div className="modal-buyer-avatar">
+                    {previewReview.reviewerAvatarUrl ? (
+                      <img src={previewReview.reviewerAvatarUrl} alt={previewReview.reviewerName || t('common.unknown_buyer')} />
+                    ) : (
+                      getBuyerInitials(previewReview.reviewerName)
+                    )}
+                  </div>
+                  <div className="modal-buyer-info">
+                    <strong>{previewReview.reviewerName || t('common.unknown_buyer')}</strong>
+                    <small>{previewReview.reviewerEmail || ''}</small>
+                    <span className="modal-review-date">
+                      <span className="material-symbols-outlined">calendar_today</span>
+                      {formatDate(previewReview.createdAt)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="modal-rating-section">
+                  <StarRating value={previewReview.rating} />
+                  <span className="modal-rating-score">{previewReview.rating?.toFixed(1)} / 5.0</span>
+                </div>
+
+                <blockquote className="modal-comment-box">
+                  &quot;{previewReview.comment || t('common.no_data')}&quot;
+                </blockquote>
+
+                <div className="modal-product-card">
+                  <div className={`modal-product-image ${isApprovedReportModal ? 'blurred-media' : ''}`}>
+                    {previewReview.productImageUrl ? (
+                      <img src={previewReview.productImageUrl} alt={previewReview.productName || t('nav.product')} />
+                    ) : (
+                      <span className="material-symbols-outlined">inventory_2</span>
+                    )}
+                    {isApprovedReportModal && (
+                      <span className="media-removed-overlay">
+                        {t('review_list.removed_tag')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="modal-product-details">
+                    <span className="product-label">{t('my_products.th_product')}</span>
+                    <strong className="product-title">{previewReview.productName || t('nav.product')}</strong>
+                    {previewReview.orderCode && (
+                      <span className="order-code-chip">
+                        <span className="material-symbols-outlined">receipt_long</span>
+                        {t('seller.orders_management')}: {previewReview.orderCode}
+                      </span>
+                    )}
+                    <small className="product-id">ID: {previewReview.productId || previewReview.reviewId}</small>
+                  </div>
+                </div>
+
+                {previewReview.latestReportReason && (
+                  <div className="modal-report-history">
+                    <span className="material-symbols-outlined">flag</span>
+                    <div>
+                      <strong>{t('reports.reason')}:</strong> {previewReview.latestReportReason}
+                      {previewReview.latestReportStatus && (
+                        <span className={`report-status-tag ${previewReview.latestReportStatus.toLowerCase()}`}>
+                          {t('common.status')}: {previewReview.latestReportStatus}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <footer className="seller-review-modal-actions">
+                  <button type="button" className="secondary-btn" onClick={closePreviewModal}>
+                    {t('common.close')}
+                  </button>
+                </footer>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </div>,
+          document.body
+        );
+      })() : null}
     </div>
   );
 }

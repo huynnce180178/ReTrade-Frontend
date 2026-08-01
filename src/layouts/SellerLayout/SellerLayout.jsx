@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../../components/LanguageSwitcher/LanguageSwitcher';
@@ -17,7 +17,6 @@ export default function SellerLayout() {
   const [avatarError, setAvatarError] = useState(false);
   const chatHubRef = useRef(null);
   const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     setAvatarError(false);
@@ -213,11 +212,6 @@ export default function SellerLayout() {
               <span className="material-symbols-outlined">rate_review</span>
               {isVi ? 'Đánh giá từ người mua' : 'Reviews Received'}
             </NavLink>
-            <p>{isVi ? 'Tài khoản của tôi' : 'My Account'}</p>
-            <Link to="/profile" onClick={closeSidebar}>
-              <span className="material-symbols-outlined">person</span>
-              {isVi ? 'Hồ sơ cá nhân' : 'Profile'}
-            </Link>
           </nav>
         </aside>
 
