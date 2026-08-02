@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import accountService from '../services/accountService';
 import profileService from '../services/profileService';
-import { forceLogout } from '../utils/authUtils';
+import { clearAuthStorage } from '../utils/authUtils';
 import { createAccountHubConnection } from '../services/accountRealtimeService';
 
 const AuthContext = createContext(null);
@@ -154,7 +154,7 @@ export const AuthProvider = ({ children }) => {
   const handleLogout = () => {
     setUser(null);
     setToken(null);
-    forceLogout();
+    clearAuthStorage();
   };
 
   const handleGoogleLogin = async (accessToken) => {
