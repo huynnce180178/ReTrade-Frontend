@@ -15,13 +15,15 @@ const isProductUnavailable = (product) => (
   Number(product?.stockQuantity ?? 0) <= 0
 );
 
+const I18N_CONTENT_PREFIX = 'i18n:';
+
 function formatTextNode(text) {
   if (!text) return null;
   const lines = text.split('\n');
   return lines.map((line, lineIdx) => {
     let cleanLine = line.trim();
     if (cleanLine.startsWith('* ') || cleanLine.startsWith('- ')) {
-      cleanLine = '• ' + cleanLine.substring(2);
+      cleanLine = `- ${cleanLine.substring(2)}`;
     }
     cleanLine = cleanLine.replace(/^\*\s*/, '');
 
@@ -85,7 +87,13 @@ function renderFormattedContent(content) {
 }
 
 export default function AssistantChatWidget() {
-  const { t, language, formatCurrency } = useLanguage();
+  const { t, formatCurrency } = useLanguage();
+  const assistantTitle = t('chat.assistant_title');
+  const assistantWelcome = t('chat.assistant_welcome');
+  const assistantSubtitle = t('chat.assistant_subtitle');
+  const assistantTypeMessage = t('chat.type_message');
+  const assistantSendTitle = t('chat.send');
+  const languageInstruction = t('chat.assistant_language_instruction');
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messageText, setMessageText] = useState('');
@@ -95,7 +103,7 @@ export default function AssistantChatWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: t('chat.assistant_welcome'),
+      content: assistantWelcome,
       products: [],
     },
   ]);
@@ -104,19 +112,21 @@ export default function AssistantChatWidget() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const QUICK_SUGGESTIONS = language === 'vi' ? [
-    { label: t('history.purchase_title'), query: 'Kiểm tra lịch sử mua hàng của tôi trên ReTrade' },
-    { label: t('auction.title'), query: 'Làm sao để tham gia đấu giá trên ReTrade?' },
-    { label: t('home.start_selling'), query: 'Tôi muốn đăng bán sản phẩm đồ cũ trên ReTrade' },
-    { label: t('home.featured_products'), query: 'Cho tôi xem danh sách các sản phẩm mới nhất' },
-    { label: t('nav.wishlist'), query: 'Xem danh sách sản phẩm yêu thích của tôi' },
-  ] : [
-    { label: t('history.purchase_title'), query: 'Check my purchase history on ReTrade' },
-    { label: t('auction.title'), query: 'How to participate in auctions on ReTrade?' },
-    { label: t('home.start_selling'), query: 'I want to sell a second-hand product on ReTrade' },
-    { label: t('home.featured_products'), query: 'Show me the latest products on ReTrade' },
-    { label: t('nav.wishlist'), query: 'View my wishlist items' },
+  const QUICK_SUGGESTIONS = [
+    { label: t('history.purchase_title'), query: t('chat.assistant_query_purchase_history') },
+    { label: t('auction.title'), query: t('chat.assistant_query_auction_help') },
+    { label: t('home.start_selling'), query: t('chat.assistant_query_start_selling') },
+    { label: t('home.featured_products'), query: t('chat.assistant_query_featured_products') },
+    { label: t('nav.wishlist'), query: t('chat.assistant_query_wishlist') },
   ];
+
+  const translateAssistantContent = (content) => {
+    if (!content?.startsWith(I18N_CONTENT_PREFIX)) {
+      return content;
+    }
+
+    return t(content.slice(I18N_CONTENT_PREFIX.length));
+  };
 
   useEffect(() => {
     if (!sessionId) return;
@@ -202,8 +212,7 @@ export default function AssistantChatWidget() {
     setSending(true);
 
     try {
-      // Append language hint for Gemini API if in Vietnamese mode
-      const queryWithLang = language === 'vi' ? `${text} (Vui lòng trả lời hoàn toàn bằng Tiếng Việt)` : text;
+      const queryWithLang = languageInstruction ? `${text} (${languageInstruction})` : text;
       const response = await assistantChatService.sendMessage(queryWithLang, sessionId);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
@@ -246,7 +255,7 @@ export default function AssistantChatWidget() {
       {
         id: 'welcome-new',
         role: 'assistant',
-        content: t('chat.assistant_welcome'),
+        content: assistantWelcome,
         products: [],
       },
     ]);
@@ -255,7 +264,7 @@ export default function AssistantChatWidget() {
   return (
     <div className={`assistant-widget ${open ? 'open' : ''}`}>
       {open && (
-        <section className="assistant-widget-panel" aria-label={t('chat.assistant_title')}>
+        <section className="assistant-widget-panel" aria-label={assistantTitle}>
           <header className="assistant-widget-header">
             <div className="assistant-widget-brand">
               <div className="assistant-widget-avatar-head">
@@ -263,8 +272,8 @@ export default function AssistantChatWidget() {
                 <span className="assistant-widget-online-dot" />
               </div>
               <div className="assistant-widget-header-title">
-                <strong>{t('chat.assistant_title')}</strong>
-                <span>AI Shopping Assistant</span>
+                <strong>{assistantTitle}</strong>
+                <span>{assistantSubtitle}</span>
               </div>
             </div>
             <div className="assistant-widget-actions">
@@ -288,7 +297,7 @@ export default function AssistantChatWidget() {
 
                 <div className="assistant-widget-bubble">
                   <div className="assistant-widget-text">
-                    {renderFormattedContent(message.content)}
+                    {renderFormattedContent(translateAssistantContent(message.content))}
                   </div>
 
                   {message.products?.length > 0 && (
@@ -304,7 +313,7 @@ export default function AssistantChatWidget() {
                           <Link to={`/product/${product.productId}`} className="assistant-widget-product-card">
                             <div className="assistant-widget-product-img">
                               {product.mainImageUrl ? (
-                                <img src={product.mainImageUrl} alt={product.name || 'Product'} />
+                                <img src={product.mainImageUrl} alt={product.name || t('common.product_image')} />
                               ) : (
                                 <div className="assistant-widget-img-placeholder">
                                   <span className="material-symbols-outlined">inventory_2</span>
@@ -312,10 +321,10 @@ export default function AssistantChatWidget() {
                               )}
                             </div>
                             <div className="assistant-widget-product-meta">
-                              <span className="product-title">{product.name || 'ReTrade Product'}</span>
+                              <span className="product-title">{product.name || t('common.unnamed_product')}</span>
                               <span className="product-price">{formatCurrency(product.price)}</span>
                               <small style={{ color: '#059669', fontWeight: 600, fontSize: '11px', marginTop: '2px' }}>
-                                {outOfStock ? t('product.out_of_stock') : `${t('common.view_detail')} →`}
+                                {outOfStock ? t('product.out_of_stock') : t('common.view_detail')}
                               </small>
                             </div>
                           </Link>
@@ -390,10 +399,10 @@ export default function AssistantChatWidget() {
               type="text"
               value={messageText}
               onChange={(event) => setMessageText(event.target.value)}
-              placeholder={t('chat.type_message')}
+              placeholder={assistantTypeMessage}
               maxLength={2000}
             />
-            <button type="submit" disabled={!messageText.trim() || sending} title={t('chat.send')}>
+            <button type="submit" disabled={!messageText.trim() || sending} title={assistantSendTitle}>
               <span className="material-symbols-outlined">{sending ? 'sync' : 'send'}</span>
             </button>
           </form>
@@ -404,7 +413,7 @@ export default function AssistantChatWidget() {
         type="button"
         className="assistant-widget-toggle-btn"
         onClick={() => setOpen((current) => !current)}
-        aria-label={t('chat.assistant_title')}
+        aria-label={assistantTitle}
       >
         <span className="material-symbols-outlined">{open ? 'expand_more' : 'robot'}</span>
       </button>

@@ -55,8 +55,8 @@ export default function PaymentResult() {
   })();
 
   const titleText = success
-    ? (language === 'vi' ? 'Thanh toán Thành công' : 'Payment Successful')
-    : (language === 'vi' ? 'Thanh toán Thất bại' : 'Payment Not Successful');
+    ? (language === 'vi' ? 'Thanh toán thành công' : 'Payment Successful')
+    : (language === 'vi' ? 'Thanh toán thất bại' : 'Payment Not Successful');
 
   const serviceId = searchParams.get('serviceId') || '';
   const orderType = searchParams.get('orderType') || '';
@@ -108,7 +108,7 @@ export default function PaymentResult() {
             {amount ? (isNaN(amount) ? `${amount} VND` : formatCurrency(Number(amount))) : '-'}
           </div>
           <div>
-            <strong>{language === 'vi' ? 'Mã giao dịch VNPay:' : 'VNPay Transaction No:'}</strong> {transactionNo || '-'}
+            <strong>{language === 'vi' ? 'Mã giao dịch VNPAY:' : 'VNPay Transaction No:'}</strong> {transactionNo || '-'}
           </div>
         </div>
 
@@ -116,33 +116,33 @@ export default function PaymentResult() {
           {auctionId ? (
             <>
               <Link to={`/auction/${auctionId}`} className="btn btn-primary">
-                {language === 'vi' ? 'Quay lại Đấu giá' : 'Back to Auction'}
+                {language === 'vi' ? 'Quay lại đấu giá' : 'Back to Auction'}
               </Link>
               <Link to="/" className="btn btn-secondary">
-                {language === 'vi' ? 'Về Trang chủ' : 'Back to Home'}
+                {language === 'vi' ? 'Về trang chủ' : 'Back to Home'}
               </Link>
             </>
           ) : isSubscription ? (
             <>
               <Link to="/my-subscriptions" className="btn btn-primary">
-                {language === 'vi' ? 'Quản lý Gói dịch vụ' : 'Manage Subscriptions'}
+                {language === 'vi' ? 'Quản lý gói dịch vụ' : 'Manage Subscriptions'}
               </Link>
               <Link to="/" className="btn btn-secondary">
-                {language === 'vi' ? 'Về Trang chủ' : 'Back to Home'}
+                {language === 'vi' ? 'Về trang chủ' : 'Back to Home'}
               </Link>
             </>
           ) : (
             <>
               <Link to="/" className="btn btn-primary">
-                {language === 'vi' ? 'Về Trang chủ' : 'Back to Home'}
+                {language === 'vi' ? 'Về trang chủ' : 'Back to Home'}
               </Link>
               <Link to="/purchase-history" className="btn btn-secondary">
-                {language === 'vi' ? 'Xem Lịch sử Mua hàng' : 'View Purchase History'}
+                {language === 'vi' ? 'Xem lịch sử mua hàng' : 'View Purchase History'}
               </Link>
             </>
           )}
           <Link to="/my-subscriptions" className="btn btn-secondary">
-            {language === 'vi' ? 'Quản lý Gói dịch vụ' : 'Manage Subscriptions'}
+            {language === 'vi' ? 'Quản lý gói dịch vụ' : 'Manage Subscriptions'}
           </Link>
         </div>
       </div>

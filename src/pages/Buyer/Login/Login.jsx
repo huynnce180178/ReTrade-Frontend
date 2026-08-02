@@ -78,11 +78,21 @@ export default function Login() {
         setGoogleLoading(false);
       }
     },
-    onError: () => {
+    onError: (errorResponse) => {
+      if (errorResponse?.error === 'access_denied') {
+        showToast(language === 'vi' ? 'Bạn đã từ chối quyền Google Profile.' : 'You denied Google profile permission.', 'warning');
+        return;
+      }
       showToast(t('common.error_occurred'), 'error');
     },
+    onNonOAuthError: () => {
+      showToast(language === 'vi' ? 'Đăng nhập Google đã bị đóng hoặc bị chặn.' : 'Google sign-in was closed or blocked.', 'warning');
+    },
     flow: 'implicit',
-    scope: 'openid email profile',
+    // Explicit profile scopes keep behavior aligned with common production OAuth setups.
+    scope: 'openid email profile https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+    prompt: 'consent select_account',
+    include_granted_scopes: false,
   });
 
   return (
