@@ -39,7 +39,6 @@ export default function Register() {
 
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
-  const [registeredLoginCredentials, setRegisteredLoginCredentials] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -47,7 +46,6 @@ export default function Register() {
 
   const handleVerifyClose = () => {
     setShowVerifyModal(false);
-    setRegisteredLoginCredentials(null);
   };
 
   const handleChange = (e) => {
@@ -141,10 +139,6 @@ export default function Register() {
       if (result.success) {
         showToast(t('toast.register_success'), 'success');
         setRegisteredEmail(trimmedEmail);
-        setRegisteredLoginCredentials({
-          username: trimmedUsername,
-          password,
-        });
         setShowVerifyModal(true);
       } else {
         showToast(result.error || t('common.error_occurred'), 'error');
@@ -300,7 +294,6 @@ export default function Register() {
         isOpen={showVerifyModal} 
         onClose={handleVerifyClose} 
         email={registeredEmail}
-        loginCredentials={registeredLoginCredentials}
       />
       <TermsModal 
         isOpen={showTerms} 

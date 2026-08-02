@@ -1,15 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import accountService from '../../services/accountService';
-import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 
 import './Verify.css';
 
-export default function VerifyModal({ isOpen, onClose, email, loginCredentials }) {
+export default function VerifyModal({ isOpen, onClose, email }) {
   const { t } = useLanguage();
-  const { login } = useAuth();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -97,24 +95,9 @@ export default function VerifyModal({ isOpen, onClose, email, loginCredentials }
         throw new Error(verifyResult?.message || 'Invalid or expired OTP.');
       }
 
-      if (loginCredentials?.username && loginCredentials?.password) {
-        const loginResult = await login(loginCredentials.username, loginCredentials.password);
-        if (loginResult.success) {
-          showToast(t('toast.login_success'), 'success');
-          onClose();
-          navigate('/', { replace: true });
-          return;
-        }
-
-        showToast(loginResult.error || t('common.error_occurred'), 'error');
-        onClose();
-        navigate('/login');
-        return;
-      }
-
-      showToast(t('toast.login_success'), 'success');
+      showToast(verifyResult?.message || t('toast.register_success'), 'success');
       onClose();
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || t('common.error_occurred');
       showToast(errorMsg, 'error');
