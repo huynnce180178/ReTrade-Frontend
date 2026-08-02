@@ -5,7 +5,7 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 ARG VITE_API_URL
-ENV VITE_API_URL=${VITE_API_URL:-http://localhost:8385/api}
+ENV VITE_API_URL=${VITE_API_URL:-http://localhost:8386/api}
 RUN npm run build
 
 # Stage 2: Serve with Nginx

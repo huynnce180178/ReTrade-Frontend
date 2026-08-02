@@ -72,6 +72,7 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   // Search History
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,6 +146,10 @@ export default function Header() {
       disposed = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.avatarUrl]);
 
 
   useEffect(() => {
@@ -301,6 +306,8 @@ export default function Header() {
     return user.username;
   };
 
+  const hasUsableAvatar = Boolean(user?.avatarUrl) && !avatarLoadFailed;
+
   const getPackageVisual = (serviceId) => {
     switch (serviceId) {
       case 'SERVICE_UPGRADE_SELLER':
@@ -439,8 +446,13 @@ export default function Header() {
               {user ? (
                 <div className="mobile-user-info">
                   <div className="avatar-circle">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                    {hasUsableAvatar ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt="Avatar"
+                        className="user-avatar-img"
+                        onError={() => setAvatarLoadFailed(true)}
+                      />
                     ) : (
                       getInitials()
                     )}
@@ -589,8 +601,13 @@ export default function Header() {
                   aria-expanded={dropdownOpen}
                 >
                   <div className="avatar-circle">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                    {hasUsableAvatar ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt="Avatar"
+                        className="user-avatar-img"
+                        onError={() => setAvatarLoadFailed(true)}
+                      />
                     ) : (
                       getInitials()
                     )}

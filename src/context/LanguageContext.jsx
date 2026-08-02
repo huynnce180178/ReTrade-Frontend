@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import vi from '../locales/vi.json';
 import en from '../locales/en.json';
 
@@ -72,9 +72,10 @@ export const LanguageProvider = ({ children }) => {
         return key;
       }
 
-      // Replace interpolation params like {name}, {amount}
-      return val.replace(/\{(\w+)\}/g, (_, match) => {
-        return params[match] !== undefined ? String(params[match]) : `{${match}}`;
+      // Replace interpolation params like {name}, {amount}, {{name}}
+      return val.replace(/\{\{(\w+)\}\}|\{(\w+)\}/g, (placeholder, doubleMatch, singleMatch) => {
+        const match = doubleMatch || singleMatch;
+        return params[match] !== undefined ? String(params[match]) : placeholder;
       });
     },
     [language]

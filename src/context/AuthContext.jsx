@@ -80,6 +80,36 @@ export const AuthProvider = ({ children }) => {
     };
   }, [token, user?.accountId]);
 
+  const buildUserFromAuthData = (authData) => ({
+    accountId: authData.accountId,
+    userId: authData.userId,
+    username: authData.username,
+    email: authData.email,
+    firstName: authData.firstName,
+    lastName: authData.lastName,
+    roles: authData.roles,
+    avatarUrl: authData.avatarUrl,
+    phone: authData.phone,
+    isPasswordSet: authData.isPasswordSet,
+    mustChangePassword: authData.mustChangePassword ?? false,
+  });
+
+  const hydrateUserWithProfile = async (baseUser) => {
+    try {
+      const freshProfile = await profileService.getMyProfile();
+      return {
+        ...baseUser,
+        ...freshProfile,
+        roles: freshProfile.roles || baseUser.roles || [],
+        avatarUrl: freshProfile.avatarUrl || baseUser.avatarUrl,
+        isPasswordSet: freshProfile.isPasswordSet ?? baseUser.isPasswordSet,
+        mustChangePassword: baseUser.mustChangePassword ?? false,
+      };
+    } catch {
+      return baseUser;
+    }
+  };
+
   const handleLogin = async (username, password) => {
     setError(null);
     try {
@@ -87,23 +117,12 @@ export const AuthProvider = ({ children }) => {
       
       if (authData && authData.token) {
         localStorage.setItem('token', authData.token);
-        const userObj = {
-          accountId: authData.accountId,
-          userId: authData.userId,
-          username: authData.username,
-          email: authData.email,
-          firstName: authData.firstName,
-          lastName: authData.lastName,
-          roles: authData.roles,
-          avatarUrl: authData.avatarUrl,
-          phone: authData.phone,
-          isPasswordSet: authData.isPasswordSet,
-          mustChangePassword: authData.mustChangePassword ?? false,
-        };
+        const userObj = buildUserFromAuthData(authData);
+        const hydratedUser = await hydrateUserWithProfile(userObj);
 
         setToken(authData.token);
-        setUser(userObj);
-        localStorage.setItem('user', JSON.stringify(userObj));
+        setUser(hydratedUser);
+        localStorage.setItem('user', JSON.stringify(hydratedUser));
         // propagate mustChangePassword flag to caller
         return { success: true, mustChangePassword: authData.mustChangePassword };
       }
@@ -144,22 +163,11 @@ export const AuthProvider = ({ children }) => {
       const authData = await accountService.loginWithGoogle(accessToken);
       if (authData && authData.token) {
         localStorage.setItem('token', authData.token);
-        const userObj = {
-          accountId: authData.accountId,
-          userId: authData.userId,
-          username: authData.username,
-          email: authData.email,
-          firstName: authData.firstName,
-          lastName: authData.lastName,
-          roles: authData.roles,
-          avatarUrl: authData.avatarUrl,
-          phone: authData.phone,
-          isPasswordSet: authData.isPasswordSet,
-          mustChangePassword: authData.mustChangePassword ?? false,
-        };
+        const userObj = buildUserFromAuthData(authData);
+        const hydratedUser = await hydrateUserWithProfile(userObj);
         setToken(authData.token);
-        setUser(userObj);
-        localStorage.setItem('user', JSON.stringify(userObj));
+        setUser(hydratedUser);
+        localStorage.setItem('user', JSON.stringify(hydratedUser));
         return { success: true, mustChangePassword: authData.mustChangePassword };
       }
 
