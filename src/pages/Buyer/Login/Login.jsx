@@ -107,7 +107,10 @@ export default function Login() {
               alt="Sustainable Luxury Close-up"
             />
             <div className="hero-gradient">
-              <h2>{t('home.hero_title')}</h2>
+              <h2>
+                {t('home.hero_title_1')}<br />
+                {t('home.hero_title_2')}
+              </h2>
               <p>{t('home.hero_subtitle')}</p>
             </div>
           </div>
