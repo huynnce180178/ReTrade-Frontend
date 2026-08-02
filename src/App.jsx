@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+// ReTrade Application Root Component
 import CategoryList from './pages/Buyer/Category/CategoryList';
 import CategoryProductList from './pages/Buyer/Category/CategoryProductList';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';

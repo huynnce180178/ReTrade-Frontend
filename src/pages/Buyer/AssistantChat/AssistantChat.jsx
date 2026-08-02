@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import assistantChatService from '../../../services/assistantChatService';
 import './AssistantChat.css';
 
 const SESSION_KEY = 'retrade_assistant_session_id';
+const I18N_CONTENT_PREFIX = 'i18n:';
 
 function formatCurrency(value) {
   if (value === null || value === undefined) return 'Liên hệ';
@@ -35,6 +37,7 @@ function mapHistoryMessage(message) {
 
 export default function AssistantChat() {
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messages, setMessages] = useState([
     {
@@ -146,6 +149,14 @@ export default function AssistantChat() {
     }
   };
 
+  const translateAssistantContent = (content) => {
+    if (!content?.startsWith(I18N_CONTENT_PREFIX)) {
+      return content;
+    }
+
+    return t(content.slice(I18N_CONTENT_PREFIX.length));
+  };
+
   return (
     <div className="assistant-chat-page">
       <section className="assistant-chat-panel">
@@ -176,7 +187,7 @@ export default function AssistantChat() {
                   </span>
                 )}
                 <div className="assistant-message-bubble">
-                  <p>{message.content}</p>
+                  <p>{translateAssistantContent(message.content)}</p>
                   {message.products?.length > 0 && (
                     <div className="assistant-products">
                       {message.products.map((product) => (

@@ -93,7 +93,6 @@ export default function AssistantChatWidget() {
   const assistantSubtitle = t('chat.assistant_subtitle');
   const assistantTypeMessage = t('chat.type_message');
   const assistantSendTitle = t('chat.send');
-  const languageInstruction = t('chat.assistant_language_instruction');
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messageText, setMessageText] = useState('');
@@ -212,8 +211,7 @@ export default function AssistantChatWidget() {
     setSending(true);
 
     try {
-      const queryWithLang = languageInstruction ? `${text} (${languageInstruction})` : text;
-      const response = await assistantChatService.sendMessage(queryWithLang, sessionId);
+      const response = await assistantChatService.sendMessage(text, sessionId);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
         setSessionId(response.sessionId);
