@@ -48,13 +48,15 @@ export default function Login() {
           navigate('/');
         }
       } else {
+        const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title);
         const errorMsg = (result.code && t(`auth.${result.code.toLowerCase()}`) !== `auth.${result.code.toLowerCase()}`)
           ? t(`auth.${result.code.toLowerCase()}`)
-          : (result.error || t('common.error_occurred'));
+          : (rawErr || t('common.error_occurred'));
         showToast(errorMsg, 'error');
       }
     } catch (err) {
-      showToast(t('common.error_occurred'), 'error');
+      const msg = err.response?.data?.message || err.message || t('common.error_occurred');
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -74,13 +76,15 @@ export default function Login() {
             navigate('/');
           }
         } else {
+          const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title);
           const errorMsg = (result.code && t(`auth.${result.code.toLowerCase()}`) !== `auth.${result.code.toLowerCase()}`)
             ? t(`auth.${result.code.toLowerCase()}`)
-            : (result.error || t('common.error_occurred'));
+            : (rawErr || t('common.error_occurred'));
           showToast(errorMsg, 'error');
         }
-      } catch {
-        showToast(t('common.error_occurred'), 'error');
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message || t('common.error_occurred');
+        showToast(msg, 'error');
       } finally {
         setGoogleLoading(false);
       }

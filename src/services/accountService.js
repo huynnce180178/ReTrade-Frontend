@@ -5,7 +5,10 @@ const get = (url) => api.get(url).then(r => r.data);
 
 const accountService = {
   register: (data) => post('/Account/register', data),
-  loginWithGoogle: (accessToken) => post('/Account/login-with-google', { accessToken }),
+  loginWithGoogle: (accessTokenData) => {
+    const token = typeof accessTokenData === 'string' ? accessTokenData : (accessTokenData?.accessToken || accessTokenData?.idToken || accessTokenData?.token);
+    return post('/Account/login-with-google', { accessToken: token });
+  },
   verify: (data) => post('/Account/verify', data),
   resendOtp: (email) => post('/Account/resend-otp', { email }),
   login: (data) => post('/Account/login', data),

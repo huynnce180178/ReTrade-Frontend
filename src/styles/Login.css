@@ -43,6 +43,34 @@
   overflow: hidden;
 }
 
+@media (max-width: 768px) {
+  .login-page-premium {
+    padding-top: 16px;
+    padding-bottom: 24px;
+  }
+
+  .login-left-side {
+    height: 100px;
+  }
+
+  .hero-gradient {
+    padding: 16px 20px;
+  }
+
+  .hero-gradient h2 {
+    font-size: 20px;
+    margin-bottom: 0;
+  }
+
+  .hero-gradient p {
+    display: none;
+  }
+
+  .login-right-side {
+    padding: 24px 16px;
+  }
+}
+
 @media (min-width: 1024px) {
   .login-left-side {
     width: 50%;
