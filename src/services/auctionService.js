@@ -15,6 +15,8 @@ const auctionService = {
   getMyDeposit: (id) => get(`/Auction/${id}/my-deposit`),
   createDepositPaymentUrl: (id, data) => post(`/Auction/${id}/deposit/payment-url`, data),
   placeBid: (id, data) => post(`/Auction/${id}/bid`, data),
+  endAuction: (id) => post(`/Auction/${id}/end`),
+  relistAuction: (id, data) => post(`/Auction/${id}/relist`, data),
 };
 
 export default auctionService;

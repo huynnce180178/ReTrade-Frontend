@@ -6,9 +6,19 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
-import { formatAuctionDateTime, parseAuctionDateTime } from '../../../utils/auctionTime';
+import { auctionDateTimeLocalToApiValue, formatAuctionDateTime, getFutureAuctionDateTimeLocal, parseAuctionDateTime } from '../../../utils/auctionTime';
 import './Auction.css';
 import './AuctionDetail.css';
+
+function toAuctionPayload(form) {
+  return {
+    startingPrice: Number(form.startingPrice),
+    minIncrement: Number(form.minIncrement),
+    buyNowPrice: form.buyNowPrice ? Number(form.buyNowPrice) : null,
+    startTime: auctionDateTimeLocalToApiValue(form.startTime),
+    endTime: auctionDateTimeLocalToApiValue(form.endTime),
+  };
+}
 
 const moneyFormatter = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
@@ -484,6 +494,70 @@ export default function AuctionDetail() {
     }
   };
 
+  const [relistForm, setRelistForm] = useState(null);
+
+  const [showEndConfirmModal, setShowEndConfirmModal] = useState(false);
+
+  const openEndConfirmModal = () => {
+    setShowEndConfirmModal(true);
+  };
+
+  const closeEndConfirmModal = () => {
+    if (actionLoading) return;
+    setShowEndConfirmModal(false);
+  };
+
+  const handleEndAuctionConfirm = async () => {
+    try {
+      setActionLoading(true);
+      await auctionService.endAuction(auctionId);
+      showToast(t('my_auctions.end_success'), 'success');
+      setShowEndConfirmModal(false);
+      await refreshAuction();
+    } catch (error) {
+      showToast(getApiErrorMessage(error) || t('my_auctions.end_error'), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openRelistModal = () => {
+    setRelistForm({
+      startingPrice: auction?.startingPrice ?? '',
+      minIncrement: auction?.minIncrement ?? '',
+      buyNowPrice: auction?.buyNowPrice ?? '',
+      startTime: getFutureAuctionDateTimeLocal(0),
+      endTime: getFutureAuctionDateTimeLocal(24 * 60 * 60 * 1000),
+    });
+  };
+
+  const closeRelistModal = () => {
+    if (actionLoading) return;
+    setRelistForm(null);
+  };
+
+  const handleRelistChange = (event) => {
+    const { name, value } = event.target;
+    setRelistForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleRelistSubmit = async (event) => {
+    event.preventDefault();
+    if (!relistForm) return;
+
+    try {
+      setActionLoading(true);
+      await auctionService.relistAuction(auctionId, toAuctionPayload(relistForm));
+      showToast(t('my_auctions.relist_success'), 'success');
+      setRelistForm(null);
+      await refreshAuction();
+    } catch (error) {
+      showToast(getApiErrorMessage(error) || t('my_auctions.relist_error'), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
 
 
   if (loading) {
@@ -665,7 +739,7 @@ export default function AuctionDetail() {
                 ) : paidDeposit ? (
                   <div>
                     <h3>{isVi ? 'Phiên Đấu Giá Đã Kết Thúc' : 'Auction Ended'}</h3>
-                    <p>{isVi ? 'Người thắng cuộc:' : 'Winner:'} <strong>{auction.winnerName || (isVi ? 'Ẩn danh' : 'Anonymous')}</strong>.</p>
+                    <p>{isVi ? 'Người thắng cuộc:' : 'Winner:'} <strong>{auction.winnerName || (auction.winnerId ? (isVi ? 'Ẩn danh' : 'Anonymous') : (isVi ? 'Không có' : 'None'))}</strong>.</p>
                     <small className="refund-notice">{isVi ? 'Số tiền đặt cọc của bạn (trừ phí tham gia 20.000 VNĐ) sẽ được quản trị viên hoàn trả lại.' : 'Your deposit balance (excluding the 20,000 VND participation fee) will be manually refunded by the administrator.'}</small>
                   </div>
                 ) : auction.winnerId ? (
@@ -681,7 +755,33 @@ export default function AuctionDetail() {
                 )}
               </div>
             ) : isOwner ? (
-              <div className="auction-detail-notice">{isVi ? 'Bạn không thể ra giá cho sản phẩm đấu giá của chính mình.' : 'You cannot bid on your own auction.'}</div>
+              <div className="auction-detail-notice">
+                <p style={{ margin: 0 }}>{isVi ? 'Bạn không thể ra giá cho sản phẩm đấu giá của chính mình.' : 'You cannot bid on your own auction.'}</p>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+                  {effectiveStatus === 'Ongoing' && (
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      style={{ color: '#dc2626', borderColor: '#fca5a5', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                      onClick={openEndConfirmModal}
+                      disabled={actionLoading}
+                    >
+                      {t('my_auctions.end_auction')}
+                    </button>
+                  )}
+                  {(effectiveStatus === 'EndedNoBid' || (isEnded && Number(auction.bidCount || 0) === 0)) && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                      onClick={openRelistModal}
+                      disabled={actionLoading}
+                    >
+                      {t('my_auctions.relist_auction')}
+                    </button>
+                  )}
+                </div>
+              </div>
             ) : !paidDeposit ? (
               <form className="auction-deposit-form" onSubmit={handleDepositSubmit} noValidate>
                 <label>
@@ -1017,6 +1117,74 @@ export default function AuctionDetail() {
                   {t('auction.policy_btn_agree')}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {relistForm && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', maxWidth: '540px', width: '100%', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>{t('my_auctions.relist_title')}</h3>
+              <button type="button" onClick={closeRelistModal} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>×</button>
+            </div>
+            <form onSubmit={handleRelistSubmit} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.starting_price')} (VND) *</label>
+                  <input type="number" name="startingPrice" value={relistForm.startingPrice} onChange={handleRelistChange} required min="1" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.min_step')} (VND) *</label>
+                  <input type="number" name="minIncrement" value={relistForm.minIncrement} onChange={handleRelistChange} required min="1" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.buy_now_price')} (VND) *</label>
+                <input type="number" name="buyNowPrice" value={relistForm.buyNowPrice} onChange={handleRelistChange} required min="1" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.start_time')} *</label>
+                  <input type="datetime-local" name="startTime" value={relistForm.startTime} onChange={handleRelistChange} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.end_time')} *</label>
+                  <input type="datetime-local" name="endTime" value={relistForm.endTime} onChange={handleRelistChange} min={relistForm.startTime || undefined} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+                <button type="button" onClick={closeRelistModal} disabled={actionLoading} style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: '8px', background: '#fff', cursor: 'pointer' }}>{t('common.cancel')}</button>
+                <button type="submit" disabled={actionLoading} style={{ padding: '8px 20px', border: 'none', borderRadius: '8px', background: '#1b6b51', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>{actionLoading ? t('common.saving') : t('my_auctions.relist_auction')}</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showEndConfirmModal && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', maxWidth: '440px', width: '100%', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>warning</span>
+                {t('my_auctions.end_auction')}
+              </h3>
+              <button type="button" onClick={closeEndConfirmModal} disabled={actionLoading} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ padding: '24px', fontSize: '14px', color: '#4b5563', lineHeight: 1.5 }}>
+              {t('my_auctions.confirm_end_msg')}
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button type="button" onClick={closeEndConfirmModal} disabled={actionLoading} style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: '8px', background: '#fff', cursor: 'pointer' }}>
+                {t('common.cancel')}
+              </button>
+              <button type="button" onClick={handleEndAuctionConfirm} disabled={actionLoading} style={{ padding: '8px 20px', border: 'none', borderRadius: '8px', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
+                {actionLoading ? t('common.submitting') : t('common.confirm')}
+              </button>
             </div>
           </div>
         </div>,

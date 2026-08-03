@@ -86,8 +86,9 @@ function validateAuctionForm(form, { requireProduct = false, requireFutureStart 
   if (form.buyNowPrice === '' || Number.isNaN(buyNowPrice)) return t('validation.required');
   if (buyNowPrice <= startingPrice) return t('auction.err_buy_now_exceeded');
   if (!form.startTime || !start || Number.isNaN(start.getTime())) return t('validation.required');
-  if (!form.endTime || !end || Number.isNaN(end.getTime())) return t('validation.required');
-  if (requireFutureStart && start <= new Date()) return t('auction.err_future_start');
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  if (requireFutureStart && start < todayStart) return t('auction.err_future_start');
   if (end <= start) return t('validation.required');
 
   return '';
@@ -109,6 +110,9 @@ export default function MyAuctions() {
   const [createForm, setCreateForm] = useState(getDefaultCreateForm);
   const [editingAuction, setEditingAuction] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [endingAuction, setEndingAuction] = useState(null);
+  const [relistingAuction, setRelistingAuction] = useState(null);
+  const [relistForm, setRelistForm] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [auctionPage, setAuctionPage] = useState(1);
   const [auctionTotalPages, setAuctionTotalPages] = useState(1);
@@ -320,6 +324,74 @@ export default function MyAuctions() {
     }
   };
 
+  const openEndModal = (auction) => {
+    setEndingAuction(auction);
+  };
+
+  const closeEndModal = () => {
+    if (saving) return;
+    setEndingAuction(null);
+  };
+
+  const handleEndAuctionConfirm = async () => {
+    if (!endingAuction) return;
+    try {
+      setSaving(true);
+      await auctionService.endAuction(endingAuction.auctionId);
+      showToast(t('my_auctions.end_success'), 'success');
+      closeEndModal();
+      await Promise.all([loadAuctions(auctionPage), loadAuctionStats()]);
+    } catch (error) {
+      showToast(error?.response?.data || t('my_auctions.end_error'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openRelistModal = (auction) => {
+    setRelistingAuction(auction);
+    setRelistForm({
+      startingPrice: auction.startingPrice ?? '',
+      minIncrement: auction.minIncrement ?? '',
+      buyNowPrice: auction.buyNowPrice ?? '',
+      startTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS),
+      endTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS + 24 * 60 * 60 * 1000),
+    });
+  };
+
+  const closeRelistModal = () => {
+    if (saving) return;
+    setRelistingAuction(null);
+    setRelistForm(null);
+  };
+
+  const handleRelistChange = (event) => {
+    const { name, value } = event.target;
+    setRelistForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleRelist = async (event) => {
+    event.preventDefault();
+    if (!relistingAuction || !relistForm) return;
+    const validationError = validateAuctionForm(relistForm, { requireFutureStart: true }, t);
+    if (validationError) {
+      showToast(validationError, 'warning');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await auctionService.relistAuction(relistingAuction.auctionId, toAuctionPayload(relistForm));
+      showToast(t('my_auctions.relist_success'), 'success');
+      closeRelistModal();
+      await Promise.all([loadAuctions(auctionPage), loadAuctionStats()]);
+    } catch (error) {
+      showToast(error?.response?.data || t('my_auctions.relist_error'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSearchSubmit = (event) => {
     event.preventDefault();
     setAuctionPage(1);
@@ -477,6 +549,27 @@ export default function MyAuctions() {
                           onClick={() => openEditModal(auction)}
                         >
                           {t('common.edit')}
+                        </button>
+                      )}
+                      {auction.status === 'Ongoing' && (
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          style={{ color: '#dc2626', borderColor: '#fca5a5' }}
+                          onClick={() => openEndModal(auction)}
+                          disabled={saving}
+                        >
+                          {t('my_auctions.end_auction')}
+                        </button>
+                      )}
+                      {(auction.status === 'EndedNoBid' || (isEndedStatus(auction.status) && Number(auction.bidCount || 0) === 0)) && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => openRelistModal(auction)}
+                          disabled={saving}
+                        >
+                          {t('my_auctions.relist_auction')}
                         </button>
                       )}
                     </div>
@@ -666,6 +759,119 @@ export default function MyAuctions() {
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
             </div>
           </form>
+        </div>
+      </div>
+    )}
+
+    {/* Relist Auction Modal */}
+    {relistingAuction && relistForm && (
+      <div className="seller-auctions-modal-overlay">
+        <div className="seller-auctions-modal-content animate-fade-in">
+          <div className="modal-header">
+            <h3>{t('my_auctions.relist_title')} - {relistingAuction.productName}</h3>
+            <button className="close-btn" onClick={closeRelistModal}>×</button>
+          </div>
+          <form onSubmit={handleRelist} className="modal-body">
+            <div className="form-group-row">
+              <div className="form-group">
+                <label>{t('auction.starting_price')} (VND) *</label>
+                <input
+                  type="number"
+                  name="startingPrice"
+                  value={relistForm.startingPrice}
+                  onChange={handleRelistChange}
+                  required
+                  min="1"
+                />
+              </div>
+              <div className="form-group">
+                <label>{t('auction.min_step')} (VND) *</label>
+                <input
+                  type="number"
+                  name="minIncrement"
+                  value={relistForm.minIncrement}
+                  onChange={handleRelistChange}
+                  required
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>{t('auction.buy_now_price')} (VND) *</label>
+              <input
+                type="number"
+                name="buyNowPrice"
+                value={relistForm.buyNowPrice}
+                onChange={handleRelistChange}
+                required
+                min="1"
+              />
+            </div>
+
+            <div className="form-group-row">
+              <div className="form-group">
+                <label>{t('auction.start_time')} *</label>
+                <input
+                  type="datetime-local"
+                  name="startTime"
+                  value={relistForm.startTime}
+                  onChange={handleRelistChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>{t('auction.end_time')} *</label>
+                <input
+                  type="datetime-local"
+                  name="endTime"
+                  value={relistForm.endTime}
+                  onChange={handleRelistChange}
+                  min={relistForm.startTime || undefined}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeRelistModal} disabled={saving}>{t('common.cancel')}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>{saving ? t('common.saving') : t('my_auctions.relist_auction')}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {/* End Auction Confirmation Modal */}
+    {endingAuction && (
+      <div className="seller-auctions-modal-overlay">
+        <div className="seller-auctions-modal-content animate-fade-in" style={{ maxWidth: '440px' }}>
+          <div className="modal-header">
+            <h3 style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>warning</span>
+              {t('my_auctions.end_auction')}
+            </h3>
+            <button className="close-btn" onClick={closeEndModal} disabled={saving}>×</button>
+          </div>
+          <div className="modal-body" style={{ padding: '20px 24px' }}>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              {t('my_auctions.confirm_end_msg')}
+            </p>
+          </div>
+          <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '16px 24px', borderTop: '1px solid var(--border-color)' }}>
+            <button type="button" className="btn-secondary" onClick={closeEndModal} disabled={saving}>
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ background: '#dc2626', borderColor: '#dc2626' }}
+              onClick={handleEndAuctionConfirm}
+              disabled={saving}
+            >
+              {saving ? t('common.submitting') : t('common.confirm')}
+            </button>
+          </div>
         </div>
       </div>
     )}
