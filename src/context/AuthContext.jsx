@@ -149,26 +149,28 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const authData = await accountService.loginWithGoogle(googleResponse);
-      if (authData && authData.token) {
-        localStorage.setItem('token', authData.token);
+      const tokenVal = authData?.token || authData?.accessToken || authData?.jwtToken;
+      if (authData && tokenVal) {
+        localStorage.setItem('token', tokenVal);
         const userObj = buildUserFromAuthData(authData);
         const hydratedUser = await hydrateUserWithProfile(userObj);
 
-        setToken(authData.token);
+        setToken(tokenVal);
         setUser(hydratedUser);
         localStorage.setItem('user', JSON.stringify(hydratedUser));
         return { success: true, mustChangePassword: authData.mustChangePassword };
       }
-      return { success: false, error: 'Google Login failed' };
+      return { success: false, error: 'Google Login failed: No token returned from backend server.' };
     } catch (err) {
+      console.error('Google Login Exception:', err);
       const data = err.response?.data;
       let errMsg;
       if (typeof data === 'string' && data.trim()) {
         errMsg = data;
       } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || (typeof data === 'object' && Object.keys(data).length > 0 ? JSON.stringify(data) : '') || 'Google authentication failed.';
+        errMsg = data.message || data.title || data.error || (data.errors ? Object.values(data.errors).flat().join(', ') : '') || (Object.keys(data).length > 0 ? JSON.stringify(data) : '');
       }
-      errMsg = errMsg || err.message || 'Google Login failed.';
+      errMsg = errMsg || err.message || 'Google authentication failed.';
       
       setError(errMsg);
       return { success: false, error: errMsg, code: data?.code };

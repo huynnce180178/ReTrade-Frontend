@@ -61,15 +61,18 @@ export default function Register() {
       setGoogleLoading(true);
       try {
         const doGoogleLogin = googleLogin || loginWithGoogle;
-        const result = await doGoogleLogin(tokenResponse.access_token);
+        const result = await doGoogleLogin(tokenResponse);
         if (result.success) {
           showToast(t('toast.register_success'), 'success');
           navigate('/');
         } else {
-          showToast(result.error || t('common.error_occurred'), 'error');
+          const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title || JSON.stringify(result.error));
+          showToast(rawErr || t('common.error_occurred'), 'error');
         }
-      } catch {
-        showToast(t('common.error_occurred'), 'error');
+      } catch (err) {
+        console.error('Google register error:', err);
+        const msg = err.response?.data?.message || err.response?.data || err.message || t('common.error_occurred');
+        showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
       } finally {
         setGoogleLoading(false);
       }

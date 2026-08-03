@@ -5,9 +5,19 @@ const get = (url) => api.get(url).then(r => r.data);
 
 const accountService = {
   register: (data) => post('/Account/register', data),
-  loginWithGoogle: (accessTokenData) => {
-    const token = typeof accessTokenData === 'string' ? accessTokenData : (accessTokenData?.accessToken || accessTokenData?.idToken || accessTokenData?.token);
-    return post('/Account/login-with-google', { accessToken: token });
+  loginWithGoogle: (googleTokenData) => {
+    const token = typeof googleTokenData === 'string'
+      ? googleTokenData
+      : (googleTokenData?.access_token || googleTokenData?.accessToken || googleTokenData?.id_token || googleTokenData?.idToken || googleTokenData?.token);
+    const idToken = typeof googleTokenData === 'object'
+      ? (googleTokenData?.id_token || googleTokenData?.idToken)
+      : null;
+
+    return post('/Account/login-with-google', {
+      accessToken: token,
+      idToken: idToken || token,
+      token: token
+    });
   },
   verify: (data) => post('/Account/verify', data),
   resendOtp: (email) => post('/Account/resend-otp', { email }),

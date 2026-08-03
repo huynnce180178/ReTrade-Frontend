@@ -67,7 +67,7 @@ export default function Login() {
       setGoogleLoading(true);
       try {
         const doGoogleLogin = googleLogin || loginWithGoogle;
-        const result = await doGoogleLogin(tokenResponse.access_token);
+        const result = await doGoogleLogin(tokenResponse);
         if (result.success) {
           if (result.mustChangePassword) {
             showToast(t('auth.change_pw_title'), 'info');
@@ -77,15 +77,16 @@ export default function Login() {
             navigate('/');
           }
         } else {
-          const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title);
+          const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title || JSON.stringify(result.error));
           const errorMsg = (result.code && t(`auth.${result.code.toLowerCase()}`) !== `auth.${result.code.toLowerCase()}`)
             ? t(`auth.${result.code.toLowerCase()}`)
-            : (rawErr || t('common.error_occurred'));
+            : (rawErr || 'Google sign-in failed. Please try again.');
           showToast(errorMsg, 'error');
         }
       } catch (err) {
-        const msg = err.response?.data?.message || err.message || t('common.error_occurred');
-        showToast(msg, 'error');
+        console.error('Google login component error:', err);
+        const msg = err.response?.data?.message || err.response?.data || err.message || t('common.error_occurred');
+        showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
       } finally {
         setGoogleLoading(false);
       }
