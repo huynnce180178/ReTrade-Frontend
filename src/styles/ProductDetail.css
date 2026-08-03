@@ -1829,6 +1829,56 @@
   }
 }
 
+@media (max-width: 768px) {
+  .pd-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 12px !important;
+  }
+
+  .pd-btn-buy {
+    width: 100% !important;
+    min-height: 48px !important;
+  }
+
+  .pd-actions-icons {
+    width: 100% !important;
+    display: flex !important;
+    gap: 12px !important;
+  }
+
+  .pd-btn-icon {
+    flex: 1 !important;
+    height: 48px !important;
+    width: auto !important;
+  }
+
+  .pd-offer-buttons {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .pd-offer-btn {
+    flex: 1 !important;
+    min-width: 0 !important;
+    justify-content: center !important;
+    padding: 10px 8px !important;
+    font-size: 13px !important;
+  }
+
+  .pd-offer-btn span {
+    font-size: 16px !important;
+  }
+
+  .pd-info-col,
+  .pd-offer-section {
+    margin-bottom: 24px !important;
+  }
+}
+
 
 
 

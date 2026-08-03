@@ -543,6 +543,23 @@
   animation: scaleFadeIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
+@media (max-width: 768px) {
+  .user-dropdown-wrapper {
+    position: static !important;
+  }
+
+  .user-dropdown {
+    position: absolute !important;
+    top: 56px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: calc(100vw - 24px) !important;
+    max-width: 320px !important;
+    margin-left: auto !important;
+    z-index: 9999 !important;
+  }
+}
+
 .dropdown-user-info {
   padding: 8px 10px;
 }
