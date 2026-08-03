@@ -141,6 +141,7 @@ export default function Category() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
+  const [editingCategory, setEditingCategory] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCategory, setDetailCategory] = useState(null);
 
@@ -343,8 +344,16 @@ export default function Category() {
 
   const filteredCategories = hierarchicalCategories;
 
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingCategory(null);
+    setSelectedImageFile(null);
+    setImagePreview('');
+  };
+
   const handleOpenCreateModal = () => {
     setModalMode('create');
+    setEditingCategory(null);
     setName('');
     setDescription('');
     setParentId('');
@@ -357,6 +366,8 @@ export default function Category() {
 
   const handleOpenEditModal = (category) => {
     setModalMode('edit');
+    setEditingCategory(category);
+    setSelectedCategory(category);
     setName(category.name || '');
     setDescription(category.description || '');
     setParentId(category.parentId || '');
@@ -497,18 +508,20 @@ export default function Category() {
 
     try {
       let savedCategory = null;
+      const targetCatId = modalMode === 'create' ? null : (editingCategory?.categoryId || selectedCategory?.categoryId);
+
       if (modalMode === 'create') {
         showToast(t('admin.categories.msg_creating'), 'info');
         savedCategory = await categoryService.create(payload);
         showToast(t('admin.categories.msg_create_success'), 'success');
       } else {
         showToast(t('admin.categories.msg_updating'), 'info');
-        savedCategory = await categoryService.update(selectedCategory.categoryId, payload);
+        savedCategory = await categoryService.update(targetCatId, payload);
         showToast(t('admin.categories.msg_update_success'), 'success');
       }
 
       if (selectedImageFile && (savedCategory || modalMode === 'edit')) {
-        const categoryIdToUpload = modalMode === 'create' ? savedCategory.categoryId : selectedCategory.categoryId;
+        const categoryIdToUpload = modalMode === 'create' ? savedCategory.categoryId : targetCatId;
         showToast(t('admin.categories.msg_uploading_img'), 'info');
         const imgRes = await categoryService.uploadImage(categoryIdToUpload, selectedImageFile);
         if (imgRes?.imageUrl && modalMode === 'edit') {
@@ -516,9 +529,7 @@ export default function Category() {
         }
       }
 
-      setIsModalOpen(false);
-      setSelectedImageFile(null);
-      setImagePreview('');
+      handleCloseModal();
       await fetchCategories();
     } catch (err) {
       showToast(getApiErrorMessage(err, 'admin.categories.msg_save_error'), 'error');
@@ -986,11 +997,11 @@ export default function Category() {
 
       {/* Create / Edit Modal */}
       {isModalOpen && createPortal(
-        <div className="modal-overlay animate-fade-in" onClick={() => setIsModalOpen(false)}>
+        <div className="modal-overlay animate-fade-in" onClick={handleCloseModal}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{modalMode === 'create' ? t('admin.categories.add_category') : t('admin.categories.edit_category')}</h3>
-              <button className="modal-close-btn" onClick={() => setIsModalOpen(false)}>
+              <button className="modal-close-btn" onClick={handleCloseModal}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -1212,7 +1223,7 @@ export default function Category() {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>{t('common.cancel')}</button>
+                <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>{t('common.cancel')}</button>
                 <button type="submit" className="btn btn-primary">{t('admin.categories.save_changes')}</button>
               </div>
             </form>

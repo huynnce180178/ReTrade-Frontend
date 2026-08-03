@@ -887,22 +887,25 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .cat-tbl-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 32px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 8px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
+  flex-shrink: 0;
 }
 
 .cat-tbl-btn .material-symbols-outlined {
@@ -1347,8 +1350,8 @@
 
 .diagram-nodes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
   width: 100%;
 }
 
@@ -1383,12 +1386,16 @@
   align-items: center;
   justify-content: space-between;
   background: #ffffff;
+  flex-wrap: wrap;
+  gap: 10px 12px;
 }
 
 .diagram-node-identity {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1 1 auto;
+  min-width: 130px;
 }
 
 .diagram-node-body {
