@@ -510,6 +510,7 @@
   },
   "admin": {
     "dashboard_title": "Bảng Điều Khiển Admin",
+    "sales_stats": "Thống Kê Doanh Số",
     "user_management": "Quản lý người dùng",
     "category_management": "Quản lý danh mục",
     "listings_moderation": "Kiểm Duyệt Niêm Yết",

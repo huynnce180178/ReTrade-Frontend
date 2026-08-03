@@ -278,7 +278,7 @@ export default function AdminLayout() {
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">monitoring</span>
-                {t('seller.sales_stats')}
+                {t('admin.sales_stats')}
               </NavLink>
 
               <NavLink 

@@ -510,6 +510,7 @@
   },
   "admin": {
     "dashboard_title": "Admin Dashboard",
+    "sales_stats": "Sales Statistics",
     "user_management": "User Management",
     "category_management": "Category Management",
     "listings_moderation": "Listings Moderation",
