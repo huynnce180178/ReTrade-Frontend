@@ -1460,3 +1460,64 @@
   cursor: pointer;
   margin-top: 8px;
 }
+
+/* ============================================
+   MyAccount Mobile Responsive Rules
+   ============================================ */
+@media (max-width: 768px) {
+  .profile-page-wrapper.container {
+    padding: 0 16px;
+  }
+
+  .profile-page-wrapper {
+    padding-top: 20px;
+  }
+
+  .profile-grid {
+    gap: 20px;
+  }
+
+  .profile-sidebar {
+    padding: 20px 16px;
+  }
+
+  .ma-header-title h1 {
+    font-size: 24px !important;
+  }
+
+  .ma-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .ma-form-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .ma-form-actions button {
+    width: 100%;
+  }
+
+  .ma-modal-backdrop .ma-modal-container {
+    width: calc(100vw - 24px);
+    max-height: 90vh;
+  }
+}
+
+@media (max-width: 576px) {
+  .profile-page-wrapper.container {
+    padding: 0 12px;
+  }
+
+  .large-avatar-circle {
+    width: 72px;
+    height: 72px;
+    font-size: 24px;
+  }
+
+  .profile-avatar-section h3 {
+    font-size: 18px;
+  }
+}
+

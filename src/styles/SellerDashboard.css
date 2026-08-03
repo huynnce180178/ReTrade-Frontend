@@ -2875,3 +2875,83 @@
   font-size: 14px;
 }
 
+/* ============================================
+   Seller Mobile Responsive Rules
+   ============================================ */
+@media (max-width: 992px) {
+  .seller-dashboard-page {
+    grid-template-columns: 1fr;
+  }
+
+  .seller-mobile-header {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .seller-sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: #001b14;
+    cursor: pointer;
+  }
+
+  .seller-dash-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1000;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .seller-dash-sidebar.open {
+    left: 0;
+  }
+
+  .seller-sidebar-overlay {
+    display: block;
+  }
+
+  .seller-dash-main {
+    padding: 16px !important;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Table Horizontal Scrolling */
+  .seller-table-container,
+  .table-responsive,
+  .orders-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .seller-table,
+  .orders-table {
+    min-width: 650px;
+  }
+}
+
+@media (max-width: 576px) {
+  .seller-pagination {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .seller-dash-profile {
+    margin-bottom: 24px;
+  }
+}
+
+

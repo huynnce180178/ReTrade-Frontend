@@ -782,3 +782,41 @@
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* ============================================
+   Product Page Mobile Responsive Rules
+   ============================================ */
+@media (max-width: 992px) {
+  .product-page-layout {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
+  }
+
+  .product-filter-sidebar {
+    position: static !important;
+    width: 100%;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 576px) {
+  .product-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .product-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .product-search-bar {
+    width: 100%;
+  }
+}
+

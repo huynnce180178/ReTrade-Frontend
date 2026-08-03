@@ -16,8 +16,11 @@ export default function AdminLayout() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
+
+  const closeSidebar = () => setIsMobileSidebarOpen(false);
 
   useEffect(() => {
     setAvatarError(false);
@@ -116,6 +119,13 @@ export default function AdminLayout() {
       {/* Admin Header Bar */}
       <header className="admin-header">
         <div className="admin-header-left">
+          <button 
+            className="admin-mobile-toggle" 
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            aria-label="Toggle Admin Sidebar"
+          >
+            <span className="material-symbols-outlined">{isMobileSidebarOpen ? 'close' : 'menu'}</span>
+          </button>
           <Link to="/" className="admin-logo-text">RETRADE</Link>
         </div>
 
@@ -124,7 +134,7 @@ export default function AdminLayout() {
 
           <Link to="/" className="btn-view-live">
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>home</span>
-            {t('common.view_home')}
+            <span className="btn-live-text">{t('common.view_home')}</span>
           </Link>
 
           <div className="notification-wrapper" ref={notifRef} style={{ position: 'relative' }}>
@@ -229,10 +239,15 @@ export default function AdminLayout() {
         </div>
       </header>
 
+      {/* Mobile Overlay */}
+      {isMobileSidebarOpen && (
+        <div className="admin-sidebar-overlay" onClick={closeSidebar}></div>
+      )}
+
       {/* Admin Workspace Grid */}
       <div className="admin-workspace">
         {/* Admin Left Sidebar */}
-        <aside className="admin-sidebar">
+        <aside className={`admin-sidebar ${isMobileSidebarOpen ? 'open' : ''}`}>
           <div className="admin-sidebar-top">
             <div className="admin-profile-header">
               <div className="admin-shield-icon">
@@ -242,11 +257,15 @@ export default function AdminLayout() {
                 <h3>RETRADE Admin</h3>
                 <p>{t('nav.admin_center')}</p>
               </div>
+              <button className="admin-sidebar-close" onClick={closeSidebar} aria-label="Close Sidebar">
+                <span className="material-symbols-outlined">close</span>
+              </button>
             </div>
 
             <nav className="admin-sidebar-menu">
               <NavLink 
                 to="/admin/dashboard" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">grid_view</span>
@@ -255,6 +274,7 @@ export default function AdminLayout() {
 
               <NavLink 
                 to="/admin/statistics" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">monitoring</span>
@@ -263,6 +283,7 @@ export default function AdminLayout() {
 
               <NavLink 
                 to="/admin/users" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">group</span>
@@ -271,6 +292,7 @@ export default function AdminLayout() {
 
               <NavLink 
                 to="/admin/category" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">category</span>
@@ -279,6 +301,7 @@ export default function AdminLayout() {
 
               <NavLink 
                 to="/admin/listings" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">rule</span>
@@ -287,6 +310,7 @@ export default function AdminLayout() {
 
               <NavLink 
                 to="/admin/auctions" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">gavel</span>
@@ -295,6 +319,7 @@ export default function AdminLayout() {
 
               <NavLink 
                 to="/admin/refunds" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">payments</span>
@@ -303,6 +328,7 @@ export default function AdminLayout() {
 
               <NavLink 
                 to="/admin/reports" 
+                onClick={closeSidebar}
                 className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
               >
                 <span className="material-symbols-outlined admin-menu-item-icon">flag</span>
@@ -317,12 +343,12 @@ export default function AdminLayout() {
               <span>{t('common.system')}: OK</span>
             </div>
 
-            <Link to="/profile" className="admin-profile-link">
+            <Link to="/profile" onClick={closeSidebar} className="admin-profile-link">
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>account_box</span>
               {t('nav.profile')}
             </Link>
 
-            <button className="admin-logout-btn" onClick={handleLogoutClick}>
+            <button className="admin-logout-btn" onClick={() => { closeSidebar(); handleLogoutClick(); }}>
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
               {t('nav.logout')}
             </button>

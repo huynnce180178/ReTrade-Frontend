@@ -731,14 +731,38 @@
   background: #ffffff;
   width: 100%;
   max-width: 900px;
-  max-height: 95vh;
-  overflow: hidden;
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   box-shadow: 0 30px 70px rgba(2, 36, 27, 0.25);
   border-radius: 24px;
   padding: 0;
   border: 1px solid rgba(2, 36, 27, 0.08);
+}
+
+@media (max-width: 768px) {
+  .sub-modal-overlay {
+    padding: 12px;
+  }
+  .sub-modal-container {
+    border-radius: 16px;
+  }
+  .sub-modal-header {
+    padding: 24px 20px 16px;
+  }
+  .sub-modal-header h2 {
+    font-size: 22px;
+  }
+  .sub-modal-grid {
+    padding: 0 16px 24px;
+    gap: 16px;
+  }
+  .sub-modal-close {
+    top: 16px;
+    right: 16px;
+  }
 }
 
 .sub-modal-close {
