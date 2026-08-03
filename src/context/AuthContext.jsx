@@ -54,7 +54,11 @@ export const AuthProvider = ({ children }) => {
     accountHubRef.current = connection;
     let disposed = false;
 
-    const handleForceLogout = () => {
+    const handleForceLogout = (reasonMessage) => {
+      const msg = typeof reasonMessage === 'string' && reasonMessage.trim()
+        ? reasonMessage
+        : 'Quyền hạn tài khoản của bạn đã bị Quản trị viên thay đổi. Hệ thống tự động đăng xuất.';
+      alert(msg);
       handleLogout();
     };
 
@@ -123,7 +127,6 @@ export const AuthProvider = ({ children }) => {
         setToken(authData.token);
         setUser(hydratedUser);
         localStorage.setItem('user', JSON.stringify(hydratedUser));
-        // propagate mustChangePassword flag to caller
         return { success: true, mustChangePassword: authData.mustChangePassword };
       }
       return { success: false, error: 'Unauthorized: Invalid credentials' };
@@ -142,91 +145,70 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const clearMustChangePassword = () => {
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, mustChangePassword: false, isPasswordSet: true };
-      localStorage.setItem('user', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setToken(null);
-    clearAuthStorage();
-  };
-
-  const handleGoogleLogin = async (accessToken) => {
+  const handleGoogleLogin = async (googleResponse) => {
     setError(null);
     try {
-      const authData = await accountService.loginWithGoogle(accessToken);
+      const authData = await accountService.loginWithGoogle(googleResponse);
       if (authData && authData.token) {
         localStorage.setItem('token', authData.token);
         const userObj = buildUserFromAuthData(authData);
         const hydratedUser = await hydrateUserWithProfile(userObj);
+
         setToken(authData.token);
         setUser(hydratedUser);
         localStorage.setItem('user', JSON.stringify(hydratedUser));
         return { success: true, mustChangePassword: authData.mustChangePassword };
       }
-
-      return { success: false, error: 'Google login failed. Please try again.' };
+      return { success: false, error: 'Google Login failed' };
     } catch (err) {
       const data = err.response?.data;
       let errMsg;
       if (typeof data === 'string' && data.trim()) {
         errMsg = data;
       } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || JSON.stringify(data);
+        errMsg = data.message || data.title || 'Google authentication failed.';
       }
-      errMsg = errMsg || err.message || 'Google login failed. Try again.';
+      errMsg = errMsg || err.message || 'Google Login failed.';
+      
       setError(errMsg);
       return { success: false, error: errMsg };
     }
   };
 
-  const handleRegister = async (registerData) => {
-
-    setError(null);
-    try {
-      const responseMsg = await accountService.register(registerData);
-      return { success: true, message: responseMsg };
-    } catch (err) {
-      const data = err.response?.data;
-      let errMsg;
-      if (typeof data === 'string' && data.trim()) {
-        errMsg = data;
-      } else if (data && typeof data === 'object') {
-        if (data.message) {
-          errMsg = data.message;
-        } else if (data.errors) {
-          const allErrors = Object.values(data.errors).flat();
-          errMsg = allErrors.join(' ');
-        } else if (data.title) {
-          errMsg = data.title;
-        }
-      }
-      errMsg = errMsg || err.message || 'Registration failed. Try again.';
-      setError(errMsg);
-      return { success: false, error: errMsg };
+  const handleLogout = () => {
+    if (accountHubRef.current) {
+      accountHubRef.current.stop().catch(() => {});
+      accountHubRef.current = null;
     }
+    clearAuthStorage();
+    setUser(null);
+    setToken(null);
   };
 
-  const value = {
-    user,
-    token,
-    loading,
-    error,
-    login: handleLogin,
-    
-    googleLogin: handleGoogleLogin,
-    logout: handleLogout,
-    register: handleRegister,
-    setUser
+  const updateUserState = (updatedFields) => {
+    setUser((prev) => {
+      const nextUser = { ...prev, ...updatedFields };
+      localStorage.setItem('user', JSON.stringify(nextUser));
+      return nextUser;
+    });
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        error,
+        login: handleLogin,
+        loginWithGoogle: handleGoogleLogin,
+        logout: handleLogout,
+        updateUserState,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

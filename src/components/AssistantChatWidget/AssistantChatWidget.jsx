@@ -47,20 +47,28 @@ function formatTextNode(text) {
 function renderFormattedContent(content) {
   if (!content) return null;
 
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const linkRegex = /(!?)\[([^\]]+)\]\(([^)]+)\)/g;
   const elements = [];
   let lastIndex = 0;
   let match;
 
   while ((match = linkRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      elements.push(formatTextNode(content.substring(lastIndex, match.index)));
+    const isImage = match[1] === '!';
+    const textStart = match.index;
+    if (textStart > lastIndex) {
+      elements.push(formatTextNode(content.substring(lastIndex, textStart)));
     }
 
-    const title = match[1];
-    const url = match[2];
+    const title = match[2];
+    const url = match[3];
 
-    if (url.startsWith('/')) {
+    if (isImage) {
+      elements.push(
+        <div key={`img-${url}-${match.index}`} className="assistant-widget-inline-img-wrapper">
+          <img src={url} alt={title} className="assistant-widget-inline-img" onError={(e) => { e.target.style.display = 'none'; }} />
+        </div>
+      );
+    } else if (url.startsWith('/')) {
       elements.push(
         <Link key={`${url}-${match.index}`} to={url} className="assistant-widget-nav-btn">
           <span>{title}</span>
@@ -94,6 +102,7 @@ export default function AssistantChatWidget() {
   const assistantTypeMessage = t('chat.type_message');
   const assistantSendTitle = t('chat.send');
   const [open, setOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
@@ -262,7 +271,7 @@ export default function AssistantChatWidget() {
   return (
     <div className={`assistant-widget ${open ? 'open' : ''}`}>
       {open && (
-        <section className="assistant-widget-panel" aria-label={assistantTitle}>
+        <section className={`assistant-widget-panel ${isMaximized ? 'maximized' : ''}`} aria-label={assistantTitle}>
           <header className="assistant-widget-header">
             <div className="assistant-widget-brand">
               <div className="assistant-widget-avatar-head">
@@ -275,6 +284,13 @@ export default function AssistantChatWidget() {
               </div>
             </div>
             <div className="assistant-widget-actions">
+              <button
+                type="button"
+                onClick={() => setIsMaximized((prev) => !prev)}
+                title={isMaximized ? 'Thu nhỏ' : 'Phóng to'}
+              >
+                <span className="material-symbols-outlined">{isMaximized ? 'close_fullscreen' : 'open_in_full'}</span>
+              </button>
               <button type="button" onClick={handleNewChat} title={t('common.reset')}>
                 <span className="material-symbols-outlined">autorenew</span>
               </button>
