@@ -95,7 +95,7 @@ function renderFormattedContent(content) {
 }
 
 export default function AssistantChatWidget() {
-  const { t, formatCurrency } = useLanguage();
+  const { t, formatCurrency, language } = useLanguage();
   const assistantTitle = t('chat.assistant_title');
   const assistantWelcome = t('chat.assistant_welcome');
   const assistantSubtitle = t('chat.assistant_subtitle');
@@ -220,7 +220,7 @@ export default function AssistantChatWidget() {
     setSending(true);
 
     try {
-      const response = await assistantChatService.sendMessage(text, sessionId);
+      const response = await assistantChatService.sendMessage(text, sessionId, language);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
         setSessionId(response.sessionId);

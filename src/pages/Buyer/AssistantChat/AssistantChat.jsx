@@ -37,7 +37,7 @@ function mapHistoryMessage(message) {
 
 export default function AssistantChat() {
   const { showToast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messages, setMessages] = useState([
     {
@@ -115,7 +115,7 @@ export default function AssistantChat() {
     setSending(true);
 
     try {
-      const response = await assistantChatService.sendMessage(text, sessionId);
+      const response = await assistantChatService.sendMessage(text, sessionId, language);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
         setSessionId(response.sessionId);
