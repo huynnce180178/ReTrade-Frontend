@@ -24,21 +24,52 @@ const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   minute: '2-digit',
 });
 
-const getJourneySteps = (language, status) => {
-  const isFailed = String(status || '').toLowerCase() === 'deliveryfailed';
-  return [
-    { key: 'AwaitingPayment', label: language === 'vi' ? 'Chờ thanh toán' : 'Awaiting Payment', icon: 'receipt_long' },
-    { key: 'Pending', label: language === 'vi' ? 'Đang xử lý' : 'Processing', icon: 'inventory' },
-    { key: 'Confirmed', label: language === 'vi' ? 'Đã xác nhận' : 'Confirmed', icon: 'verified_user' },
-    { key: 'Shipping', label: language === 'vi' ? 'Đang giao' : 'Shipping', icon: 'local_shipping' },
-    isFailed
-      ? { key: 'DeliveryFailed', label: language === 'vi' ? 'Giao thất bại' : 'Delivery Failed', icon: 'report' }
-      : { key: 'Delivered', label: language === 'vi' ? 'Đã giao' : 'Delivered', icon: 'package_2' },
-    { key: 'Completed', label: language === 'vi' ? 'Hoàn thành' : 'Completed', icon: 'check_circle' },
+const getJourneySteps = (t, status) => {
+  const normStatus = String(status || '').toLowerCase();
+
+  const steps = [
+    { key: 'AwaitingPayment', label: t('order_status.awaiting_payment'), icon: 'receipt_long' },
+    { key: 'Pending', label: t('order_status.pending'), icon: 'inventory' },
+    { key: 'Confirmed', label: t('order_status.confirmed'), icon: 'verified_user' },
+    { key: 'Shipping', label: t('order_status.shipping'), icon: 'local_shipping' },
   ];
+
+  if (normStatus === 'deliveryfailed') {
+    steps.push({ key: 'DeliveryFailed', label: t('order_status.delivery_failed'), icon: 'report' });
+  } else {
+    steps.push({ key: 'Delivered', label: t('order_status.delivered'), icon: 'package_2' });
+  }
+
+  if (normStatus === 'cancelled') {
+    steps.push({ key: 'Cancelled', label: t('order_status.cancelled'), icon: 'block' });
+  } else if (normStatus === 'returnrequested') {
+    steps.push({ key: 'Completed', label: t('order_status.completed'), icon: 'check_circle' });
+    steps.push({ key: 'ReturnRequested', label: t('order_status.return_requested'), icon: 'assignment_return' });
+  } else if (normStatus === 'returnrejected') {
+    steps.push({ key: 'Completed', label: t('order_status.completed'), icon: 'check_circle' });
+    steps.push({ key: 'ReturnRejected', label: t('order_status.return_rejected'), icon: 'do_not_disturb_on' });
+  } else if (normStatus === 'returned') {
+    steps.push({ key: 'Completed', label: t('order_status.completed'), icon: 'check_circle' });
+    steps.push({ key: 'Returned', label: t('order_status.returned'), icon: 'assignment_turned_in' });
+  } else {
+    steps.push({ key: 'Completed', label: t('order_status.completed'), icon: 'check_circle' });
+  }
+
+  return steps;
 };
 
-const statusOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered', 'Completed'];
+function getActiveStepIndex(status, steps) {
+  const normStatus = String(status || '').toLowerCase();
+  if (normStatus === 'cancelled') return steps.findIndex((s) => s.key === 'Cancelled');
+  if (normStatus === 'deliveryfailed') return steps.findIndex((s) => s.key === 'DeliveryFailed');
+  if (normStatus === 'returnrequested') return steps.findIndex((s) => s.key === 'ReturnRequested');
+  if (normStatus === 'returnrejected') return steps.findIndex((s) => s.key === 'ReturnRejected');
+  if (normStatus === 'returned') return steps.findIndex((s) => s.key === 'Returned');
+
+  const stdOrder = ['AwaitingPayment', 'Pending', 'Confirmed', 'Shipping', 'Delivered', 'Completed'];
+  const idx = stdOrder.findIndex((s) => s.toLowerCase() === normStatus);
+  return idx >= 0 ? idx : steps.length - 1;
+}
 
 const returnRequestWindowMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -335,7 +366,7 @@ export default function PurchaseDetail() {
                   <section className="purchase-detail-main">
                     <article className="purchase-detail-card">
                       <h2><span className="material-symbols-outlined">route</span>{language === 'vi' ? 'Hành Trình Đơn Hàng' : 'Order Journey'}</h2>
-                      <Journey status={purchase.status} createdAt={purchase.createdAt} updatedAt={purchase.updatedAt} language={language} />
+                      <Journey status={purchase.status} createdAt={purchase.createdAt} updatedAt={purchase.updatedAt} t={t} />
                     </article>
 
                     <article className="purchase-detail-card">
@@ -346,7 +377,7 @@ export default function PurchaseDetail() {
                           <div className="purchase-detail-item-top">
                             <h3>{purchase.productName || t('common.unnamed_product')}</h3>
                             <em className={`purchase-status ${getStatusClassName(purchase.status)}`}>
-                              {getStatusLabel(purchase.status, language)}
+                              {getStatusLabel(purchase.status, t)}
                             </em>
                           </div>
                           <p>{language === 'vi' ? 'Người bán:' : 'Seller:'} {purchase.sellerName || purchase.sellerEmail || '-'}</p>
@@ -483,73 +514,73 @@ function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onCl
   );
 }
 
-function Journey({ status, createdAt, updatedAt, language }) {
+function Journey({ status, createdAt, updatedAt, t }) {
   if (!status) return null;
-  const isVi = language === 'vi';
-
-  if (String(status).toLowerCase() === 'cancelled') {
-    return (
-      <div className="purchase-empty-state">
-        <span className="material-symbols-outlined">block</span>
-        <h3>{isVi ? 'Đơn Hàng Đã Bị Hủy' : 'Order Cancelled'}</h3>
-        <p>{isVi ? `Đơn hàng này đã bị hủy vào ${formatDateTime(updatedAt || createdAt)}.` : `This order was cancelled on ${formatDateTime(updatedAt || createdAt)}.`}</p>
-      </div>
-    );
-  }
-
-  if (String(status).toLowerCase() === 'returnrequested') {
-    return (
-      <div className="purchase-empty-state">
-        <span className="material-symbols-outlined">assignment_return</span>
-        <h3>{isVi ? 'Đã Gửi Yêu Cầu Trả Hàng' : 'Return Requested'}</h3>
-        <p>{isVi ? `Yêu cầu trả hàng của bạn đã gửi vào ${formatDateTime(updatedAt || createdAt)}.` : `Your return request was submitted on ${formatDateTime(updatedAt || createdAt)}.`}</p>
-      </div>
-    );
-  }
-
-  if (String(status).toLowerCase() === 'returnrejected') {
-    return (
-      <div className="purchase-empty-state">
-        <span className="material-symbols-outlined">do_not_disturb_on</span>
-        <h3>{isVi ? 'Yêu Cầu Trả Hàng Bị Từ Chối' : 'Return Rejected'}</h3>
-        <p>{isVi ? `Người bán đã từ chối yêu cầu trả hàng vào ${formatDateTime(updatedAt || createdAt)}.` : `The seller rejected this return request on ${formatDateTime(updatedAt || createdAt)}.`}</p>
-      </div>
-    );
-  }
-
-  if (String(status).toLowerCase() === 'returned') {
-    return (
-      <div className="purchase-empty-state">
-        <span className="material-symbols-outlined">assignment_turned_in</span>
-        <h3>{isVi ? 'Đã Trả Hàng Thành Công' : 'Returned'}</h3>
-        <p>{isVi ? `Đơn hàng đã được duyệt trả hàng vào ${formatDateTime(updatedAt || createdAt)}.` : `This purchase was approved for return on ${formatDateTime(updatedAt || createdAt)}.`}</p>
-      </div>
-    );
-  }
-
-  const steps = getJourneySteps(language, status);
-  let activeIndex = statusOrder.indexOf(status);
-  if (String(status).toLowerCase() === 'deliveryfailed') {
-    activeIndex = 4;
-  }
-  const hasActive = activeIndex >= 0;
+  const steps = getJourneySteps(t, status);
+  const activeIndex = getActiveStepIndex(status, steps);
+  const normStatus = String(status || '').toLowerCase();
+  const dateStr = formatDateTime(updatedAt || createdAt);
 
   return (
-    <div className="purchase-journey">
-      {steps.map((step, index) => {
-        const isDone = hasActive && index <= activeIndex;
-        const isCurrent = hasActive && index === activeIndex;
+    <div className="purchase-journey-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="purchase-journey" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+        {steps.map((step, index) => {
+          const isDone = index <= activeIndex;
+          const isCurrent = index === activeIndex;
+          const isSpecial = ['cancelled', 'deliveryfailed', 'returnrequested', 'returnrejected', 'returned'].includes(step.key.toLowerCase());
 
-        return (
-          <div key={step.key} className={`purchase-journey-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`}>
-            <div>
-              <span className="material-symbols-outlined">{isDone ? (step.key === 'DeliveryFailed' ? 'report' : 'check') : step.icon}</span>
+          return (
+            <div
+              key={step.key}
+              className={`purchase-journey-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''} ${isSpecial && isCurrent ? step.key.toLowerCase() : ''}`}
+            >
+              <div>
+                <span className="material-symbols-outlined">
+                  {isDone && !isCurrent ? 'check' : step.icon}
+                </span>
+              </div>
+              <strong>{step.label}</strong>
+              <small>
+                {isDone
+                  ? formatDateTime(isCurrent ? updatedAt || createdAt : createdAt)
+                  : t('order_status.pending')}
+              </small>
             </div>
-            <strong>{step.label}</strong>
-            <small>{isDone ? formatDateTime(isCurrent ? updatedAt || createdAt : createdAt) : (isVi ? 'Chờ xử lý' : 'Pending')}</small>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {normStatus === 'cancelled' && (
+        <div className="purchase-empty-state" style={{ padding: '16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px' }}>
+          <span className="material-symbols-outlined" style={{ color: '#dc2626' }}>block</span>
+          <h3 style={{ color: '#991b1b', margin: '4px 0' }}>{t('order_status.order_cancelled_title')}</h3>
+          <p style={{ margin: 0, color: '#7f1d1d' }}>{t('order_status.order_cancelled_msg', { date: dateStr })}</p>
+        </div>
+      )}
+
+      {normStatus === 'returnrequested' && (
+        <div className="purchase-empty-state" style={{ padding: '16px', background: '#f3e8ff', border: '1px solid #d8b4fe', borderRadius: '12px' }}>
+          <span className="material-symbols-outlined" style={{ color: '#7c3aed' }}>assignment_return</span>
+          <h3 style={{ color: '#5b21b6', margin: '4px 0' }}>{t('order_status.return_requested_title')}</h3>
+          <p style={{ margin: 0, color: '#6b21a8' }}>{t('order_status.return_requested_msg', { date: dateStr })}</p>
+        </div>
+      )}
+
+      {normStatus === 'returnrejected' && (
+        <div className="purchase-empty-state" style={{ padding: '16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px' }}>
+          <span className="material-symbols-outlined" style={{ color: '#dc2626' }}>do_not_disturb_on</span>
+          <h3 style={{ color: '#991b1b', margin: '4px 0' }}>{t('order_status.return_rejected_title')}</h3>
+          <p style={{ margin: 0, color: '#7f1d1d' }}>{t('order_status.return_rejected_msg', { date: dateStr })}</p>
+        </div>
+      )}
+
+      {normStatus === 'returned' && (
+        <div className="purchase-empty-state" style={{ padding: '16px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '12px' }}>
+          <span className="material-symbols-outlined" style={{ color: '#d97706' }}>assignment_turned_in</span>
+          <h3 style={{ color: '#92400e', margin: '4px 0' }}>{t('order_status.returned_title')}</h3>
+          <p style={{ margin: 0, color: '#78350f' }}>{t('order_status.returned_msg', { date: dateStr })}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -572,35 +603,23 @@ function formatVnd(value) {
   return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
-function getStatusLabel(status, language) {
-  if (!status) return 'Unknown';
-  const labelsVi = {
-    AwaitingPayment: 'Chờ thanh toán',
-    Pending: 'Đang xử lý',
-    Confirmed: 'Đã xác nhận',
-    Shipping: 'Đang giao hàng',
-    Delivered: 'Đã giao hàng',
-    Completed: 'Hoàn thành',
-    DeliveryFailed: 'Giao hàng thất bại',
-    ReturnRequested: 'Yêu cầu trả hàng',
-    ReturnRejected: 'Bị từ chối trả hàng',
-    Returned: 'Đã trả hàng',
-    Cancelled: 'Đã hủy',
+function getStatusLabel(status, t) {
+  if (!status) return '-';
+  const statusKeys = {
+    AwaitingPayment: 'order_status.awaiting_payment',
+    Pending: 'order_status.pending',
+    Confirmed: 'order_status.confirmed',
+    Shipping: 'order_status.shipping',
+    Delivered: 'order_status.delivered',
+    Completed: 'order_status.completed',
+    DeliveryFailed: 'order_status.delivery_failed',
+    ReturnRequested: 'order_status.return_requested',
+    ReturnRejected: 'order_status.return_rejected',
+    Returned: 'order_status.returned',
+    Cancelled: 'order_status.cancelled',
   };
-  const labelsEn = {
-    AwaitingPayment: 'Waiting for Payment',
-    Pending: 'Processing',
-    Confirmed: 'Confirmed',
-    Shipping: 'Shipping',
-    Delivered: 'Delivered',
-    Completed: 'Completed',
-    DeliveryFailed: 'Delivery Failed',
-    ReturnRequested: 'Return Requested',
-    ReturnRejected: 'Return Rejected',
-    Returned: 'Returned',
-    Cancelled: 'Cancelled',
-  };
-  return language === 'vi' ? (labelsVi[status] || status) : (labelsEn[status] || status);
+  const key = statusKeys[status];
+  return key && typeof t === 'function' ? t(key) : status;
 }
 
 function getStatusClassName(status) {

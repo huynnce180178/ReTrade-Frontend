@@ -287,7 +287,7 @@ export default function AssistantChatWidget() {
               <button
                 type="button"
                 onClick={() => setIsMaximized((prev) => !prev)}
-                title={isMaximized ? 'Thu nhỏ' : 'Phóng to'}
+                title={isMaximized ? t('chat.minimize') : t('chat.maximize')}
               >
                 <span className="material-symbols-outlined">{isMaximized ? 'close_fullscreen' : 'open_in_full'}</span>
               </button>

@@ -38,38 +38,38 @@ const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   year: 'numeric',
 });
 
-const statusTabs = [
-  { key: 'all', label: 'All Orders' },
-  { key: 'AwaitingPayment', label: 'Pending Payment' },
-  { key: 'Pending', label: 'Processing' },
-  { key: 'Shipping', label: 'Shipping' },
-  { key: 'Delivered', label: 'Delivered' },
-  { key: 'Completed', label: 'Completed' },
-  { key: 'ReturnRequested', label: 'Return Requested' },
-  { key: 'Returned', label: 'Returned' },
-  { key: 'ReturnRejected', label: 'Return Rejected' },
-  { key: 'DeliveryFailed', label: 'Delivery Failed' },
-  { key: 'Cancelled', label: 'Cancelled' },
-];
-
-const statusMeta = {
-  AwaitingPayment: { label: 'Waiting for Payment', className: 'awaiting' },
-  Pending: { label: 'Confirmed', className: 'confirmed' },
-  Confirmed: { label: 'Confirmed', className: 'confirmed' },
-  Shipping: { label: 'Shipping', className: 'shipping' },
-  Delivered: { label: 'Delivered', className: 'delivered' },
-  Completed: { label: 'Completed', className: 'completed' },
-  DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
-  Cancelled: { label: 'Cancelled', className: 'cancelled' },
-  ReturnRequested: { label: 'Return Requested', className: 'return-requested' },
-  ReturnRejected: { label: 'Return Rejected', className: 'return-rejected' },
-  Returned: { label: 'Returned', className: 'returned' },
-};
-
 export default function PurchaseHistory() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { t, language, formatCurrency } = useLanguage();
+
+  const statusTabs = useMemo(() => [
+    { key: 'all', label: t('common.all') },
+    { key: 'AwaitingPayment', label: t('order_status.awaiting_payment') },
+    { key: 'Pending', label: t('order_status.pending') },
+    { key: 'Shipping', label: t('order_status.shipping') },
+    { key: 'Delivered', label: t('order_status.delivered') },
+    { key: 'Completed', label: t('order_status.completed') },
+    { key: 'ReturnRequested', label: t('order_status.return_requested') },
+    { key: 'Returned', label: t('order_status.returned') },
+    { key: 'ReturnRejected', label: t('order_status.return_rejected') },
+    { key: 'DeliveryFailed', label: t('order_status.delivery_failed') },
+    { key: 'Cancelled', label: t('order_status.cancelled') },
+  ], [t]);
+
+  const statusMeta = useMemo(() => ({
+    AwaitingPayment: { label: t('order_status.awaiting_payment'), className: 'awaiting' },
+    Pending: { label: t('order_status.pending'), className: 'confirmed' },
+    Confirmed: { label: t('order_status.confirmed'), className: 'confirmed' },
+    Shipping: { label: t('order_status.shipping'), className: 'shipping' },
+    Delivered: { label: t('order_status.delivered'), className: 'delivered' },
+    Completed: { label: t('order_status.completed'), className: 'completed' },
+    DeliveryFailed: { label: t('order_status.delivery_failed'), className: 'delivery-failed' },
+    Returned: { label: t('order_status.returned'), className: 'returned' },
+    ReturnRequested: { label: t('order_status.return_requested'), className: 'return-requested' },
+    ReturnRejected: { label: t('order_status.return_rejected'), className: 'return-rejected' },
+    Cancelled: { label: t('order_status.cancelled'), className: 'cancelled' },
+  }), [t]);
 
 
   const [purchases, setPurchases] = useState([]);
@@ -665,7 +665,20 @@ export default function PurchaseHistory() {
 
 function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain, onReportSeller, language }) {
   const { t } = useLanguage();
-  const meta = statusMeta[purchase.status] || { label: purchase.status || (t ? t('common.unknown') : 'Unknown'), className: 'default' };
+  const statusMetaMap = {
+    AwaitingPayment: { label: t('order_status.awaiting_payment'), className: 'awaiting' },
+    Pending: { label: t('order_status.pending'), className: 'confirmed' },
+    Confirmed: { label: t('order_status.confirmed'), className: 'confirmed' },
+    Shipping: { label: t('order_status.shipping'), className: 'shipping' },
+    Delivered: { label: t('order_status.delivered'), className: 'delivered' },
+    Completed: { label: t('order_status.completed'), className: 'completed' },
+    DeliveryFailed: { label: t('order_status.delivery_failed'), className: 'delivery-failed' },
+    Returned: { label: t('order_status.returned'), className: 'returned' },
+    ReturnRequested: { label: t('order_status.return_requested'), className: 'return-requested' },
+    ReturnRejected: { label: t('order_status.return_rejected'), className: 'return-rejected' },
+    Cancelled: { label: t('order_status.cancelled'), className: 'cancelled' },
+  };
+  const meta = statusMetaMap[purchase.status] || { label: purchase.status || (t ? t('common.unknown') : 'Unknown'), className: 'default' };
 
   const canCancel = false;
   const canComplete = purchase.status === 'Delivered';

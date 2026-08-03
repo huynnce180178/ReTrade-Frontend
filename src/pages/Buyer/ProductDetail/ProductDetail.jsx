@@ -340,8 +340,15 @@ export default function ProductDetail() {
       showToast(language === 'vi' ? 'Vui lòng đăng nhập để dùng danh sách yêu thích.' : 'Please sign in to use the wishlist.', 'error');
       return;
     }
-    if (product?.sellerId === user.userId || product?.sellerId === user.id || product?.sellerId === user.accountId) {
-      showToast(language === 'vi' ? 'Bạn không thể thêm sản phẩm của chính mình vào danh sách yêu thích.' : 'You cannot add your own product to your wishlist.', 'error');
+    const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+    const productSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+    const isOwnProduct = Boolean(
+      currentUserId &&
+      productSellerId &&
+      String(currentUserId).toLowerCase() === String(productSellerId).toLowerCase()
+    );
+    if (isOwnProduct) {
+      showToast(t('product.cannot_wishlist_own_product'), 'error');
       return;
     }
     if (!isWishlisted && isProductUnavailable(product)) {

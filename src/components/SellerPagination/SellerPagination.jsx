@@ -14,13 +14,8 @@ export default function SellerPagination({
 
   const safePage = Math.max(1, Number(page) || 1);
   const safeTotalPages = Math.max(1, Number(totalPages) || 1);
-  const safePageSize = Math.max(1, Number(pageSize) || 1);
-  const safeTotalItems = Math.max(0, Number(totalItems) || 0);
 
   if (safeTotalPages <= 1) return null;
-
-  const start = safeTotalItems === 0 ? 0 : (safePage - 1) * safePageSize + 1;
-  const end = Math.min(safePage * safePageSize, safeTotalItems);
 
   const goToPage = (nextPage) => {
     if (disabled) return;
@@ -30,11 +25,44 @@ export default function SellerPagination({
     }
   };
 
+  const getPageNumbers = () => {
+    const pages = [];
+    if (safeTotalPages <= 7) {
+      for (let i = 1; i <= safeTotalPages; i += 1) pages.push(i);
+    } else {
+      pages.push(1);
+      if (safePage > 3) pages.push('...');
+      const start = Math.max(2, safePage - 1);
+      const end = Math.min(safeTotalPages - 1, safePage + 1);
+      for (let i = start; i <= end; i += 1) pages.push(i);
+      if (safePage < safeTotalPages - 2) pages.push('...');
+      pages.push(safeTotalPages);
+    }
+    return pages;
+  };
+
+  const pageNumbers = getPageNumbers();
+
   return (
     <footer className="seller-dash-pagination">
-      <span className="seller-dash-pagination-info">
-        {t('common.showing_range', { start, end, total: safeTotalItems })}
-      </span>
+      <div className="seller-dash-pagination-numbers">
+        {pageNumbers.map((p, idx) => (p === '...' ? (
+          <span key={`dots-${idx}`} className="seller-dash-page-ellipsis">
+            ...
+          </span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            className={`seller-dash-page-num ${p === safePage ? 'active' : ''}`}
+            disabled={disabled || p === safePage}
+            onClick={() => goToPage(p)}
+          >
+            {p}
+          </button>
+        )))}
+      </div>
+
       <div className="seller-dash-pagination-actions">
         <button
           type="button"
@@ -60,8 +88,8 @@ export default function SellerPagination({
 SellerPagination.propTypes = {
   page: PropTypes.number.isRequired,
   totalPages: PropTypes.number.isRequired,
-  pageSize: PropTypes.number.isRequired,
-  totalItems: PropTypes.number.isRequired,
+  pageSize: PropTypes.number,
+  totalItems: PropTypes.number,
   onPageChange: PropTypes.func.isRequired,
   disabled: PropTypes.bool,
 };

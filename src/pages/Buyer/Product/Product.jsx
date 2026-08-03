@@ -187,8 +187,15 @@ export default function Product() {
       showToast(t('auth.login_title'), 'error');
       return;
     }
-    if (product.sellerId === user.userId || product.sellerId === user.id) {
-      showToast(t('common.warning'), 'error');
+    const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+    const productSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+    const isOwnProduct = Boolean(
+      currentUserId &&
+      productSellerId &&
+      String(currentUserId).toLowerCase() === String(productSellerId).toLowerCase()
+    );
+    if (isOwnProduct) {
+      showToast(t('product.cannot_wishlist_own_product'), 'error');
       return;
     }
     if (isProductUnavailable(product)) {
@@ -403,57 +410,62 @@ export default function Product() {
               </div>
             ) : (
               <div className="product-grid">
-                {products.map(product => (
-                  <div
-                    key={product.productId}
-                    className="product-card"
-                    onClick={() => navigate(`/product/${product.productId}`)}
-                  >
-                    <div className="product-card-image">
-                      {product.mainImageUrl ? (
-                        <img src={product.mainImageUrl} alt={product.name} loading="lazy" />
-                      ) : (
-                        <div className="product-card-image-placeholder">📦</div>
-                      )}
-                      {product.condition && (
-                        <span className="product-card-condition">{product.condition}</span>
-                      )}
-                      {product.status !== 'SoldOut' && product.status !== 'Sold' && product.status !== 'Inactive' && product.stockQuantity > 0 && (
-                        <>
-                          <button
-                            className={`product-wishlist-btn${wishlistIds.has(product.productId) ? ' active' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleWishlist(product);
-                            }}
-                            disabled={togglingId === product.productId}
-                            title={wishlistIds.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
-                          >
-                            {togglingId === product.productId
-                              ? <span className="product-wl-spinner" />
-                              : <span
-                                  className="material-symbols-outlined product-wishlist-heart"
-                                  style={{ fontVariationSettings: wishlistIds.has(product.productId) ? "'FILL' 1" : "'FILL' 0" }}
-                                >
-                                favorite
-                               </span>
-                            }
-                          </button>
-                          {product.price != null && (
+                {products.map(product => {
+                  const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+                  const pSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+                  const isOwn = Boolean(currentUserId && pSellerId && String(currentUserId).toLowerCase() === String(pSellerId).toLowerCase());
+
+                  return (
+                    <div
+                      key={product.productId}
+                      className="product-card"
+                      onClick={() => navigate(`/product/${product.productId}`)}
+                    >
+                      <div className="product-card-image">
+                        {product.mainImageUrl ? (
+                          <img src={product.mainImageUrl} alt={product.name} loading="lazy" />
+                        ) : (
+                          <div className="product-card-image-placeholder">📦</div>
+                        )}
+                        {product.condition && (
+                          <span className="product-card-condition">{product.condition}</span>
+                        )}
+                        {product.status !== 'SoldOut' && product.status !== 'Sold' && product.status !== 'Inactive' && product.stockQuantity > 0 && !isOwn && (
+                          <>
                             <button
-                              className="product-buy-now-btn"
+                              className={`product-wishlist-btn${wishlistIds.has(product.productId) ? ' active' : ''}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/checkout/${product.productId}`);
+                                handleToggleWishlist(product);
                               }}
-                              title={t('product.buy_now')}
+                              disabled={togglingId === product.productId}
+                              title={wishlistIds.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
                             >
-                              <span className="material-symbols-outlined">shopping_cart</span>
+                              {togglingId === product.productId
+                                ? <span className="product-wl-spinner" />
+                                : <span
+                                    className="material-symbols-outlined product-wishlist-heart"
+                                    style={{ fontVariationSettings: wishlistIds.has(product.productId) ? "'FILL' 1" : "'FILL' 0" }}
+                                  >
+                                  favorite
+                                 </span>
+                              }
                             </button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                            {product.price != null && (
+                              <button
+                                className="product-buy-now-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/checkout/${product.productId}`);
+                                }}
+                                title={t('product.buy_now')}
+                              >
+                                <span className="material-symbols-outlined">shopping_cart</span>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     <div className="product-card-body">
                       <span className="product-card-category">{product.categoryName || t('common.none')}</span>
                       <span className="product-card-name">{product.name}</span>
@@ -471,10 +483,10 @@ export default function Product() {
                       ) : (
                         <span className="product-card-price-no">{t('nav.auction')}</span>
                       )}
-                      <span className="product-card-date">{timeAgo(product.createdAt, language)}</span>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             )}
 
