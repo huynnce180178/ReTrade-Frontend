@@ -168,7 +168,11 @@
     "new_password": "Mật khẩu mới",
     "update_password": "Cập nhật mật khẩu",
     "change_pw_title": "Đổi mật khẩu tài khoản",
-    "current_password": "Mật khẩu hiện tại"
+    "current_password": "Mật khẩu hiện tại",
+    "account_banned": "Tài khoản của bạn đã bị KHÓA bởi Quản trị viên. Vui lòng kiểm tra email thông báo hoặc liên hệ Admin để được hỗ trợ.",
+    "account_inactive": "Tài khoản của bạn CHƯA ĐƯỢC KÍCH HOẠT. Vui lòng kiểm tra email để nhập mã OTP xác thực.",
+    "account_deleted": "Tài khoản này không tồn tại hoặc đã bị xóa khỏi hệ thống.",
+    "invalid_credentials": "Tên đăng nhập/email hoặc mật khẩu không chính xác."
   },
   "home": {
     "hero_badge": "✨ Nền Tảng Giao Dịch Thế Hệ Mới",
@@ -313,9 +317,29 @@
     "add_more_deposit": "Nạp Thêm Tiền Cọc",
     "top_up_deposit": "Nạp Tiền Cọc",
     "deposit_terms_accept": "Tôi đồng ý với quy định và điều khoản đặt cọc.",
+    "deposit_min_error": "Tiền cọc tối thiểu là 20.000 VNĐ.",
+    "deposit_policy_error": "Vui lòng đồng ý với điều khoản đặt cọc trước khi thanh toán.",
+    "bid_deposit_required": "Bạn cần nạp cọc trước khi thực hiện ra giá.",
+    "bid_min_error": "Mức giá ra tối thiểu phải là {{minBid}}.",
+    "bid_limit_error": "Mức giá ra không được vượt quá hạn mức ra giá (Tiền cọc - 20.000 VNĐ).",
+    "bid_buynow_exceed": "Mức giá ra không được cao hơn giá mua ngay.",
+    "bid_success": "Đặt giá thành công!",
+    "bid_buynow_ended": "Đặt giá khớp với giá mua ngay. Phiên đấu giá đã kết thúc!",
     "topup_note": "Nạp thêm tiền cọc để tăng hạn mức ra giá hoặc mở khóa mức giá mua ngay.",
     "rules_title": "Quy Định & Hướng Dẫn Đấu Giá",
     "rules_agree": "Tôi Đã Hiểu & Đồng Ý",
+    "view_policy_terms": "Xem Quy định & Điều khoản đặt cọc",
+    "policy_modal_title": "Quy Định & Điều Khoản Đặt Cọc",
+    "policy_banner_desc": "Tiền đặt cọc được ReTrade sử dụng để đảm bảo tính minh bạch và nghiêm túc của người tham gia đấu giá. Số tiền này là hạn mức bảo đảm của bạn.",
+    "policy_section_1_title": "1. Hạn mức ra giá & Hoàn cọc",
+    "policy_section_1_bullet_1": "Người tham gia có thể ra giá nhiều lần tối đa tới hạn mức Tiền cọc - 20.000 VNĐ.",
+    "policy_section_1_bullet_2": "Tiền cọc không bị trừ dồn theo các lượt ra giá. Tiền chỉ được cấn trừ khi bạn Thắng cuộc.",
+    "policy_section_1_bullet_3": "Trường hợp không thắng cuộc, tiền cọc (trừ phí tham gia 20.000 VNĐ) sẽ được hoàn lại.",
+    "policy_section_2_title": "2. Trách nhiệm người tham gia",
+    "policy_section_2_bullet_1": "Mọi lượt ra giá đã gửi là có hiệu lực và không thể hủy bỏ.",
+    "policy_section_2_bullet_2": "Người thắng cuộc có trách nhiệm hoàn tất thanh toán đơn hàng đúng hạn.",
+    "policy_modal_notice": "Nhấp xác nhận bên dưới để tích chọn đồng ý",
+    "policy_btn_agree": "Tôi đã đọc & Đồng ý",
     "starts_in": "Bắt đầu sau {duration}",
     "ends_in": "Kết thúc sau {duration}",
     "starts_in_label": "Bắt đầu sau: ",
@@ -361,7 +385,13 @@
     "continue_shopping": "Tiếp tục mua sắm",
     "condition_label": "Tình trạng:",
     "select_or_enter_voucher": "CHỌN HOẶC NHẬP MÃ GIẢM GIÁ",
-    "best_offer": "Ưu đãi tốt nhất"
+    "best_offer": "Ưu đãi tốt nhất",
+    "confirm_title": "Xác nhận thanh toán",
+    "agreed_price_badge": "Giá đã duyệt",
+    "counter_offer_badge": "Giá thương lượng",
+    "confirm_offer_accepted_msg": "Người bán đã đồng ý mức giá {{price}}. Bạn có muốn tiến hành thanh toán ngay không?",
+    "confirm_buy_now_msg": "Bạn có chắc chắn muốn tiến hành thanh toán cho sản phẩm này?",
+    "checkout_now": "Thanh toán ngay"
   },
   "account": {
     "profile_title": "Thông tin cá nhân",
@@ -1084,7 +1114,9 @@
     "status_accepted": "Đã chấp nhận",
     "status_rejected": "Đã từ chối",
     "accept_success": "Đã chấp nhận trả giá thành công.",
-    "reject_success": "Đã từ chối trả giá."
+    "reject_success": "Đã từ chối trả giá.",
+    "confirm_accept_msg": "Bạn có chắc chắn muốn CHẤP NHẬN đề xuất giá {{price}} cho sản phẩm \"{{product}}\" không?",
+    "confirm_reject_msg": "Bạn có chắc chắn muốn TỪ CHỐI đề xuất giá {{price}} cho sản phẩm \"{{product}}\" không?"
   },
   "order_management": {
     "title": "Quản lý đơn hàng",
@@ -1522,5 +1554,34 @@
     "satisfy_req_err": "Vui lòng đáp ứng đầy đủ các yêu cầu mật khẩu an toàn.",
     "success_msg": "Cập nhật mật khẩu mới thành công!",
     "failed_msg": "Không thể đổi mật khẩu."
+  },
+  "payment_result": {
+    "title_success": "Thanh toán thành công",
+    "title_failed": "Thanh toán thất bại",
+    "payment_id": "Mã thanh toán",
+    "amount": "Số tiền",
+    "vnpay_trans_no": "Mã giao dịch VNPAY",
+    "response_code": "Mã phản hồi VNPAY",
+    "back_to_auction": "Quay lại phiên đấu giá",
+    "back_to_home": "Về trang chủ",
+    "manage_subscriptions": "Quản lý gói dịch vụ",
+    "view_purchase_history": "Xem lịch sử mua hàng",
+    "try_again": "Thử lại thanh toán",
+    "no_info": "Không có thông tin chi tiết về giao dịch."
+  },
+  "vnpay_codes": {
+    "00": "Giao dịch thành công.",
+    "07": "Giao dịch bị nghi ngờ gian lận.",
+    "09": "Tài khoản/Thẻ chưa đăng ký dịch vụ Internet Banking.",
+    "10": "Xác thực thông tin thẻ/tài khoản không đúng quá 3 lần.",
+    "11": "Đã hết hạn chờ thanh toán.",
+    "12": "Thẻ hoặc tài khoản của bạn đang bị khóa.",
+    "13": "Mật khẩu xác thực OTP không chính xác.",
+    "24": "Bạn đã hủy giao dịch thanh toán.",
+    "51": "Tài khoản của bạn không đủ số dư để thực hiện giao dịch.",
+    "65": "Tài khoản đã vượt quá hạn mức giao dịch trong ngày.",
+    "75": "Ngân hàng thanh toán đang bảo trì.",
+    "79": "Nhập sai mật khẩu thanh toán quá số lần quy định.",
+    "default_failed": "Thanh toán thất bại. Vui lòng kiểm tra lại thẻ hoặc thử lại sau."
   }
 }

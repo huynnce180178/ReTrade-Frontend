@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import productService from '../../../services/productService';
 import addressService from '../../../services/addressService';
 import checkoutService from '../../../services/checkoutService';
@@ -20,6 +20,7 @@ const isProductUnavailable = (product) => (
 const Checkout = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const { t, language, formatCurrency } = useLanguage();
 
@@ -333,7 +334,8 @@ const Checkout = () => {
     );
   }
 
-  const subtotal = product.price || 0;
+  const customPrice = location.state?.price || location.state?.offerPrice;
+  const subtotal = customPrice != null ? Number(customPrice) : (product.price || 0);
   const total = Math.max(0, subtotal + shippingFee - discountAmount);
 
   const bestVoucher = myVouchers.length > 0 ? (

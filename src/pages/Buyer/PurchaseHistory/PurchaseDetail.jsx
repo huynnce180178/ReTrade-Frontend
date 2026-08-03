@@ -389,11 +389,6 @@ export default function PurchaseDetail() {
                     </section>
 
                     <section className="purchase-detail-actions">
-                      {['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status) && (
-                        <button type="button" className="purchase-text-danger" disabled={updating} onClick={cancelPurchase}>
-                          {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Updating...') : (language === 'vi' ? 'Hủy đơn hàng' : 'Cancel Purchase')}
-                        </button>
-                      )}
                       {purchase.status === 'AwaitingPayment' && (
                         <button type="button" className="purchase-primary-btn" disabled={updating} onClick={payAgain}>
                           {updating ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...') : (language === 'vi' ? 'Thanh toán lại' : 'Pay Again')}

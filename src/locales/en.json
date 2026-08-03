@@ -168,7 +168,11 @@
     "new_password": "New Password",
     "update_password": "Update Password",
     "change_pw_title": "Change Account Password",
-    "current_password": "Current Password"
+    "current_password": "Current Password",
+    "account_banned": "Your account has been BANNED by an administrator. Please check your email notification or contact support for assistance.",
+    "account_inactive": "Your account is NOT ACTIVATED yet. Please check your email for the OTP verification code.",
+    "account_deleted": "This account does not exist or has been deleted from the system.",
+    "invalid_credentials": "Invalid username/email or password."
   },
   "home": {
     "hero_badge": "✨ Next-Generation Trading Platform",
@@ -313,9 +317,29 @@
     "add_more_deposit": "Add More Deposit",
     "top_up_deposit": "Top Up Deposit",
     "deposit_terms_accept": "I accept the auction policy and deposit terms.",
+    "deposit_min_error": "Deposit must be at least 20,000 VND.",
+    "deposit_policy_error": "Please accept the auction policy before paying deposit.",
+    "bid_deposit_required": "A paid deposit is required before bidding.",
+    "bid_min_error": "Bid must be at least {{minBid}}.",
+    "bid_limit_error": "Bid cannot exceed your bidding limit (deposit - 20,000 VND).",
+    "bid_buynow_exceed": "Bid cannot be greater than the buy now price.",
+    "bid_success": "Bid placed successfully.",
+    "bid_buynow_ended": "Bid matched the buy now price. Auction ended.",
     "topup_note": "Top up your deposit balance to place higher bids or unlock buy-now pricing.",
     "rules_title": "Auction Rules & Guidelines",
     "rules_agree": "I Understand & Accept",
+    "view_policy_terms": "View Auction Policy & Terms",
+    "policy_modal_title": "Auction Deposit Policy & Terms",
+    "policy_banner_desc": "Deposits are used by ReTrade to ensure transparency and security in auctions. Your deposit serves as your bidding guarantee limit.",
+    "policy_section_1_title": "1. Bidding Limit & Refunds",
+    "policy_section_1_bullet_1": "Participants can place multiple bids up to their deposit limit minus 20,000 VND.",
+    "policy_section_1_bullet_2": "Deposit balance is not accumulated per bid. Funds are only applied if you Win.",
+    "policy_section_1_bullet_3": "If you do not win, your deposit (minus 20,000 VND participation fee) will be refunded.",
+    "policy_section_2_title": "2. Participant Responsibilities",
+    "policy_section_2_bullet_1": "All submitted bids are valid and binding.",
+    "policy_section_2_bullet_2": "The winning bidder is responsible for completing order payment on time.",
+    "policy_modal_notice": "Click confirm below to accept terms",
+    "policy_btn_agree": "I have read & Agree",
     "starts_in": "Starts in {duration}",
     "ends_in": "Ends in {duration}",
     "starts_in_label": "Starts in: ",
@@ -361,7 +385,13 @@
     "continue_shopping": "Continue Shopping",
     "condition_label": "Condition:",
     "select_or_enter_voucher": "Select or Enter Voucher",
-    "best_offer": "Best Offer Available"
+    "best_offer": "Best Offer Available",
+    "confirm_title": "Confirm Checkout",
+    "agreed_price_badge": "Agreed Price",
+    "counter_offer_badge": "Counter Offer",
+    "confirm_offer_accepted_msg": "The seller agreed to the price of {{price}}. Would you like to proceed to checkout now?",
+    "confirm_buy_now_msg": "Are you sure you want to proceed to checkout for this item?",
+    "checkout_now": "Checkout Now"
   },
   "account": {
     "profile_title": "Personal Information",
@@ -1076,7 +1106,9 @@
     "status_accepted": "Accepted",
     "status_rejected": "Rejected",
     "accept_success": "Offer accepted successfully.",
-    "reject_success": "Offer rejected."
+    "reject_success": "Offer rejected.",
+    "confirm_accept_msg": "Are you sure you want to ACCEPT the offer of {{price}} for product \"{{product}}\"?",
+    "confirm_reject_msg": "Are you sure you want to REJECT the offer of {{price}} for product \"{{product}}\"?"
   },
   "order_management": {
     "title": "Order Management",
@@ -1514,5 +1546,34 @@
     "satisfy_req_err": "Please satisfy all password security requirements.",
     "success_msg": "Password updated successfully!",
     "failed_msg": "Failed to change password."
+  },
+  "payment_result": {
+    "title_success": "Payment Successful",
+    "title_failed": "Payment Failed",
+    "payment_id": "Payment ID",
+    "amount": "Amount",
+    "vnpay_trans_no": "VNPay Transaction No",
+    "response_code": "VNPay Response Code",
+    "back_to_auction": "Back to Auction",
+    "back_to_home": "Back to Home",
+    "manage_subscriptions": "Manage Subscriptions",
+    "view_purchase_history": "View Purchase History",
+    "try_again": "Try Payment Again",
+    "no_info": "No transaction details available."
+  },
+  "vnpay_codes": {
+    "00": "Payment completed successfully.",
+    "07": "Transaction suspected of fraud.",
+    "09": "Account/Card is not registered for Internet Banking.",
+    "10": "Incorrect card information verification failed 3 times.",
+    "11": "Payment window expired.",
+    "12": "Your card or account is currently locked.",
+    "13": "Incorrect OTP authentication code.",
+    "24": "Payment transaction was canceled by customer.",
+    "51": "Insufficient account balance to complete transaction.",
+    "65": "Daily transaction limit exceeded.",
+    "75": "Payment bank is currently under maintenance.",
+    "79": "Incorrect payment password entered too many times.",
+    "default_failed": "Payment failed. Please check your card info or try another payment method."
   }
 }

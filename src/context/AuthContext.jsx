@@ -133,12 +133,12 @@ export const AuthProvider = ({ children }) => {
       if (typeof data === 'string' && data.trim()) {
         errMsg = data;
       } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || 'Invalid credentials or account pending verification.';
+        errMsg = data.message || data.title;
       }
       errMsg = errMsg || err.message || 'Login failed. Please check your username and password.';
       
       setError(errMsg);
-      return { success: false, error: errMsg };
+      return { success: false, error: errMsg, code: data?.code };
     }
   };
 
@@ -178,11 +178,11 @@ export const AuthProvider = ({ children }) => {
       if (typeof data === 'string' && data.trim()) {
         errMsg = data;
       } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || JSON.stringify(data);
+        errMsg = data.message || data.title || (typeof data === 'object' ? JSON.stringify(data) : '');
       }
       errMsg = errMsg || err.message || 'Google login failed. Try again.';
       setError(errMsg);
-      return { success: false, error: errMsg };
+      return { success: false, error: errMsg, code: data?.code };
     }
   };
 

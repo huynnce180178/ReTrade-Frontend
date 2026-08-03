@@ -1,25 +1,58 @@
 import React, { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import profileService from '../../../services/profileService';
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams();
-  const { language, formatCurrency } = useLanguage();
+  const { t, language, formatCurrency } = useLanguage();
+  const { showToast } = useToast();
   const success = searchParams.get('success') === 'true';
   const rawMessage = searchParams.get('message');
+  const responseCode = searchParams.get('responseCode') || '';
   const paymentId = searchParams.get('paymentId') || '';
   const amount = searchParams.get('amount') || '';
   const transactionNo = searchParams.get('transactionNo') || '';
   const auctionId = searchParams.get('auctionId') || '';
+  const orderId = searchParams.get('orderId') || '';
+  const serviceId = searchParams.get('serviceId') || '';
+  const orderType = searchParams.get('orderType') || '';
   const { user, setUser } = useAuth();
 
   const profileRefreshedRef = React.useRef(false);
 
+  const displayMessage = (() => {
+    if (responseCode) {
+      const translatedCode = t(`vnpay_codes.${responseCode}`);
+      if (translatedCode && translatedCode !== `vnpay_codes.${responseCode}`) {
+        return translatedCode;
+      }
+    }
+    if (rawMessage === 'Payment completed successfully.') {
+      return t('vnpay_codes.00');
+    }
+    if (!success) {
+      return t('vnpay_codes.default_failed');
+    }
+    return rawMessage || t('payment_result.no_info');
+  })();
+
+  const titleText = success
+    ? t('payment_result.title_success')
+    : t('payment_result.title_failed');
+
   useEffect(() => {
     if (profileRefreshedRef.current) return;
     profileRefreshedRef.current = true;
+
+    // Toast notification for user
+    if (success) {
+      showToast(displayMessage, 'success');
+    } else {
+      showToast(displayMessage, 'error');
+    }
 
     const refreshProfile = async () => {
       if (success && user) {
@@ -44,22 +77,6 @@ export default function PaymentResult() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const displayMessage = (() => {
-    if (!rawMessage) {
-      return language === 'vi' ? 'Không có thông tin chi tiết về giao dịch.' : 'No transaction information is available.';
-    }
-    if (rawMessage === 'Payment completed successfully.') {
-      return language === 'vi' ? 'Thanh toán hoàn tất thành công.' : rawMessage;
-    }
-    return rawMessage;
-  })();
-
-  const titleText = success
-    ? (language === 'vi' ? 'Thanh toán thành công' : 'Payment Successful')
-    : (language === 'vi' ? 'Thanh toán thất bại' : 'Payment Not Successful');
-
-  const serviceId = searchParams.get('serviceId') || '';
-  const orderType = searchParams.get('orderType') || '';
   const isSubscription = searchParams.get('type') === 'subscription' || paymentId.includes('sub_') || paymentId.includes('srv_') || !!serviceId || orderType === 'subscription';
 
   return (
@@ -89,61 +106,76 @@ export default function PaymentResult() {
               fontWeight: 700,
             }}
           >
-            {success ? 'OK' : 'X'}
+            {success ? '✓' : '✕'}
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: '28px', color: '#02241b' }}>
               {titleText}
             </h1>
-            <p style={{ margin: '8px 0 0', color: '#5c706b' }}>{displayMessage}</p>
+            <p style={{ margin: '8px 0 0', color: success ? '#1b7a3d' : '#b22a2a', fontWeight: 600 }}>
+              {displayMessage}
+            </p>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: '12px', marginTop: '24px' }}>
+        <div style={{ display: 'grid', gap: '12px', marginTop: '24px', background: '#f9fafb', padding: '16px', borderRadius: '12px' }}>
           <div>
-            <strong>{language === 'vi' ? 'Mã thanh toán:' : 'Payment ID:'}</strong> {paymentId || '-'}
+            <strong>{t('payment_result.payment_id')}:</strong> {paymentId || '-'}
           </div>
           <div>
-            <strong>{language === 'vi' ? 'Số tiền:' : 'Amount:'}</strong>{' '}
+            <strong>{t('payment_result.amount')}:</strong>{' '}
             {amount ? (isNaN(amount) ? `${amount} VND` : formatCurrency(Number(amount))) : '-'}
           </div>
-          <div>
-            <strong>{language === 'vi' ? 'Mã giao dịch VNPAY:' : 'VNPay Transaction No:'}</strong> {transactionNo || '-'}
-          </div>
+          {transactionNo && (
+            <div>
+              <strong>{t('payment_result.vnpay_trans_no')}:</strong> {transactionNo}
+            </div>
+          )}
+          {responseCode && (
+            <div>
+              <strong>{t('payment_result.response_code')}:</strong>{' '}
+              <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${success ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                {responseCode}
+              </span>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: '28px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          {!success && orderId && (
+            <Link to={`/purchase-history/${orderId}`} className="btn btn-primary">
+              {t('payment_result.try_again')}
+            </Link>
+          )}
+
           {auctionId ? (
             <>
               <Link to={`/auction/${auctionId}`} className="btn btn-primary">
-                {language === 'vi' ? 'Quay lại đấu giá' : 'Back to Auction'}
+                {t('payment_result.back_to_auction')}
               </Link>
               <Link to="/" className="btn btn-secondary">
-                {language === 'vi' ? 'Về trang chủ' : 'Back to Home'}
+                {t('payment_result.back_to_home')}
               </Link>
             </>
           ) : isSubscription ? (
             <>
               <Link to="/my-subscriptions" className="btn btn-primary">
-                {language === 'vi' ? 'Quản lý gói dịch vụ' : 'Manage Subscriptions'}
+                {t('payment_result.manage_subscriptions')}
               </Link>
               <Link to="/" className="btn btn-secondary">
-                {language === 'vi' ? 'Về trang chủ' : 'Back to Home'}
+                {t('payment_result.back_to_home')}
               </Link>
             </>
           ) : (
             <>
-              <Link to="/" className="btn btn-primary">
-                {language === 'vi' ? 'Về trang chủ' : 'Back to Home'}
+              <Link to="/purchase-history" className="btn btn-primary">
+                {t('payment_result.view_purchase_history')}
               </Link>
-              <Link to="/purchase-history" className="btn btn-secondary">
-                {language === 'vi' ? 'Xem lịch sử mua hàng' : 'View Purchase History'}
+              <Link to="/" className="btn btn-secondary">
+                {t('payment_result.back_to_home')}
               </Link>
             </>
           )}
-          <Link to="/my-subscriptions" className="btn btn-secondary">
-            {language === 'vi' ? 'Quản lý gói dịch vụ' : 'Manage Subscriptions'}
-          </Link>
         </div>
       </div>
     </div>

@@ -1701,10 +1701,66 @@
     margin-bottom: 0;
     align-self: flex-end;
   }
-  .offer-modal-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
+
+/* Offer Alert Banners */
+.pd-offer-alert {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  margin-bottom: 32px;
+  border: 1px solid rgba(27, 107, 81, 0.2);
+  background: #f0fdf4;
+  box-shadow: 0 4px 16px rgba(27, 107, 81, 0.08);
 }
+
+.pd-offer-alert.accepted {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.pd-offer-alert.pending {
+  background: #fefce8;
+  border-color: #fef08a;
+  color: #854d0e;
+}
+
+.pd-offer-alert-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.pd-offer-alert-text strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pd-offer-alert-text span {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.pd-offer-alert-btn {
+  padding: 8px 18px;
+  background: #1b6b51;
+  color: #ffffff;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pd-offer-alert-btn:hover {
+  background: #15533f;
+  transform: translateY(-1px);
+}
+
 
 
