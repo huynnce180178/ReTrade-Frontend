@@ -1,3 +1,15 @@
+/* Global Mobile Viewport Safety & Horizontal Overflow Prevention */
+html, body {
+  overflow-x: hidden !important;
+  width: 100% !important;
+  max-width: 100vw !important;
+}
+
+#root, .app, main, .site-header {
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
 /* Reusable Grid System & Mobile Responsive Utilities */
 .grid-4-col {
   display: grid;

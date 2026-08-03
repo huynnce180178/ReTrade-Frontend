@@ -351,6 +351,13 @@
   z-index: 2;
 }
 
+@media (max-width: 992px) {
+  .floating-card-1,
+  .floating-card-2 {
+    display: none !important;
+  }
+}
+
 .float-badge {
   font-weight: 700;
   color: var(--primary);
