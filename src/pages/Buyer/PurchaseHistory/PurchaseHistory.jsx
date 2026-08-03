@@ -54,7 +54,7 @@ const statusTabs = [
 
 const statusMeta = {
   AwaitingPayment: { label: 'Waiting for Payment', className: 'awaiting' },
-  Pending: { label: 'Processing', className: 'pending' },
+  Pending: { label: 'Confirmed', className: 'confirmed' },
   Confirmed: { label: 'Confirmed', className: 'confirmed' },
   Shipping: { label: 'Shipping', className: 'shipping' },
   Delivered: { label: 'Delivered', className: 'delivered' },
@@ -485,7 +485,7 @@ export default function PurchaseHistory() {
                     const tabMapVi = {
                       all: 'Tất cả đơn',
                       AwaitingPayment: 'Chờ thanh toán',
-                      Pending: 'Đang xử lý',
+                      Pending: 'Đã xác nhận',
                       Confirmed: 'Đã xác nhận',
                       Shipping: 'Đang giao',
                       Delivered: 'Đã giao',
@@ -667,7 +667,7 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
   const { t } = useLanguage();
   const meta = statusMeta[purchase.status] || { label: purchase.status || (t ? t('common.unknown') : 'Unknown'), className: 'default' };
 
-  const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
+  const canCancel = false;
   const canComplete = purchase.status === 'Delivered';
   const isReviewed = Boolean(purchase.hasReview || purchase.isReviewed || purchase.hasReviewed || purchase.isHasReviewed);
   const canReview = purchase.status === 'Completed' && !isReviewed;

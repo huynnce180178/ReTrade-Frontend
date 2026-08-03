@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { useNotification } from '../../../context/NotificationContext';
 import productService from '../../../services/productService';
 import wishlistService from '../../../services/wishlistService';
 import offerService from '../../../services/offerService';
@@ -234,7 +235,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { user } = useAuth();
-  const { language, formatCurrency } = useLanguage();
+  const { t, language, formatCurrency } = useLanguage();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -247,6 +248,9 @@ export default function ProductDetail() {
 
   const [showMakeOffer, setShowMakeOffer] = useState(false);
   const [myPendingOffer, setMyPendingOffer] = useState(null);
+  const [showCheckoutConfirmModal, setShowCheckoutConfirmModal] = useState(false);
+  const { notifications } = useNotification();
+  const lastNotificationRef = React.useRef(null);
 
   const images = product?.images || [];
   const sortedImages = [...images].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
@@ -292,20 +296,44 @@ export default function ProductDetail() {
     fetchWishlistStatus();
   }, [user, productId]);
 
-  // Check if user has a pending/accepted offer on this product
+  const checkMyOffer = async () => {
+    if (!user || !productId) return null;
+    try {
+      const offers = await offerService.getMyOffers(productId);
+      const pending = (Array.isArray(offers) ? offers : []).find(
+        o => o.status === 'Pending' || o.status === 'Accepted' || o.status === 'CounterOffer'
+      );
+      setMyPendingOffer(pending || null);
+      return pending || null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Check if user has a pending/accepted/counter offer on this product
   useEffect(() => {
-    const checkMyOffer = async () => {
-      if (!user || !productId) return;
-      try {
-        const offers = await offerService.getMyOffers(productId);
-        const pending = (Array.isArray(offers) ? offers : []).find(
-          o => o.status === 'Pending' || o.status === 'Accepted'
-        );
-        setMyPendingOffer(pending || null);
-      } catch { }
-    };
-    checkMyOffer();
+    checkMyOffer().then((offer) => {
+      if (offer && (offer.status === 'Accepted' || offer.status === 'CounterOffer')) {
+        setShowCheckoutConfirmModal(true);
+      }
+    });
   }, [user, productId]);
+
+  // Listen to SignalR notifications in real-time
+  useEffect(() => {
+    if (!notifications || notifications.length === 0) return;
+    const latest = notifications[0];
+    if (lastNotificationRef.current === latest?.notificationId) return;
+    lastNotificationRef.current = latest?.notificationId;
+
+    if (latest?.type === 'Offer' || (latest?.message && latest.message.toLowerCase().includes('offer'))) {
+      checkMyOffer().then((pending) => {
+        if (pending && (pending.status === 'Accepted' || pending.status === 'CounterOffer')) {
+          setShowCheckoutConfirmModal(true);
+        }
+      });
+    }
+  }, [notifications]);
 
   const handleToggleWishlist = async () => {
     if (!user) {
@@ -317,7 +345,7 @@ export default function ProductDetail() {
       return;
     }
     if (!isWishlisted && isProductUnavailable(product)) {
-      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng.' : 'This product is out of stock.', 'warning');
+      showToast(language === 'vi' ? 'Sản phẩm đã hết hàng.' : 'This product is out of stock.', 'warning');
       return;
     }
     setTogglingWishlist(true);
@@ -346,10 +374,10 @@ export default function ProductDetail() {
   const handleGoToCheckout = () => {
     if (!product?.productId) return;
     if (isProductUnavailable(product)) {
-      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng, khÃ´ng thá»ƒ mua ngay.' : 'This product is out of stock and cannot be purchased.', 'warning');
+      showToast(language === 'vi' ? 'Sản phẩm đã hết hàng, không thể mua ngay.' : 'This product is out of stock and cannot be purchased.', 'warning');
       return;
     }
-    navigate(`/checkout/${product.productId}`, { state: { product } });
+    setShowCheckoutConfirmModal(true);
   };
 
   const handlePlaceBid = () => {
@@ -666,13 +694,39 @@ export default function ProductDetail() {
                       {getOfferStatusConfig(myPendingOffer.status, language).label}
                     </span>
                   </div>
-                  <button
-                    className="pd-offer-btn pd-offer-btn-history"
-                    onClick={() => navigate('/offer-history')}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>history</span>
-                    {language === 'vi' ? 'Xem lịch sử trả giá' : 'View Offer History'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '10px' }}>
+                    {(myPendingOffer.status === 'Accepted' || myPendingOffer.status === 'CounterOffer') && (
+                      <button
+                        className="pd-offer-btn"
+                        onClick={() => setShowCheckoutConfirmModal(true)}
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#1b6b51',
+                          color: '#ffffff',
+                          fontWeight: 700,
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>shopping_cart_checkout</span>
+                        {t('checkout.checkout_now')}
+                      </button>
+                    )}
+                    <button
+                      className="pd-offer-btn pd-offer-btn-history"
+                      onClick={() => navigate('/offer-history')}
+                      style={{ flex: 1 }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>history</span>
+                      {language === 'vi' ? 'Xem lịch sử' : 'View History'}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="pd-offer-buttons">
@@ -702,32 +756,6 @@ export default function ProductDetail() {
 
       {/* Bottom Sections (span full width) */}
       <div className="pd-bottom-sections">
-        {/* Offer Alerts */}
-        {myPendingOffer && myPendingOffer.status === 'Accepted' && (
-          <div className="pd-offer-alert accepted">
-            <span className="material-symbols-outlined">check_circle</span>
-            <div className="pd-offer-alert-text">
-              <strong>{language === 'vi' ? 'Đề xuất giá đã được chấp nhận!' : 'Offer Accepted!'}</strong>
-              <span>{language === 'vi' ? `Người bán đã đồng ý mức giá ${formatCurrency(myPendingOffer.offerPrice)}.` : `The seller accepted your offer of ${formatCurrency(myPendingOffer.offerPrice)}.`}</span>
-            </div>
-            <button className="pd-offer-alert-btn" onClick={() => navigate('/offer-history')}>
-              {language === 'vi' ? 'Thanh toán ngay' : 'Checkout Now'}
-            </button>
-          </div>
-        )}
-
-        {myPendingOffer && myPendingOffer.status === 'Pending' && (
-          <div className="pd-offer-alert pending">
-            <span className="material-symbols-outlined">schedule</span>
-            <div className="pd-offer-alert-text">
-              <strong>{language === 'vi' ? 'Đang chờ người bán phản hồi' : 'Offer Pending'}</strong>
-              <span>{language === 'vi' ? `Bạn có đề xuất trả giá ${formatCurrency(myPendingOffer.offerPrice)}.` : `You have a pending offer of ${formatCurrency(myPendingOffer.offerPrice)}.`}</span>
-            </div>
-            <button className="pd-offer-alert-btn" onClick={() => navigate('/offer-history')}>
-              {language === 'vi' ? 'Xem trạng thái' : 'View Status'}
-            </button>
-          </div>
-        )}
 
         {/* Description */}
         {product.description && (
@@ -845,6 +873,115 @@ export default function ProductDetail() {
           onClose={() => setShowMakeOffer(false)}
           onSuccess={handleMakeOfferSuccess}
         />
+      )}
+
+      {/* Checkout Confirmation Modal Popup */}
+      {showCheckoutConfirmModal && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999999,
+          padding: '16px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            padding: '24px',
+            maxWidth: '440px',
+            width: '100%',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+            border: '1px solid #f3f4f6',
+            position: 'relative',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1b6b51' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>shopping_cart_checkout</span>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#111827', fontFamily: 'serif' }}>
+                  {t('checkout.confirm_title')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCheckoutConfirmModal(false)}
+                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', backgroundColor: '#f9fafb', padding: '12px 16px', borderRadius: '12px', marginBottom: '16px' }}>
+              {sortedImages[0]?.imageUrl && (
+                <img
+                  src={sortedImages[0].imageUrl}
+                  alt={product.name}
+                  style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                />
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {product.name}
+                </h4>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '4px' }}>
+                  {myPendingOffer && (myPendingOffer.status === 'Accepted' || myPendingOffer.status === 'CounterOffer') ? (
+                    <>
+                      <span style={{ fontSize: '12px', color: '#9ca3af', textDecoration: 'line-through' }}>{formatCurrency(product.price)}</span>
+                      <span style={{ color: '#047857', fontWeight: 700, fontSize: '16px' }}>{formatCurrency(myPendingOffer.offerPrice)}</span>
+                      <span style={{ backgroundColor: '#d1fae5', color: '#065f46', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, textTransform: 'uppercase' }}>
+                        {myPendingOffer.status === 'Accepted' ? t('checkout.agreed_price_badge') : t('checkout.counter_offer_badge')}
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ color: '#1b6b51', fontWeight: 700, fontSize: '16px' }}>{formatCurrency(product.price)}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '24px', lineHeight: 1.5, margin: '0 0 24px 0' }}>
+              {myPendingOffer && (myPendingOffer.status === 'Accepted' || myPendingOffer.status === 'CounterOffer')
+                ? t('checkout.confirm_offer_accepted_msg', { price: formatCurrency(myPendingOffer.offerPrice) })
+                : t('checkout.confirm_buy_now_msg')}
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowCheckoutConfirmModal(false)}
+                style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', color: '#374151', borderRadius: '10px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCheckoutConfirmModal(false);
+                  const agreedPrice = (myPendingOffer && (myPendingOffer.status === 'Accepted' || myPendingOffer.status === 'CounterOffer')) 
+                    ? myPendingOffer.offerPrice 
+                    : product.price;
+                  navigate(`/checkout/${product.productId}`, { state: { product, price: agreedPrice, offerId: myPendingOffer?.offerId } });
+                }}
+                style={{ padding: '8px 20px', backgroundColor: '#1b6b51', color: '#ffffff', borderRadius: '10px', fontSize: '13px', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>credit_card</span>
+                {t('checkout.checkout_now')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

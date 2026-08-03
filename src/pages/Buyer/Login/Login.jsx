@@ -20,6 +20,7 @@ export default function Login() {
       navigate('/', { replace: true });
     }
   }, [user, navigate]);
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -47,7 +48,10 @@ export default function Login() {
           navigate('/');
         }
       } else {
-        showToast(result.error || t('common.error_occurred'), 'error');
+        const errorMsg = (result.code && t(`auth.${result.code.toLowerCase()}`) !== `auth.${result.code.toLowerCase()}`)
+          ? t(`auth.${result.code.toLowerCase()}`)
+          : (result.error || t('common.error_occurred'));
+        showToast(errorMsg, 'error');
       }
     } catch (err) {
       showToast(t('common.error_occurred'), 'error');
@@ -70,7 +74,10 @@ export default function Login() {
             navigate('/');
           }
         } else {
-          showToast(result.error || t('common.error_occurred'), 'error');
+          const errorMsg = (result.code && t(`auth.${result.code.toLowerCase()}`) !== `auth.${result.code.toLowerCase()}`)
+            ? t(`auth.${result.code.toLowerCase()}`)
+            : (result.error || t('common.error_occurred'));
+          showToast(errorMsg, 'error');
         }
       } catch {
         showToast(t('common.error_occurred'), 'error');
@@ -89,7 +96,6 @@ export default function Login() {
       showToast(language === 'vi' ? 'Đăng nhập Google đã bị đóng hoặc bị chặn.' : 'Google sign-in was closed or blocked.', 'warning');
     },
     flow: 'implicit',
-    // Explicit profile scopes keep behavior aligned with common production OAuth setups.
     scope: 'openid email profile https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
     prompt: 'consent select_account',
     include_granted_scopes: false,
@@ -150,94 +156,74 @@ export default function Login() {
                   <div className="login-divider">
                     <div className="login-divider-line"></div>
                     <span>{t('auth.or_continue_with')}</span>
-                    <div className="login-divider-line"></div>
                   </div>
 
-                  {/* Form */}
-                  <form onSubmit={handleSubmit} className="login-form-premium">
-
-                    <div className="form-group-premium">
-                      <label htmlFor="username">{t('auth.username_or_email')}</label>
+                  {/* Form fields */}
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        {t('auth.username_or_email')}
+                      </label>
                       <input
                         type="text"
-                        id="username"
-                        className="input-line"
+                        required
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        required
-                        disabled={loading || googleLoading}
+                        placeholder="user@example.com"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm"
                       />
                     </div>
 
-                    <div className="form-group-premium">
-                      <label htmlFor="password">{t('auth.password')}</label>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        id="password"
-                        className="input-line"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        disabled={loading || googleLoading}
-                      />
-                      <button
-                        type="button"
-                        className="password-toggle-premium"
-                        onClick={() => setShowPassword(!showPassword)}
-                        disabled={loading || googleLoading}
-                      >
-                        {showPassword ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-                            <path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-                            <line x1="2" y1="2" x2="22" y2="22" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        )}
-                      </button>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          {t('auth.password')}
+                        </label>
+                        <Link to="/forgot-password" className="text-xs text-[#1b6b51] hover:underline font-medium">
+                          {t('auth.forgot_password')}
+                        </Link>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <span className="material-symbols-outlined text-xl">
+                            {showPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="login-form-footer" style={{ justifyContent: 'flex-start' }}>
-                      <label className="remember-me">
-                        <input type="checkbox" />
-                        <span>{t('auth.remember_me')}</span>
-                      </label>
-                    </div>
-
-                    <button type="submit" className="submit-btn-premium" disabled={loading || googleLoading}>
+                    <button
+                      type="submit"
+                      disabled={loading || googleLoading}
+                      className="w-full py-3.5 px-4 bg-[#1b6b51] hover:bg-[#15533f] text-white font-bold rounded-xl transition-all shadow-lg shadow-[#1b6b51]/20 flex items-center justify-center gap-2 disabled:opacity-50 text-sm mt-6"
+                    >
                       {loading ? (
-                        <span className="btn-spinner" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></span>
+                        <span className="btn-spinner" style={{ width: '20px', height: '20px' }}></span>
                       ) : (
-                        <>
-                          {t('auth.login_button')}
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                          </svg>
-                        </>
+                        t('auth.login_button')
                       )}
                     </button>
-
                   </form>
+              </>
 
-                  <div className="register-prompt">
-                    <p>
-                      {t('auth.no_account')}
-                      <Link to="/register" className="register-link-premium"> {t('auth.register_now')}</Link>
-                    </p>
-                  </div>
-
-                  <div className="password-recovery-links">
-                    <Link to="/forgot-password" className="forgot-link-premium">{t('auth.forgot_password')}</Link>
-                    <span className="link-separator"></span>
-                    <Link to="/reset-password" className="forgot-link-premium">{t('auth.reset_title')}</Link>
-                  </div>
-                </>
+              <div className="text-center mt-6 pt-6 border-t border-gray-100 text-xs text-gray-500">
+                {t('auth.no_account')}{' '}
+                <Link to="/register" className="text-[#1b6b51] font-bold hover:underline">
+                  {t('auth.register_now')}
+                </Link>
+              </div>
 
             </div>
           </div>
@@ -245,14 +231,15 @@ export default function Login() {
         </div>
       </section>
 
-      <ChangePasswordAfterRecoveryModal
-        isOpen={showFirstChangeModal}
-        onClose={() => setShowFirstChangeModal(false)}
-        onSuccess={() => {
-          setShowFirstChangeModal(false);
-          navigate('/');
-        }}
-      />
+      {showFirstChangeModal && (
+        <ChangePasswordAfterRecoveryModal
+          isOpen={showFirstChangeModal}
+          onClose={() => {
+            setShowFirstChangeModal(false);
+            navigate('/');
+          }}
+        />
+      )}
     </div>
   );
 }
