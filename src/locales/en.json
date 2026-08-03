@@ -781,6 +781,8 @@
       "unlimited": "Unlimited",
       "admin_granted": "Granted by Admin",
       "seller_subscription": "Seller Package",
+      "seller_active_desc": "Seller package active with Unlimited duration granted by Admin.",
+      "seller_inactive_desc": "This account does not have Seller privileges or subscription.",
       "btn_grant_seller": "Grant Seller Package (Unlimited)",
       "btn_revoke_seller": "Revoke Seller Package",
       "grant_seller_success": "Seller Package (Unlimited) granted successfully.",

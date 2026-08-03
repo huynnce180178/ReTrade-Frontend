@@ -621,7 +621,7 @@ export default function UserAccounts() {
                   <tbody>
                     {filteredUsers.map((user) => {
                       const isSelected = selectedUser?.accountId === user.accountId;
-                      const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Unknown User';
+                      const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || t('admin.users.unknown_user');
                       const statusClass = statusTone(user.status);
 
                       return (
@@ -952,7 +952,7 @@ export default function UserAccounts() {
                           <span className="badge-unlimited">{t('admin.users.unlimited')}</span>
                           <span className="badge-admin-granted">{t('admin.users.admin_granted')}</span>
                         </div>
-                        <p className="admin-detail-muted">Gói Seller đang hoạt động với thời hạn Không giới hạn do Admin cấp.</p>
+                        <p className="admin-detail-muted">{t('admin.users.seller_active_desc')}</p>
                         <button
                           type="button"
                           className="admin-seller-action-btn danger"
@@ -964,7 +964,7 @@ export default function UserAccounts() {
                       </div>
                     ) : (
                       <div className="admin-seller-sub-box">
-                        <p className="admin-detail-muted">Tài khoản này chưa có quyền hoặc gói đăng ký Seller.</p>
+                        <p className="admin-detail-muted">{t('admin.users.seller_inactive_desc')}</p>
                         <button
                           type="button"
                           className="admin-seller-action-btn success"

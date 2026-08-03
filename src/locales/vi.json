@@ -799,6 +799,8 @@
       "unlimited": "Không giới hạn",
       "admin_granted": "Admin cấp",
       "seller_subscription": "Gói Seller",
+      "seller_active_desc": "Gói Seller đang hoạt động với thời hạn Không giới hạn do Admin cấp.",
+      "seller_inactive_desc": "Tài khoản này chưa có quyền hoặc gói đăng ký Seller.",
       "btn_grant_seller": "Cấp gói Seller (Không giới hạn)",
       "btn_revoke_seller": "Gỡ gói Seller",
       "grant_seller_success": "Đã cấp gói Seller (Không giới hạn) thành công.",
