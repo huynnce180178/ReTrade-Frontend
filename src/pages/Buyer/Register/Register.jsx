@@ -9,10 +9,10 @@ import VerifyModal from '../../../components/VerifyModal/VerifyModal';
 import TermsModal from '../../../components/TermsModal/TermsModal';
 import bgRegister from '../../../assets/background-register.png';
 
-const SPECIAL_CHAR_REGEX = /[!@#$%^&*(),.?":{}|<>_\-]/;
+const SPECIAL_CHAR_REGEX = /[!@#$%^&*(),.?":{}|<>-]/;
 
 export default function Register() {
-  const { user, register, googleLogin } = useAuth();
+  const { user, register, googleLogin, loginWithGoogle } = useAuth();
   const { showToast } = useToast();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
@@ -60,7 +60,8 @@ export default function Register() {
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       try {
-        const result = await googleLogin(tokenResponse.access_token);
+        const doGoogleLogin = googleLogin || loginWithGoogle;
+        const result = await doGoogleLogin(tokenResponse.access_token);
         if (result.success) {
           showToast(t('toast.register_success'), 'success');
           navigate('/');
@@ -167,7 +168,7 @@ export default function Register() {
               <img src={bgRegister} alt="ReTrade Platform" />
               <div className="brand-image-overlay">
                 <div className="brand-quote-box">
-                  <p className="brand-quote">"{language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day.'}"</p>
+                  <p className="brand-quote">&quot;{language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day.'}&quot;</p>
                   <p className="brand-est">EST. 2024 — TRUSTED MARKETPLACE</p>
                 </div>
               </div>

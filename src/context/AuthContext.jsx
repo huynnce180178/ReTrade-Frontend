@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import accountService from '../services/accountService';
 import profileService from '../services/profileService';
 import { clearAuthStorage } from '../utils/authUtils';
@@ -202,6 +202,7 @@ export const AuthProvider = ({ children }) => {
         error,
         login: handleLogin,
         loginWithGoogle: handleGoogleLogin,
+        googleLogin: handleGoogleLogin,
         logout: handleLogout,
         updateUserState,
       }}

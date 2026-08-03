@@ -10,7 +10,7 @@ import ChangePasswordAfterRecoveryModal from '../../../components/ChangePassword
 import '../../../styles/Login.css';
 
 export default function Login() {
-  const { user, login, googleLogin } = useAuth();
+  const { user, login, googleLogin, loginWithGoogle } = useAuth();
   const { showToast } = useToast();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
@@ -66,7 +66,8 @@ export default function Login() {
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       try {
-        const result = await googleLogin(tokenResponse.access_token);
+        const doGoogleLogin = googleLogin || loginWithGoogle;
+        const result = await doGoogleLogin(tokenResponse.access_token);
         if (result.success) {
           if (result.mustChangePassword) {
             showToast(t('auth.change_pw_title'), 'info');
