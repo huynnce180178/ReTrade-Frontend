@@ -42,6 +42,8 @@ export default function AddressBook() {
     districts: {},
     wards: {},
   });
+  const [addressToDelete, setAddressToDelete] = useState(null);
+  const [isDeletingAddress, setIsDeletingAddress] = useState(false);
 
   const provinceMap = useMemo(() => new Map(provinces.map((item) => [normalizeCode(item.code), item.name])), [provinces]);
   const districtMap = useMemo(() => new Map(districts.map((item) => [normalizeCode(item.code), item.name])), [districts]);
@@ -258,14 +260,18 @@ export default function AddressBook() {
     }
   };
 
-  const handleDelete = async (addressId) => {
-    if (!window.confirm(isVi ? 'Bạn có chắc chắn muốn xóa địa chỉ này?' : 'Are you sure you want to delete this address?')) return;
+  const handleConfirmDeleteAddress = async () => {
+    if (!addressToDelete) return;
     try {
-      await addressService.deleteAddress(addressId);
+      setIsDeletingAddress(true);
+      await addressService.deleteAddress(addressToDelete);
       showToast(isVi ? 'Đã xóa địa chỉ thành công.' : 'Address deleted.', 'success');
+      setAddressToDelete(null);
       await loadAddresses();
     } catch (err) {
       showToast(err?.response?.data || (isVi ? 'Không thể xóa địa chỉ.' : 'Failed to delete address.'), 'error');
+    } finally {
+      setIsDeletingAddress(false);
     }
   };
 
@@ -344,7 +350,7 @@ export default function AddressBook() {
                           <div className="address-card-actions">
                             {!address.isDefault && <button type="button" onClick={() => handleSetDefault(address.addressId)}>{isVi ? 'Đặt mặc định' : 'Set Default'}</button>}
                             <button type="button" onClick={() => handleEditClick(address)}>{isVi ? 'Chỉnh sửa' : 'Edit'}</button>
-                            <button type="button" className="danger" onClick={() => handleDelete(address.addressId)}>{isVi ? 'Xóa' : 'Delete'}</button>
+                            <button type="button" className="danger" onClick={() => setAddressToDelete(address.addressId)}>{isVi ? 'Xóa' : 'Delete'}</button>
                           </div>
                         </article>
                       ))}
@@ -461,6 +467,33 @@ export default function AddressBook() {
                   <button className="ma-btn-secondary" type="button" onClick={() => setShowForm(false)}>{isVi ? 'Hủy Bỏ' : 'Cancel'}</button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {addressToDelete && (
+        <div className="ma-modal-overlay" onClick={() => !isDeletingAddress && setAddressToDelete(null)}>
+          <div className="ma-modal animate-fade-in" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="ma-modal-header">
+              <h2>{isVi ? 'Xác Nhận Xóa Địa Chỉ' : 'Confirm Delete Address'}</h2>
+              <button className="ma-modal-close-btn" type="button" disabled={isDeletingAddress} onClick={() => setAddressToDelete(null)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="ma-modal-body" style={{ padding: '20px 24px' }}>
+              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: 'var(--text-color, #2c322e)' }}>
+                {isVi ? 'Bạn có chắc chắn muốn xóa địa chỉ này? Thao tác này không thể hoàn tác.' : 'Are you sure you want to delete this address? This action cannot be undone.'}
+              </p>
+            </div>
+            <div className="ma-form-actions" style={{ padding: '16px 24px', background: '#fafafa', borderTop: '1px solid #eee', justifyContent: 'flex-end', gap: '12px' }}>
+              <button className="ma-btn-secondary" type="button" disabled={isDeletingAddress} onClick={() => setAddressToDelete(null)}>
+                {isVi ? 'Hủy Bỏ' : 'Cancel'}
+              </button>
+              <button className="ma-btn-primary" type="button" disabled={isDeletingAddress} onClick={handleConfirmDeleteAddress} style={{ background: '#dc2626', borderColor: '#dc2626' }}>
+                {isDeletingAddress ? (isVi ? 'Đang xóa...' : 'Deleting...') : (isVi ? 'Xóa' : 'Delete')}
+              </button>
             </div>
           </div>
         </div>

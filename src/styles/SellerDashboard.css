@@ -2954,4 +2954,77 @@
   }
 }
 
+/* Confirmation Modal for Seller Dashboard */
+.seller-confirm-modal {
+  max-width: 480px !important;
+}
 
+.seller-confirm-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.seller-confirm-icon.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.danger-text {
+  color: #dc2626 !important;
+}
+
+.seller-confirm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #fcfcfb;
+  border-top: 1px solid rgba(113, 121, 117, 0.12);
+}
+
+.seller-confirm-btn-cancel {
+  padding: 9px 18px;
+  border: 1px solid rgba(113, 121, 117, 0.3);
+  background: #ffffff;
+  color: #2c322e;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seller-confirm-btn-cancel:hover:not(:disabled) {
+  background: #f4f4f0;
+  border-color: rgba(113, 121, 117, 0.5);
+}
+
+.seller-confirm-btn-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seller-confirm-btn-delete:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.seller-confirm-btn-delete:disabled,
+.seller-confirm-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

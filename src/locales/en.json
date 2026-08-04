@@ -1152,6 +1152,7 @@
     "tab_pending": "Pending",
     "tab_rejected": "Rejected",
     "tab_auction_ready": "Auction Ready",
+    "tab_deleted": "Deleted",
     "search_placeholder": "Search by product name...",
     "th_product": "Product",
     "th_category": "Category",

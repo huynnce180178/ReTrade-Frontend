@@ -726,20 +726,25 @@ export default function Header() {
                   const pkgNameLower = pkgNameStr.toLowerCase();
                   const pkgServiceIdLower = pkgServiceIdStr.toLowerCase();
 
+                  const userRoles = (user?.roles || []).map(r => String(r).toLowerCase());
+                  const isUserSeller = userRoles.includes('seller');
+                  const isSellerUpgradePkg = !pkgServiceIdLower.includes('priority') && (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller'));
+                  const isPriorityPkg = pkgServiceIdLower.includes('priority') || pkgServiceIdLower === 'sub_20260701_100003' || pkgNameLower.includes('priority');
+
                   let displayName = pkgNameStr;
                   if (language === 'vi') {
-                    if (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller')) {
+                    if (isSellerUpgradePkg) {
                       displayName = 'Gói Nâng Cấp Người Bán';
                     } else if (pkgServiceIdLower.includes('voucher') || pkgServiceIdLower === 'sub_20260701_100002' || pkgNameLower.includes('voucher')) {
                       displayName = 'Gói Voucher Ưu Đãi';
-                    } else if (pkgServiceIdLower.includes('priority') || pkgServiceIdLower === 'sub_20260701_100003' || pkgNameLower.includes('priority')) {
+                    } else if (isPriorityPkg) {
                       displayName = 'Gói Ưu Tiên Hiển Thị';
                     }
                   }
 
                   return (
                     <div key={pkg.serviceId || pkg.id} className={visual.cardClass}>
-                      {(pkgServiceIdLower.includes('seller') || pkgServiceIdStr === 'sub_20260701_100001') && (
+                      {isSellerUpgradePkg && (
                         <div className="popular-badge">{t('subscriptions.popular')}</div>
                       )}
                       <div className="sub-card-header">
@@ -789,7 +794,7 @@ export default function Header() {
                           <span className="material-symbols-outlined">verified</span>
                           {t('subscriptions.activated', { days: daysLeft })}
                         </button>
-                      ) : (user?.roles?.includes('Seller') && (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller'))) ? (
+                      ) : (isUserSeller && isSellerUpgradePkg) ? (
                         <button
                           className="sub-card-btn white-btn active-package-btn"
                           disabled
@@ -808,14 +813,14 @@ export default function Header() {
                           <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>verified</span>
                           {language === 'vi' ? 'Đã là Người bán (Vô hạn)' : 'Already Seller (Unlimited)'}
                         </button>
-                      ) : (user && user.roles && !user.roles.includes(pkg.targetRole) && !pkgServiceIdLower.includes('voucher') && pkgServiceIdLower !== 'sub_20260701_100002' && !pkgNameLower.includes('voucher')) ? (
+                      ) : (!isUserSeller && isPriorityPkg) ? (
                         <button
                           className={`${visual.buttonClass} role-blocked-btn`}
                           disabled
                           style={{ opacity: 0.5, cursor: 'not-allowed', padding: '10px' }}
-                          title={t('subscriptions.requires_role', { role: pkg.targetRole })}
+                          title={t('subscriptions.requires_role', { role: language === 'vi' ? 'Người bán' : 'Seller' })}
                         >
-                          {t('subscriptions.requires_role', { role: pkg.targetRole })}
+                          {t('subscriptions.requires_role', { role: language === 'vi' ? 'Người bán' : 'Seller' })}
                         </button>
                       ) : (
                         <button

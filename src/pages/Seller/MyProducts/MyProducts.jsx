@@ -37,6 +37,10 @@ export default function MyProducts() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedModalImg, setSelectedModalImg] = useState('');
 
+  // Delete Modal States
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const openDetailModal = async (productSummary) => {
     setDetailModalProduct(productSummary);
     setSelectedModalImg(productSummary.mainImageUrl || '');
@@ -132,17 +136,18 @@ export default function MyProducts() {
     fetchMyProducts(page);
   };
 
-  const handleDeleteProduct = async (productId) => {
-    if (!window.confirm(t('my_products.confirm_delete_msg', { name: productId }))) return;
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
     try {
-      setProductsLoading(true);
-      await productService.delete(productId);
+      setIsDeleting(true);
+      await productService.delete(productToDelete.productId);
       showToast(t('my_products.delete_success'), 'success');
+      setProductToDelete(null);
       fetchMyProducts();
     } catch (e) {
       showToast(e?.response?.data || t('my_products.delete_error'), 'error');
     } finally {
-      setProductsLoading(false);
+      setIsDeleting(false);
     }
   };
 
@@ -172,6 +177,7 @@ export default function MyProducts() {
       case 'AuctionRejected': return { text: t('seller_dashboard.status_auction_rejected'), cls: 'status-rejected' };
       case 'Sold': return { text: t('seller_dashboard.status_sold'), cls: 'status-sold' };
       case 'Inactive': return { text: t('seller_dashboard.status_inactive'), cls: 'status-inactive' };
+      case 'Deleted': return { text: t('my_products.tab_deleted'), cls: 'status-rejected' };
       default: return { text: status, cls: 'status-unknown' };
     }
   };
@@ -224,7 +230,7 @@ export default function MyProducts() {
                 <option value="SaleRejected">{t('seller_dashboard.status_rejected')}</option>
                 <option value="AuctionRejected">{t('seller_dashboard.status_auction_rejected')}</option>
                 <option value="Sold">{t('seller_dashboard.status_sold')}</option>
-                <option value="Inactive">{t('seller_dashboard.status_inactive')}</option>
+                <option value="Deleted">{t('my_products.tab_deleted')}</option>
               </select>
 
               <select 
@@ -316,7 +322,7 @@ export default function MyProducts() {
                               title={t('common.delete')}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteProduct(p.productId);
+                                setProductToDelete(p);
                               }}
                             >
                               <span className="material-symbols-outlined">delete</span>
@@ -489,6 +495,59 @@ export default function MyProducts() {
               >
                 <span className="material-symbols-outlined">edit</span>
                 {t('seller.edit_product')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {productToDelete && (
+        <div className="seller-modal-overlay animate-fade-in" onClick={() => !isDeleting && setProductToDelete(null)}>
+          <div className="seller-modal-card seller-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="seller-modal-header" style={{ alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="seller-confirm-icon danger">
+                  <span className="material-symbols-outlined">warning</span>
+                </div>
+                <div>
+                  <span className="seller-modal-eyebrow danger-text">{t('my_products.confirm_delete_title')}</span>
+                  <h2 style={{ fontSize: '18px', margin: 0 }}>{t('common.confirm', 'Xác nhận')}</h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="seller-modal-close"
+                disabled={isDeleting}
+                onClick={() => setProductToDelete(null)}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="seller-modal-body" style={{ padding: '24px' }}>
+              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', color: '#2c322e' }}>
+                {t('my_products.confirm_delete_msg', { name: productToDelete.name || productToDelete.productId })}
+              </p>
+            </div>
+
+            <div className="seller-confirm-footer">
+              <button
+                type="button"
+                className="seller-confirm-btn-cancel"
+                disabled={isDeleting}
+                onClick={() => setProductToDelete(null)}
+              >
+                {t('common.cancel', 'Hủy')}
+              </button>
+              <button
+                type="button"
+                className="seller-confirm-btn-delete"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+              >
+                {isDeleting && <span className="btn-spinner"></span>}
+                {t('common.delete', 'Xóa')}
               </button>
             </div>
           </div>

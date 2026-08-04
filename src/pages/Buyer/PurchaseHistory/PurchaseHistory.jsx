@@ -47,6 +47,7 @@ export default function PurchaseHistory() {
     { key: 'all', label: t('common.all') },
     { key: 'AwaitingPayment', label: t('order_status.awaiting_payment') },
     { key: 'Pending', label: t('order_status.pending') },
+    { key: 'Confirmed', label: t('order_status.confirmed') },
     { key: 'Shipping', label: t('order_status.shipping') },
     { key: 'Delivered', label: t('order_status.delivered') },
     { key: 'Completed', label: t('order_status.completed') },

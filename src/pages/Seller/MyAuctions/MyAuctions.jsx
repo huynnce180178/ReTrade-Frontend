@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
@@ -591,7 +592,7 @@ export default function MyAuctions() {
     </div>
 
     {/* Create Auction Modal */}
-    {isCreateModalOpen && (
+    {isCreateModalOpen && createPortal(
       <div className="seller-auctions-modal-overlay">
         <div className="seller-auctions-modal-content animate-fade-in">
           <div className="modal-header">
@@ -683,9 +684,10 @@ export default function MyAuctions() {
             </div>
           </form>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
-    {editingAuction && editForm && (
+    {editingAuction && editForm && createPortal(
       <div className="seller-auctions-modal-overlay">
         <div className="seller-auctions-modal-content animate-fade-in">
           <div className="modal-header">
@@ -760,11 +762,12 @@ export default function MyAuctions() {
             </div>
           </form>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
 
     {/* Relist Auction Modal */}
-    {relistingAuction && relistForm && (
+    {relistingAuction && relistForm && createPortal(
       <div className="seller-auctions-modal-overlay">
         <div className="seller-auctions-modal-content animate-fade-in">
           <div className="modal-header">
@@ -839,11 +842,12 @@ export default function MyAuctions() {
             </div>
           </form>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
 
     {/* End Auction Confirmation Modal */}
-    {endingAuction && (
+    {endingAuction && createPortal(
       <div className="seller-auctions-modal-overlay">
         <div className="seller-auctions-modal-content animate-fade-in" style={{ maxWidth: '440px' }}>
           <div className="modal-header">
@@ -873,7 +877,8 @@ export default function MyAuctions() {
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
   </>
   );

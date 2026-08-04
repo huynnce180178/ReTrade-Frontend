@@ -954,7 +954,7 @@ export default function AuctionDetail() {
         </div>
       </section>
 
-      {showRules && (
+      {showRules && createPortal(
         <div className="auction-rules-overlay" role="dialog" aria-modal="true">
           <div className="auction-rules-card animate-fade-in">
             <header className="auction-rules-popup-header">
@@ -994,7 +994,8 @@ export default function AuctionDetail() {
               </button>
             </footer>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {showAuctionEndNotice && (
