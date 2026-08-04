@@ -6,6 +6,51 @@ import { createAccountHubConnection } from '../services/accountRealtimeService';
 
 const AuthContext = createContext(null);
 
+const unwrapApiPayload = (payload) => {
+  if (!payload || typeof payload !== 'object') {
+    return payload;
+  }
+
+  return payload.data || payload.result || payload.value || payload.content || payload;
+};
+
+const getAuthToken = (authData) => (
+  authData?.token
+  || authData?.accessToken
+  || authData?.jwtToken
+  || authData?.jwt
+  || authData?.bearerToken
+);
+
+const extractErrorDetails = (err, fallback) => {
+  const data = err.response?.data;
+  let code = data?.code;
+  let message;
+
+  if (typeof data === 'string' && data.trim()) {
+    message = data;
+  } else if (data && typeof data === 'object') {
+    const validationMessages = data.errors
+      ? Object.values(data.errors).flat().filter(Boolean).join(', ')
+      : '';
+    const nestedPayload = unwrapApiPayload(data);
+
+    message = data.message
+      || data.title
+      || data.error
+      || validationMessages
+      || nestedPayload?.message
+      || nestedPayload?.title
+      || nestedPayload?.error;
+    code = code || nestedPayload?.code;
+  }
+
+  return {
+    message: message || err.message || fallback,
+    code,
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -84,19 +129,23 @@ export const AuthProvider = ({ children }) => {
     };
   }, [token, user?.accountId]);
 
-  const buildUserFromAuthData = (authData) => ({
-    accountId: authData.accountId,
-    userId: authData.userId,
-    username: authData.username,
-    email: authData.email,
-    firstName: authData.firstName,
-    lastName: authData.lastName,
-    roles: authData.roles,
-    avatarUrl: authData.avatarUrl,
-    phone: authData.phone,
-    isPasswordSet: authData.isPasswordSet,
-    mustChangePassword: authData.mustChangePassword ?? false,
-  });
+  const buildUserFromAuthData = (authData) => {
+    const accountData = authData?.user || authData?.account || authData?.profile || authData;
+
+    return {
+      accountId: accountData.accountId,
+      userId: accountData.userId,
+      username: accountData.username,
+      email: accountData.email,
+      firstName: accountData.firstName,
+      lastName: accountData.lastName,
+      roles: accountData.roles,
+      avatarUrl: accountData.avatarUrl,
+      phone: accountData.phone,
+      isPasswordSet: accountData.isPasswordSet,
+      mustChangePassword: accountData.mustChangePassword ?? authData?.mustChangePassword ?? false,
+    };
+  };
 
   const hydrateUserWithProfile = async (baseUser) => {
     try {
@@ -117,39 +166,36 @@ export const AuthProvider = ({ children }) => {
   const handleLogin = async (username, password) => {
     setError(null);
     try {
-      const authData = await accountService.login({ username, password });
+      const authData = unwrapApiPayload(await accountService.login({ username, password }));
+      const tokenVal = getAuthToken(authData);
       
-      if (authData && authData.token) {
-        localStorage.setItem('token', authData.token);
+      if (authData && tokenVal) {
+        localStorage.setItem('token', tokenVal);
         const userObj = buildUserFromAuthData(authData);
         const hydratedUser = await hydrateUserWithProfile(userObj);
 
-        setToken(authData.token);
+        setToken(tokenVal);
         setUser(hydratedUser);
         localStorage.setItem('user', JSON.stringify(hydratedUser));
         return { success: true, mustChangePassword: authData.mustChangePassword };
       }
-      return { success: false, error: 'Unauthorized: Invalid credentials' };
+      return { success: false, error: 'Login failed: No token returned from backend server.' };
     } catch (err) {
-      const data = err.response?.data;
-      let errMsg;
-      if (typeof data === 'string' && data.trim()) {
-        errMsg = data;
-      } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title;
-      }
-      errMsg = errMsg || err.message || 'Login failed. Please check your username and password.';
+      const { message: errMsg, code } = extractErrorDetails(
+        err,
+        'Login failed. Please check your username and password.'
+      );
       
       setError(errMsg);
-      return { success: false, error: errMsg, code: data?.code };
+      return { success: false, error: errMsg, code };
     }
   };
 
   const handleGoogleLogin = async (googleResponse) => {
     setError(null);
     try {
-      const authData = await accountService.loginWithGoogle(googleResponse);
-      const tokenVal = authData?.token || authData?.accessToken || authData?.jwtToken;
+      const authData = unwrapApiPayload(await accountService.loginWithGoogle(googleResponse));
+      const tokenVal = getAuthToken(authData);
       if (authData && tokenVal) {
         localStorage.setItem('token', tokenVal);
         const userObj = buildUserFromAuthData(authData);
@@ -163,17 +209,10 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Google Login failed: No token returned from backend server.' };
     } catch (err) {
       console.error('Google Login Exception:', err);
-      const data = err.response?.data;
-      let errMsg;
-      if (typeof data === 'string' && data.trim()) {
-        errMsg = data;
-      } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || data.error || (data.errors ? Object.values(data.errors).flat().join(', ') : '') || (Object.keys(data).length > 0 ? JSON.stringify(data) : '');
-      }
-      errMsg = errMsg || err.message || 'Google authentication failed.';
+      const { message: errMsg, code } = extractErrorDetails(err, 'Google authentication failed.');
       
       setError(errMsg);
-      return { success: false, error: errMsg, code: data?.code };
+      return { success: false, error: errMsg, code };
     }
   };
 
@@ -209,14 +248,7 @@ export const AuthProvider = ({ children }) => {
       return { success: true, data: response };
     } catch (err) {
       console.error('Register error:', err);
-      const data = err.response?.data;
-      let errMsg;
-      if (typeof data === 'string' && data.trim()) {
-        errMsg = data;
-      } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || data.error || (data.errors ? Object.values(data.errors).flat().join(', ') : '');
-      }
-      errMsg = errMsg || err.message || 'Registration failed.';
+      const { message: errMsg } = extractErrorDetails(err, 'Registration failed.');
       setError(errMsg);
       return { success: false, error: errMsg };
     }
