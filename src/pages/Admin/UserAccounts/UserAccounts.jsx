@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
@@ -41,14 +41,31 @@ const extractErrorMessage = (error) => {
   if (typeof data === 'string') return data;
   if (data?.message) return data.message;
   if (data?.Message) return data.Message;
-  if (error?.message) return error.message;
   try { return JSON.stringify(data); } catch (e) { return String(data); }
 };
+
+function UserAvatar({ src, name }) {
+  const [hasError, setHasError] = React.useState(false);
+  const initials = (name || 'User').trim().slice(0, 2).toUpperCase();
+
+  if (!src || hasError) {
+    return <span>{initials}</span>;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name || 'User'}
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 export default function UserAccounts() {
   const { showToast } = useToast();
   const { user: currentUser } = useAuth();
   const { t, formatNumber } = useLanguage();
+  const roleActionInFlightRef = useRef(new Set());
 
   const formatRole = (role) => {
     if (!role || role === 'All') return t('admin.listings.tab_all');
@@ -81,6 +98,14 @@ export default function UserAccounts() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [roleModalLoading, setRoleModalLoading] = useState(false);
   const [roleItems, setRoleItems] = useState([]);
+
+  // New state variables for Ban reasons and Seller subscription management
+  const [selectedBanReasonKey, setSelectedBanReasonKey] = useState('');
+  const [customBanReason, setCustomBanReason] = useState('');
+  const [pendingSellerGrantUser, setPendingSellerGrantUser] = useState(null);
+  const [pendingSellerRevokeUser, setPendingSellerRevokeUser] = useState(null);
+  const [sellerActionLoading, setSellerActionLoading] = useState(false);
+  const [pendingRoleConfirm, setPendingRoleConfirm] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -266,16 +291,20 @@ export default function UserAccounts() {
       return;
     }
 
+    const actionKey = `${selectedUserId}:${role.roleId}`;
+    if (roleActionInFlightRef.current.has(actionKey)) return;
+    roleActionInFlightRef.current.add(actionKey);
+
     setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, loading: true } : r)));
 
     try {
       if (role.isAssigned) {
         await accountRoleService.removeRole(selectedUserId, role.roleId);
-        showToast(t('common.saved_success'), 'success');
+        showToast(t('admin.users.revoke_role_success', { role: formatRole(role.name) || role.name }), 'success');
         setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, isAssigned: false, loading: false } : r)));
       } else {
         await accountRoleService.assignRole(selectedUserId, role.roleId);
-        showToast(t('common.saved_success'), 'success');
+        showToast(t('admin.users.grant_role_success', { role: formatRole(role.name) || role.name }), 'success');
         setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, isAssigned: true, loading: false } : r)));
       }
       await fetchUsers();
@@ -291,6 +320,8 @@ export default function UserAccounts() {
         showToast(extractErrorMessage(error) || t('common.save_error'), 'error');
         setRoleItems((prev) => prev.map((r) => (r.roleId === role.roleId ? { ...r, loading: false } : r)));
       }
+    } finally {
+      roleActionInFlightRef.current.delete(actionKey);
     }
   };
 
@@ -326,24 +357,46 @@ export default function UserAccounts() {
   const openStatusActionModal = (user) => {
     if (!user?.accountId) return;
     setPendingActionUser(user);
+    setSelectedBanReasonKey('');
+    setCustomBanReason('');
   };
 
   const closeStatusActionModal = () => {
     if (actionLoading) return;
     setPendingActionUser(null);
+    setSelectedBanReasonKey('');
+    setCustomBanReason('');
   };
 
   const confirmStatusAction = async () => {
     if (!pendingActionUser?.accountId) return;
 
     const isInactive = isInactiveStatus(pendingActionUser?.status);
+    let banReason = null;
+
+    if (!isInactive) {
+      if (selectedBanReasonKey && selectedBanReasonKey !== 'other') {
+        const presetText = t(`admin.users.ban_reasons.${selectedBanReasonKey}`);
+        banReason = customBanReason.trim() ? `${presetText} - ${customBanReason.trim()}` : presetText;
+      } else if (customBanReason.trim()) {
+        banReason = customBanReason.trim();
+      } else {
+        banReason = t('admin.users.ban_reasons.terms_violation');
+      }
+    }
 
     try {
       setActionLoading(true);
-      await accountService.banUser(pendingActionUser.accountId);
+      await accountService.banUser(pendingActionUser.accountId, banReason);
       showToast(isInactive ? t('admin.users.unban_success') : t('admin.users.ban_success'), 'success');
       setPendingActionUser(null);
+      setSelectedBanReasonKey('');
+      setCustomBanReason('');
       await fetchUsers();
+      if (showDetailModal && selectedUserDetail?.accountId === pendingActionUser.accountId) {
+        const detail = await profileService.getUserProfile(pendingActionUser.userId);
+        setSelectedUserDetail(detail);
+      }
     } catch (error) {
       showToast(
         extractErrorMessage(error) || (isInactive ? t('admin.users.unban_error') : t('admin.users.ban_error')),
@@ -351,6 +404,44 @@ export default function UserAccounts() {
       );
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const confirmGrantSeller = async () => {
+    if (!pendingSellerGrantUser?.accountId) return;
+    try {
+      setSellerActionLoading(true);
+      await accountService.grantSellerUnlimited(pendingSellerGrantUser.accountId);
+      showToast(t('admin.users.grant_seller_success'), 'success');
+      setPendingSellerGrantUser(null);
+      await fetchUsers();
+      if (showDetailModal && selectedUserDetail?.accountId === pendingSellerGrantUser.accountId) {
+        const detail = await profileService.getUserProfile(pendingSellerGrantUser.userId);
+        setSelectedUserDetail(detail);
+      }
+    } catch (error) {
+      showToast(extractErrorMessage(error) || t('common.save_error'), 'error');
+    } finally {
+      setSellerActionLoading(false);
+    }
+  };
+
+  const confirmRevokeSeller = async () => {
+    if (!pendingSellerRevokeUser?.accountId) return;
+    try {
+      setSellerActionLoading(true);
+      await accountService.revokeSeller(pendingSellerRevokeUser.accountId);
+      showToast(t('admin.users.revoke_seller_success'), 'success');
+      setPendingSellerRevokeUser(null);
+      await fetchUsers();
+      if (showDetailModal && selectedUserDetail?.accountId === pendingSellerRevokeUser.accountId) {
+        const detail = await profileService.getUserProfile(pendingSellerRevokeUser.userId);
+        setSelectedUserDetail(detail);
+      }
+    } catch (error) {
+      showToast(extractErrorMessage(error) || t('common.save_error'), 'error');
+    } finally {
+      setSellerActionLoading(false);
     }
   };
 
@@ -530,7 +621,7 @@ export default function UserAccounts() {
                   <tbody>
                     {filteredUsers.map((user) => {
                       const isSelected = selectedUser?.accountId === user.accountId;
-                      const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Unknown User';
+                      const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || t('admin.users.unknown_user');
                       const statusClass = statusTone(user.status);
 
                       return (
@@ -542,7 +633,7 @@ export default function UserAccounts() {
                           <td>
                             <div className="admin-user-identity">
                               <div className="admin-user-avatar">
-                                {user.avatarUrl ? <img src={user.avatarUrl} alt={displayName} /> : <span>{displayName.slice(0, 2).toUpperCase()}</span>}
+                                <UserAvatar src={user.avatarUrl} name={displayName} />
                               </div>
                               <div>
                                 <strong>{displayName}</strong>
@@ -666,6 +757,34 @@ export default function UserAccounts() {
                     : t('admin.users.ban_confirm_body')}
                 </p>
               </div>
+
+              {!pendingIsInactive && (
+                <div className="admin-ban-reason-form">
+                  <label className="admin-ban-reason-label">
+                    {t('admin.users.ban_reason_label')}
+                  </label>
+                  <select
+                    className="admin-ban-reason-select"
+                    value={selectedBanReasonKey}
+                    onChange={(e) => setSelectedBanReasonKey(e.target.value)}
+                  >
+                    <option value="">{t('admin.users.ban_reason_select')}</option>
+                    <option value="terms_violation">{t('admin.users.ban_reasons.terms_violation')}</option>
+                    <option value="fake_counterfeit_product">{t('admin.users.ban_reasons.fake_counterfeit_product')}</option>
+                    <option value="fraud_scam">{t('admin.users.ban_reasons.fraud_scam')}</option>
+                    <option value="multiple_reports">{t('admin.users.ban_reasons.multiple_reports')}</option>
+                    <option value="other">{t('admin.users.ban_reasons.other')}</option>
+                  </select>
+
+                  <textarea
+                    className="admin-ban-reason-textarea"
+                    placeholder={t('admin.users.ban_reason_custom_placeholder')}
+                    value={customBanReason}
+                    onChange={(e) => setCustomBanReason(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="admin-confirm-modal-footer">
@@ -734,7 +853,7 @@ export default function UserAccounts() {
                             <button
                               type="button"
                               className={`admin-action-btn ${role.isAssigned ? 'danger' : 'ghost'}`}
-                              onClick={() => toggleRoleAssignment(role)}
+                              onClick={() => setPendingRoleConfirm({ role })}
                               disabled={role.loading || isRemovingSelfRole}
                               title={isRemovingSelfRole ? t('common.own_role_warning') : ''}
                             >
@@ -787,7 +906,7 @@ export default function UserAccounts() {
                 <>
                   <div className="admin-detail-profile-head">
                     <div className="admin-detail-big-avatar">
-                      {selectedUserDetail.avatarUrl ? <img src={selectedUserDetail.avatarUrl} alt={selectedUserDetail.username || t('admin.users.unknown_user')} /> : <span>{(selectedUserDetail.username || 'U').slice(0, 2).toUpperCase()}</span>}
+                      <UserAvatar src={selectedUserDetail.avatarUrl} name={selectedUserDetail.username || selectedUserDetail.firstName} />
                     </div>
                     <div>
                       <h4>{`${selectedUserDetail.firstName || ''} ${selectedUserDetail.lastName || ''}`.trim() || selectedUserDetail.username || t('admin.users.no_username')}</h4>
@@ -825,6 +944,39 @@ export default function UserAccounts() {
                     )}
                   </div>
 
+                  <div className="admin-detail-address-card">
+                    <h4>{t('admin.users.seller_subscription')}</h4>
+                    {selectedUserDetail.roles?.includes('Seller') ? (
+                      <div className="admin-seller-sub-box">
+                        <div className="sub-badge-row">
+                          <span className="badge-unlimited">{t('admin.users.unlimited')}</span>
+                          <span className="badge-admin-granted">{t('admin.users.admin_granted')}</span>
+                        </div>
+                        <p className="admin-detail-muted">{t('admin.users.seller_active_desc')}</p>
+                        <button
+                          type="button"
+                          className="admin-seller-action-btn danger"
+                          onClick={() => setPendingSellerRevokeUser(selectedUserDetail)}
+                        >
+                          <span className="material-symbols-outlined">person_remove</span>
+                          <span>{t('admin.users.btn_revoke_seller')}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="admin-seller-sub-box">
+                        <p className="admin-detail-muted">{t('admin.users.seller_inactive_desc')}</p>
+                        <button
+                          type="button"
+                          className="admin-seller-action-btn success"
+                          onClick={() => setPendingSellerGrantUser(selectedUserDetail)}
+                        >
+                          <span className="material-symbols-outlined">workspace_premium</span>
+                          <span>{t('admin.users.btn_grant_seller')}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {selectedUserDetail.addresses?.length > 0 && (
                     <div className="admin-detail-address-card">
                       <h4>{t('admin.users.all_addresses')}</h4>
@@ -842,6 +994,113 @@ export default function UserAccounts() {
                   )}
                 </>
               ) : null}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {pendingSellerGrantUser && createPortal(
+        <div className="admin-confirm-modal-overlay" onClick={() => !sellerActionLoading && setPendingSellerGrantUser(null)}>
+          <div className="admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-confirm-modal-header is-unban">
+              <div className="admin-confirm-icon-badge">
+                <span className="material-symbols-outlined">workspace_premium</span>
+              </div>
+              <div>
+                <p className="admin-confirm-kicker">{t('admin.users.grant_seller_title')}</p>
+                <h3>{pendingSellerGrantUser.username || pendingSellerGrantUser.accountId}</h3>
+              </div>
+              <button type="button" className="admin-confirm-close" onClick={() => setPendingSellerGrantUser(null)} disabled={sellerActionLoading}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="admin-confirm-modal-body">
+              <p>{t('admin.users.grant_seller_msg')}</p>
+            </div>
+            <div className="admin-confirm-modal-footer">
+              <button type="button" className="admin-confirm-btn cancel" onClick={() => setPendingSellerGrantUser(null)} disabled={sellerActionLoading}>
+                {t('common.cancel')}
+              </button>
+              <button type="button" className="admin-confirm-btn submit unban" onClick={confirmGrantSeller} disabled={sellerActionLoading}>
+                {sellerActionLoading ? <span className="btn-spinner"></span> : t('common.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {pendingSellerRevokeUser && createPortal(
+        <div className="admin-confirm-modal-overlay" onClick={() => !sellerActionLoading && setPendingSellerRevokeUser(null)}>
+          <div className="admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-confirm-modal-header is-ban">
+              <div className="admin-confirm-icon-badge">
+                <span className="material-symbols-outlined">person_remove</span>
+              </div>
+              <div>
+                <p className="admin-confirm-kicker">{t('admin.users.revoke_seller_title')}</p>
+                <h3>{pendingSellerRevokeUser.username || pendingSellerRevokeUser.accountId}</h3>
+              </div>
+              <button type="button" className="admin-confirm-close" onClick={() => setPendingSellerRevokeUser(null)} disabled={sellerActionLoading}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="admin-confirm-modal-body">
+              <p>{t('admin.users.revoke_seller_msg')}</p>
+            </div>
+            <div className="admin-confirm-modal-footer">
+              <button type="button" className="admin-confirm-btn cancel" onClick={() => setPendingSellerRevokeUser(null)} disabled={sellerActionLoading}>
+                {t('common.cancel')}
+              </button>
+              <button type="button" className="admin-confirm-btn submit ban" onClick={confirmRevokeSeller} disabled={sellerActionLoading}>
+                {sellerActionLoading ? <span className="btn-spinner"></span> : t('common.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {pendingRoleConfirm && createPortal(
+        <div className="admin-confirm-modal-overlay" onClick={() => setPendingRoleConfirm(null)}>
+          <div className="admin-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className={`admin-confirm-modal-header ${pendingRoleConfirm.role.isAssigned ? 'is-ban' : 'is-unban'}`}>
+              <div className="admin-confirm-icon-badge">
+                <span className="material-symbols-outlined">
+                  {pendingRoleConfirm.role.isAssigned ? 'person_remove' : 'manage_accounts'}
+                </span>
+              </div>
+              <div>
+                <p className="admin-confirm-kicker">{t('admin.users.manage_roles_title')}</p>
+                <h3>{pendingRoleConfirm.role.isAssigned ? t('admin.users.revoke_role_title') : t('admin.users.grant_role_title')}</h3>
+              </div>
+              <button type="button" className="admin-confirm-close" onClick={() => setPendingRoleConfirm(null)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="admin-confirm-modal-body">
+              <p>
+                {pendingRoleConfirm.role.isAssigned
+                  ? t('admin.users.confirm_toggle_role_revoke', { role: formatRole(pendingRoleConfirm.role.name) || pendingRoleConfirm.role.name })
+                  : t('admin.users.confirm_toggle_role_grant', { role: formatRole(pendingRoleConfirm.role.name) || pendingRoleConfirm.role.name })}
+              </p>
+            </div>
+            <div className="admin-confirm-modal-footer">
+              <button type="button" className="admin-confirm-btn cancel" onClick={() => setPendingRoleConfirm(null)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className={`admin-confirm-btn submit ${pendingRoleConfirm.role.isAssigned ? 'ban' : 'unban'}`}
+                onClick={() => {
+                  const r = pendingRoleConfirm.role;
+                  setPendingRoleConfirm(null);
+                  toggleRoleAssignment(r);
+                }}
+              >
+                {t('common.confirm')}
+              </button>
             </div>
           </div>
         </div>,

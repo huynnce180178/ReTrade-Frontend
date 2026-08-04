@@ -22,17 +22,17 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(false);
 
   const statusLabels = useMemo(() => ({
-    AwaitingPayment: t('sales_stats.awaiting_payment'),
-    Pending: t('sales_stats.pending'),
-    Confirmed: t('sales_stats.confirmed'),
-    Shipping: t('sales_stats.shipping'),
-    Delivered: t('sales_stats.delivered'),
-    Completed: t('sales_stats.completed'),
-    DeliveryFailed: t('sales_stats.delivery_failed'),
-    Returned: t('sales_stats.returned'),
-    ReturnRequested: t('history.refund_reason'),
-    ReturnRejected: t('admin.reject'),
-    Cancelled: t('sales_stats.cancelled'),
+    AwaitingPayment: t('order_status.awaiting_payment'),
+    Pending: t('order_status.pending'),
+    Confirmed: t('order_status.confirmed'),
+    Shipping: t('order_status.shipping'),
+    Delivered: t('order_status.delivered'),
+    Completed: t('order_status.completed'),
+    DeliveryFailed: t('order_status.delivery_failed'),
+    Returned: t('order_status.returned'),
+    ReturnRequested: t('order_status.return_requested'),
+    ReturnRejected: t('order_status.return_rejected'),
+    Cancelled: t('order_status.cancelled'),
   }), [t]);
 
   const statusClass = {

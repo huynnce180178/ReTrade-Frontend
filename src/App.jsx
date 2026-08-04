@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+// ReTrade Application Root Component
 import CategoryList from './pages/Buyer/Category/CategoryList';
 import CategoryProductList from './pages/Buyer/Category/CategoryProductList';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -102,6 +103,8 @@ function App() {
                   <Route path="change-password" element={<ChangePassword />} />
                   <Route path="address-book" element={<AddressBook />} />
                   <Route path="purchase-history" element={<PurchaseHistory />} />
+                  <Route path="purchase history" element={<Navigate to="/purchase-history" replace />} />
+                  <Route path="purchase%20history" element={<Navigate to="/purchase-history" replace />} />
                   <Route path="purchase-history/:orderId" element={<PurchaseDetail />} />
                   <Route path="bid-history" element={<BidHistory />} />
                   <Route path="refund-history" element={<RefundHistory />} />

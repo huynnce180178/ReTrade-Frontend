@@ -8,13 +8,22 @@ import './AssistantChatWidget.css';
 
 const SESSION_KEY = 'retrade_assistant_session_id';
 
+const isProductUnavailable = (product) => (
+  product?.status === 'SoldOut' ||
+  product?.status === 'Sold' ||
+  product?.status === 'Inactive' ||
+  Number(product?.stockQuantity ?? 0) <= 0
+);
+
+const I18N_CONTENT_PREFIX = 'i18n:';
+
 function formatTextNode(text) {
   if (!text) return null;
   const lines = text.split('\n');
   return lines.map((line, lineIdx) => {
     let cleanLine = line.trim();
     if (cleanLine.startsWith('* ') || cleanLine.startsWith('- ')) {
-      cleanLine = '• ' + cleanLine.substring(2);
+      cleanLine = `- ${cleanLine.substring(2)}`;
     }
     cleanLine = cleanLine.replace(/^\*\s*/, '');
 
@@ -38,20 +47,28 @@ function formatTextNode(text) {
 function renderFormattedContent(content) {
   if (!content) return null;
 
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const linkRegex = /(!?)\[([^\]]+)\]\(([^)]+)\)/g;
   const elements = [];
   let lastIndex = 0;
   let match;
 
   while ((match = linkRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      elements.push(formatTextNode(content.substring(lastIndex, match.index)));
+    const isImage = match[1] === '!';
+    const textStart = match.index;
+    if (textStart > lastIndex) {
+      elements.push(formatTextNode(content.substring(lastIndex, textStart)));
     }
 
-    const title = match[1];
-    const url = match[2];
+    const title = match[2];
+    const url = match[3];
 
-    if (url.startsWith('/')) {
+    if (isImage) {
+      elements.push(
+        <div key={`img-${url}-${match.index}`} className="assistant-widget-inline-img-wrapper">
+          <img src={url} alt={title} className="assistant-widget-inline-img" onError={(e) => { e.target.style.display = 'none'; }} />
+        </div>
+      );
+    } else if (url.startsWith('/')) {
       elements.push(
         <Link key={`${url}-${match.index}`} to={url} className="assistant-widget-nav-btn">
           <span>{title}</span>
@@ -78,8 +95,14 @@ function renderFormattedContent(content) {
 }
 
 export default function AssistantChatWidget() {
-  const { t, language, formatCurrency } = useLanguage();
+  const { t, formatCurrency, language } = useLanguage();
+  const assistantTitle = t('chat.assistant_title');
+  const assistantWelcome = t('chat.assistant_welcome');
+  const assistantSubtitle = t('chat.assistant_subtitle');
+  const assistantTypeMessage = t('chat.type_message');
+  const assistantSendTitle = t('chat.send');
   const [open, setOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
@@ -88,28 +111,30 @@ export default function AssistantChatWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: t('chat.assistant_welcome'),
+      content: assistantWelcome,
       products: [],
     },
   ]);
   
   const bottomRef = useRef(null);
   const navigate = useNavigate();
-  const toast = useToast();
+  const { showToast } = useToast();
 
-  const QUICK_SUGGESTIONS = language === 'vi' ? [
-    { label: t('history.purchase_title'), query: 'Kiểm tra lịch sử mua hàng của tôi trên ReTrade' },
-    { label: t('auction.title'), query: 'Làm sao để tham gia đấu giá trên ReTrade?' },
-    { label: t('home.start_selling'), query: 'Tôi muốn đăng bán sản phẩm đồ cũ trên ReTrade' },
-    { label: t('home.featured_products'), query: 'Cho tôi xem danh sách các sản phẩm mới nhất' },
-    { label: t('nav.wishlist'), query: 'Xem danh sách sản phẩm yêu thích của tôi' },
-  ] : [
-    { label: t('history.purchase_title'), query: 'Check my purchase history on ReTrade' },
-    { label: t('auction.title'), query: 'How to participate in auctions on ReTrade?' },
-    { label: t('home.start_selling'), query: 'I want to sell a second-hand product on ReTrade' },
-    { label: t('home.featured_products'), query: 'Show me the latest products on ReTrade' },
-    { label: t('nav.wishlist'), query: 'View my wishlist items' },
+  const QUICK_SUGGESTIONS = [
+    { label: t('history.purchase_title'), query: t('chat.assistant_query_purchase_history') },
+    { label: t('auction.title'), query: t('chat.assistant_query_auction_help') },
+    { label: t('home.start_selling'), query: t('chat.assistant_query_start_selling') },
+    { label: t('home.featured_products'), query: t('chat.assistant_query_featured_products') },
+    { label: t('nav.wishlist'), query: t('chat.assistant_query_wishlist') },
   ];
+
+  const translateAssistantContent = (content) => {
+    if (!content?.startsWith(I18N_CONTENT_PREFIX)) {
+      return content;
+    }
+
+    return t(content.slice(I18N_CONTENT_PREFIX.length));
+  };
 
   useEffect(() => {
     if (!sessionId) return;
@@ -141,9 +166,11 @@ export default function AssistantChatWidget() {
     }
   }, [messages.length, open, sending]);
 
-  const handleToggleWishlist = async (e, productId) => {
+  const handleToggleWishlist = async (e, product) => {
     e.preventDefault();
     e.stopPropagation();
+    const productId = product?.productId;
+    if (!productId) return;
     try {
       if (wishlistSet.has(productId)) {
         setWishlistSet((prev) => {
@@ -151,21 +178,29 @@ export default function AssistantChatWidget() {
           next.delete(productId);
           return next;
         });
-        toast?.info?.(t('product.remove_from_wishlist'));
+        showToast(t('product.remove_from_wishlist'), 'info');
       } else {
+        if (isProductUnavailable(product)) {
+          showToast(t('product.out_of_stock'), 'warning');
+          return;
+        }
         await wishlistService.addToWishlist(productId);
         setWishlistSet((prev) => new Set(prev).add(productId));
-        toast?.success?.(t('product.add_to_wishlist'));
+        showToast(t('product.add_to_wishlist'), 'success');
       }
     } catch {
-      toast?.error?.(t('auth.login_title'));
+      showToast(t('auth.login_title'), 'error');
     }
   };
 
-  const handleBuyNow = (e, productId) => {
+  const handleBuyNow = (e, product) => {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/checkout/${productId}`);
+    if (isProductUnavailable(product)) {
+      showToast(t('product.out_of_stock'), 'warning');
+      return;
+    }
+    navigate(`/checkout/${product.productId}`);
   };
 
   const sendQuery = async (textToSend) => {
@@ -185,9 +220,7 @@ export default function AssistantChatWidget() {
     setSending(true);
 
     try {
-      // Append language hint for Gemini API if in Vietnamese mode
-      const queryWithLang = language === 'vi' ? `${text} (Vui lòng trả lời hoàn toàn bằng Tiếng Việt)` : text;
-      const response = await assistantChatService.sendMessage(queryWithLang, sessionId);
+      const response = await assistantChatService.sendMessage(text, sessionId, language);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
         setSessionId(response.sessionId);
@@ -229,7 +262,7 @@ export default function AssistantChatWidget() {
       {
         id: 'welcome-new',
         role: 'assistant',
-        content: t('chat.assistant_welcome'),
+        content: assistantWelcome,
         products: [],
       },
     ]);
@@ -238,7 +271,7 @@ export default function AssistantChatWidget() {
   return (
     <div className={`assistant-widget ${open ? 'open' : ''}`}>
       {open && (
-        <section className="assistant-widget-panel" aria-label={t('chat.assistant_title')}>
+        <section className={`assistant-widget-panel ${isMaximized ? 'maximized' : ''}`} aria-label={assistantTitle}>
           <header className="assistant-widget-header">
             <div className="assistant-widget-brand">
               <div className="assistant-widget-avatar-head">
@@ -246,11 +279,18 @@ export default function AssistantChatWidget() {
                 <span className="assistant-widget-online-dot" />
               </div>
               <div className="assistant-widget-header-title">
-                <strong>{t('chat.assistant_title')}</strong>
-                <span>AI Shopping Assistant</span>
+                <strong>{assistantTitle}</strong>
+                <span>{assistantSubtitle}</span>
               </div>
             </div>
             <div className="assistant-widget-actions">
+              <button
+                type="button"
+                onClick={() => setIsMaximized((prev) => !prev)}
+                title={isMaximized ? t('chat.minimize') : t('chat.maximize')}
+              >
+                <span className="material-symbols-outlined">{isMaximized ? 'close_fullscreen' : 'open_in_full'}</span>
+              </button>
               <button type="button" onClick={handleNewChat} title={t('common.reset')}>
                 <span className="material-symbols-outlined">autorenew</span>
               </button>
@@ -271,7 +311,7 @@ export default function AssistantChatWidget() {
 
                 <div className="assistant-widget-bubble">
                   <div className="assistant-widget-text">
-                    {renderFormattedContent(message.content)}
+                    {renderFormattedContent(translateAssistantContent(message.content))}
                   </div>
 
                   {message.products?.length > 0 && (
@@ -280,12 +320,14 @@ export default function AssistantChatWidget() {
                         <span className="material-symbols-outlined">shopping_bag</span>
                         {t('product.related_products')}
                       </div>
-                      {message.products.slice(0, 5).map((product) => (
-                        <div key={product.productId} className="assistant-widget-product-card-container">
+                      {message.products.slice(0, 5).map((product) => {
+                        const outOfStock = isProductUnavailable(product);
+                        return (
+                        <div key={product.productId} className={`assistant-widget-product-card-container ${outOfStock ? 'out-of-stock' : ''}`}>
                           <Link to={`/product/${product.productId}`} className="assistant-widget-product-card">
                             <div className="assistant-widget-product-img">
                               {product.mainImageUrl ? (
-                                <img src={product.mainImageUrl} alt={product.name || 'Product'} />
+                                <img src={product.mainImageUrl} alt={product.name || t('common.product_image')} />
                               ) : (
                                 <div className="assistant-widget-img-placeholder">
                                   <span className="material-symbols-outlined">inventory_2</span>
@@ -293,10 +335,10 @@ export default function AssistantChatWidget() {
                               )}
                             </div>
                             <div className="assistant-widget-product-meta">
-                              <span className="product-title">{product.name || 'ReTrade Product'}</span>
+                              <span className="product-title">{product.name || t('common.unnamed_product')}</span>
                               <span className="product-price">{formatCurrency(product.price)}</span>
                               <small style={{ color: '#059669', fontWeight: 600, fontSize: '11px', marginTop: '2px' }}>
-                                {t('common.view_detail')} &rarr;
+                                {outOfStock ? t('product.out_of_stock') : t('common.view_detail')}
                               </small>
                             </div>
                           </Link>
@@ -304,8 +346,9 @@ export default function AssistantChatWidget() {
                             <button
                               type="button"
                               className={`assistant-widget-action-icon wishlist-btn ${wishlistSet.has(product.productId) ? 'active' : ''}`}
-                              title={wishlistSet.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
-                              onClick={(e) => handleToggleWishlist(e, product.productId)}
+                              title={outOfStock && !wishlistSet.has(product.productId) ? t('product.out_of_stock') : wishlistSet.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
+                              onClick={(e) => handleToggleWishlist(e, product)}
+                              disabled={outOfStock && !wishlistSet.has(product.productId)}
                             >
                               <span className="material-symbols-outlined">
                                 {wishlistSet.has(product.productId) ? 'favorite' : 'favorite_border'}
@@ -314,14 +357,16 @@ export default function AssistantChatWidget() {
                             <button
                               type="button"
                               className="assistant-widget-action-icon buy-btn"
-                              title={t('product.buy_now')}
-                              onClick={(e) => handleBuyNow(e, product.productId)}
+                              title={outOfStock ? t('product.out_of_stock') : t('product.buy_now')}
+                              onClick={(e) => handleBuyNow(e, product)}
+                              disabled={outOfStock}
                             >
                               <span className="material-symbols-outlined">bolt</span>
                             </button>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -368,10 +413,10 @@ export default function AssistantChatWidget() {
               type="text"
               value={messageText}
               onChange={(event) => setMessageText(event.target.value)}
-              placeholder={t('chat.type_message')}
+              placeholder={assistantTypeMessage}
               maxLength={2000}
             />
-            <button type="submit" disabled={!messageText.trim() || sending} title={t('chat.send')}>
+            <button type="submit" disabled={!messageText.trim() || sending} title={assistantSendTitle}>
               <span className="material-symbols-outlined">{sending ? 'sync' : 'send'}</span>
             </button>
           </form>
@@ -382,7 +427,7 @@ export default function AssistantChatWidget() {
         type="button"
         className="assistant-widget-toggle-btn"
         onClick={() => setOpen((current) => !current)}
-        aria-label={t('chat.assistant_title')}
+        aria-label={assistantTitle}
       >
         <span className="material-symbols-outlined">{open ? 'expand_more' : 'robot'}</span>
       </button>

@@ -60,6 +60,7 @@ export default function ForgotPassword() {
     try {
       await accountService.forgotPassword(trimmed);
       showToast(language === 'vi' ? 'Mã OTP đã được gửi đến email của bạn.' : 'OTP code sent to your email.', 'success');
+      setEmail(trimmed);
       setStep('resetForm');
       setCountdown(60);
       setOtp([...INITIAL_OTP]);
@@ -95,7 +96,7 @@ export default function ForgotPassword() {
   const handleResendOtp = async () => {
     setResending(true);
     try {
-      await accountService.forgotPassword(email);
+      await accountService.forgotPassword(email.trim());
       showToast(language === 'vi' ? 'Mã OTP mới đã được gửi lại!' : 'New OTP code resent!', 'success');
       setCountdown(60);
       setOtp([...INITIAL_OTP]);
@@ -105,6 +106,18 @@ export default function ForgotPassword() {
     } finally {
       setResending(false);
     }
+  };
+
+  const resetOtpEntry = () => {
+    setOtp([...INITIAL_OTP]);
+    setTimeout(() => inputRefs.current[0]?.focus(), 0);
+  };
+
+  const backToEmailStep = () => {
+    setStep('email');
+    setOtp([...INITIAL_OTP]);
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
   const checks = {
@@ -138,6 +151,7 @@ export default function ForgotPassword() {
       navigate('/login');
     } catch (err) {
       showToast(getErrorMsg(err, language === 'vi' ? 'Mã OTP không hợp lệ hoặc đã hết hạn.' : 'Invalid or expired OTP code.'), 'error');
+      resetOtpEntry();
     } finally {
       setLoading(false);
     }
@@ -221,7 +235,7 @@ export default function ForgotPassword() {
 
           {/* STEP 2: UNIFIED OTP & NEW PASSWORD FORM */}
           {step === 'resetForm' && (
-            <div className="fp-glass-card fp-glass-card--wide fp-animate-in" key="resetForm">
+            <div className="fp-glass-card fp-glass-card--wide fp-glass-card--reset fp-animate-in" key="resetForm">
               <div className="fp-header-center">
                 <div className="fp-icon-wrap fp-icon-wrap--otp">
                   <span className="material-symbols-outlined fp-icon">mark_email_read</span>
@@ -233,10 +247,7 @@ export default function ForgotPassword() {
                   <button
                     type="button"
                     className="fp-change-email-inline-btn"
-                    onClick={() => {
-                      setStep('email');
-                      setOtp([...INITIAL_OTP]);
-                    }}
+                    onClick={backToEmailStep}
                   >
                     ({language === 'vi' ? 'Đổi email khác' : 'Change Email'})
                   </button>
@@ -319,6 +330,14 @@ export default function ForgotPassword() {
                   {loading
                     ? <span className="fp-spinner" />
                     : (language === 'vi' ? 'Xác nhận & Đổi mật khẩu' : 'Confirm & Reset Password')}
+                </button>
+                <button type="button" className="fp-back-link" onClick={resetOtpEntry} disabled={loading}>
+                  <span className="material-symbols-outlined fp-back-icon">restart_alt</span>
+                  {language === 'vi' ? 'Nhập lại mã OTP' : 'Re-enter OTP'}
+                </button>
+                <button type="button" className="fp-back-link" onClick={backToEmailStep} disabled={loading}>
+                  <span className="material-symbols-outlined fp-back-icon">arrow_back</span>
+                  {language === 'vi' ? 'Quay lại nhập email' : 'Back to email'}
                 </button>
               </form>
 

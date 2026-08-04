@@ -8,9 +8,14 @@ import { createOrderHubConnection } from '../../../services/orderRealtimeService
 import './OrderManagement.css';
 import ReportModal from '../../../components/ReportModal/ReportModal';
 import reportService from '../../../services/reportService';
+import SellerPagination from '../../../components/SellerPagination/SellerPagination';
+import ReturnApprovalModal from '../../../components/ReturnApprovalModal/ReturnApprovalModal';
 
 const pageSize = 5;
 const numberFormatter = new Intl.NumberFormat('vi-VN');
+function formatVnd(val) {
+  return `${numberFormatter.format(Number(val) || 0)} VND`;
+}
 const REPORT_ALLOWED_STATUSES = [
   'Delivered',
   'DeliveryFailed',
@@ -20,6 +25,8 @@ const REPORT_ALLOWED_STATUSES = [
   'Returned',
 ];
 
+const canReportOrder = (status) => REPORT_ALLOWED_STATUSES
+  .some((allowed) => allowed.toLowerCase() === String(status || '').toLowerCase());
 
 export default function OrderManagement() {
   const { user, loading: authLoading } = useAuth();
@@ -36,38 +43,45 @@ export default function OrderManagement() {
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [filterForm, setFilterForm] = useState({ sortBy: 'newest' });
   const [appliedFilters, setAppliedFilters] = useState(null);
+  const [allSellerOrders, setAllSellerOrders] = useState([]);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [reportTarget, setReportTarget] = useState(null);
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [returnModalTarget, setReturnModalTarget] = useState(null);
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
   const sellerId = user?.userId;
 
   const statusMeta = useMemo(() => ({
-    AwaitingPayment: { label: t('sales_stats.awaiting_payment'), className: 'awaiting' },
-    Pending: { label: t('sales_stats.pending'), className: 'pending' },
-    Confirmed: { label: t('sales_stats.confirmed'), className: 'confirmed' },
-    Shipping: { label: t('sales_stats.shipping'), className: 'shipping' },
-    Delivered: { label: t('sales_stats.delivered'), className: 'delivered' },
-    Completed: { label: t('sales_stats.completed'), className: 'completed' },
-    DeliveryFailed: { label: t('sales_stats.delivery_failed'), className: 'delivery-failed' },
-    Returned: { label: t('sales_stats.returned'), className: 'returned' },
-    ReturnRequested: { label: t('history.refund_reason'), className: 'return-requested' },
-    ReturnRejected: { label: t('admin.reject'), className: 'return-rejected' },
-    Cancelled: { label: t('sales_stats.cancelled'), className: 'cancelled' },
+    AwaitingPayment: { label: t('order_status.awaiting_payment'), className: 'awaiting' },
+    Pending: { label: t('order_status.pending'), className: 'pending' },
+    Confirmed: { label: t('order_status.confirmed'), className: 'confirmed' },
+    Shipping: { label: t('order_status.shipping'), className: 'shipping' },
+    Delivered: { label: t('order_status.delivered'), className: 'delivered' },
+    Completed: { label: t('order_status.completed'), className: 'completed' },
+    DeliveryFailed: { label: t('order_status.delivery_failed'), className: 'delivery-failed' },
+    Returned: { label: t('order_status.returned'), className: 'returned' },
+    ReturnRequested: { label: t('order_status.return_requested'), className: 'return-requested' },
+    ReturnRejected: { label: t('order_status.return_rejected'), className: 'return-rejected' },
+    Cancelled: { label: t('order_status.cancelled'), className: 'cancelled' },
   }), [t]);
 
   const tabs = useMemo(() => [
     { key: '', label: t('common.all') },
-    { key: 'Pending', label: t('sales_stats.pending') },
-    { key: 'Confirmed', label: t('sales_stats.confirmed') },
-    { key: 'Shipping', label: t('sales_stats.shipping') },
-    { key: 'Delivered', label: t('sales_stats.delivered') },
-    { key: 'Completed', label: t('sales_stats.completed') },
-    { key: 'Cancelled', label: t('sales_stats.cancelled') },
+    { key: 'Pending', label: t('order_status.pending') },
+    { key: 'Confirmed', label: t('order_status.confirmed') },
+    { key: 'Shipping', label: t('order_status.shipping') },
+    { key: 'Delivered', label: t('order_status.delivered') },
+    { key: 'Completed', label: t('order_status.completed') },
+    { key: 'ReturnRequested', label: t('order_status.return_requested') },
+    { key: 'Returned', label: t('order_status.returned') },
+    { key: 'ReturnRejected', label: t('order_status.return_rejected') },
+    { key: 'Cancelled', label: t('order_status.cancelled') },
   ], [t]);
 
   const sortOptions = useMemo(() => [
@@ -118,13 +132,15 @@ export default function OrderManagement() {
         Status: effectiveStatus,
         SearchTerm: appliedSearchTerm || undefined,
         SortBy: appliedFilters?.sortBy || filterForm.sortBy || 'newest',
-        PageNumber: page,
+        Page: page,
         PageSize: pageSize,
       });
 
       const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      const nextTotalCount = data?.totalCount ?? data?.totalItems ?? items.length;
       setOrders(items);
-      setTotalPages(data?.totalPages ?? Math.max(1, Math.ceil((data?.totalCount ?? items.length) / pageSize)));
+      setTotalCount(nextTotalCount);
+      setTotalPages(data?.totalPages ?? Math.max(1, Math.ceil(nextTotalCount / pageSize)));
     } catch (error) {
       showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
@@ -132,11 +148,27 @@ export default function OrderManagement() {
     }
   }, [activeStatus, appliedFilters, appliedSearchTerm, filterForm.sortBy, page, sellerId, showToast, t]);
 
+  const fetchAllOrdersForStats = useCallback(async () => {
+    if (!sellerId) return;
+    try {
+      const data = await orderService.getSellerOrders({
+        SellerId: sellerId,
+        Page: 1,
+        PageSize: 1000,
+      });
+      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      setAllSellerOrders(items);
+    } catch {
+      setAllSellerOrders([]);
+    }
+  }, [sellerId]);
+
   useEffect(() => {
     if (user && (isSeller || isAdmin)) {
       fetchOrders();
+      fetchAllOrdersForStats();
     }
-  }, [fetchOrders, isAdmin, isSeller, user]);
+  }, [fetchAllOrdersForStats, fetchOrders, isAdmin, isSeller, user]);
 
   useEffect(() => {
     if (authLoading || !user || (!isSeller && !isAdmin)) return undefined;
@@ -145,7 +177,10 @@ export default function OrderManagement() {
     let disposed = false;
 
     const handleOrderUpdate = () => {
-      if (!disposed) fetchOrders();
+      if (!disposed) {
+        fetchOrders();
+        fetchAllOrdersForStats();
+      }
     };
 
     connection.on('ReceiveOrderNotification', handleOrderUpdate);
@@ -190,33 +225,42 @@ export default function OrderManagement() {
   };
 
   const stats = useMemo(() => {
-    const pendingCount = orders.filter((o) => o.status === 'Pending').length;
-    const confirmedCount = orders.filter((o) => o.status === 'Confirmed').length;
-    const shippingCount = orders.filter((o) => o.status === 'Shipping').length;
-    const totalRevenue = orders
+    const targetOrders = allSellerOrders.length > 0 ? allSellerOrders : orders;
+    const pendingCount = targetOrders.filter((o) => o.status === 'Pending').length;
+    const confirmedCount = targetOrders.filter((o) => o.status === 'Confirmed').length;
+    const shippingCount = targetOrders.filter((o) => o.status === 'Shipping').length;
+    const returnRequestedCount = targetOrders.filter((o) => o.status === 'ReturnRequested').length;
+    const totalRevenue = targetOrders
       .filter((o) => o.status === 'Completed' || o.status === 'Delivered')
       .reduce((sum, o) => sum + Number(o.finalAmount || 0), 0);
 
     return [
       {
         icon: 'hourglass_top',
-        label: t('sales_stats.pending'),
+        label: t('order_status.pending'),
         value: pendingCount,
         note: t('my_products.subtitle'),
         hot: pendingCount > 0,
       },
       {
         icon: 'package_2',
-        label: t('sales_stats.confirmed'),
+        label: t('order_status.confirmed'),
         value: confirmedCount,
         note: t('my_products.subtitle'),
         hot: confirmedCount > 0,
       },
       {
         icon: 'local_shipping',
-        label: t('sales_stats.shipping'),
+        label: t('order_status.shipping'),
         value: shippingCount,
-        note: t('sales_stats.shipping'),
+        note: t('order_status.shipping'),
+      },
+      {
+        icon: 'assignment_return',
+        label: t('order_status.return_requested'),
+        value: returnRequestedCount,
+        note: t('order_status.return_requested'),
+        hot: returnRequestedCount > 0,
       },
       {
         icon: 'payments',
@@ -225,7 +269,7 @@ export default function OrderManagement() {
         note: t('sales_stats.desc'),
       },
     ];
-  }, [orders, t]);
+  }, [allSellerOrders, orders, t]);
 
   const handleUpdateStatus = async (order, targetStatus) => {
     try {
@@ -237,6 +281,7 @@ export default function OrderManagement() {
       );
       showToast(t('order_status_update.update_success'), 'success');
       await fetchOrders();
+      await fetchAllOrdersForStats();
     } catch (error) {
       showToast(error?.response?.data || t('order_status_update.update_error'), 'error');
     } finally {
@@ -267,6 +312,38 @@ export default function OrderManagement() {
       showToast(error?.response?.data || t('common.error_occurred'), 'error');
     } finally {
       setReportSubmitting(false);
+    }
+  };
+
+  const handleApproveReturnModal = async (targetOrder) => {
+    if (!targetOrder?.orderId || !sellerId) return;
+    try {
+      setReturnSubmitting(true);
+      await orderService.approveReturnRequest(targetOrder.orderId, sellerId);
+      showToast(t('order_status_update.update_success'), 'success');
+      setReturnModalTarget(null);
+      await fetchOrders();
+      await fetchAllOrdersForStats();
+    } catch (error) {
+      showToast(error?.response?.data || t('order_status_update.update_error'), 'error');
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
+
+  const handleRejectReturnModal = async (targetOrder, reason) => {
+    if (!targetOrder?.orderId || !sellerId) return;
+    try {
+      setReturnSubmitting(true);
+      await orderService.rejectReturnRequest(targetOrder.orderId, reason, sellerId);
+      showToast(t('order_status_update.update_success'), 'success');
+      setReturnModalTarget(null);
+      await fetchOrders();
+      await fetchAllOrdersForStats();
+    } catch (error) {
+      showToast(error?.response?.data || t('order_status_update.update_error'), 'error');
+    } finally {
+      setReturnSubmitting(false);
     }
   };
 
@@ -332,7 +409,7 @@ export default function OrderManagement() {
         <div className="om-tab-strip">
           {tabs.map((tab) => (
             <button
-              key={tab.label}
+              key={tab.key || 'all'}
               type="button"
               className={activeStatus === tab.key ? 'active' : ''}
               onClick={() => {
@@ -355,7 +432,6 @@ export default function OrderManagement() {
               <tr>
                 <th>{t('common.stt')}</th>
                 <th>{t('order_management.th_buyer')}</th>
-
                 <th>{t('my_products.th_product')}</th>
                 <th>{t('order_management.th_total')}</th>
                 <th>{t('order_management.th_status')}</th>
@@ -425,12 +501,12 @@ export default function OrderManagement() {
                             <button
                               type="button"
                               className="om-action-btn primary"
-                              onClick={() => openDetail(order.orderId)}
+                              onClick={() => setReturnModalTarget(order)}
                             >
-                              {t('common.view_detail')}
+                              {t('order_status.review_return')}
                             </button>
                           ) : null}
-                          {REPORT_ALLOWED_STATUSES.includes(order.status) && (
+                          {canReportOrder(order.status) && (
                             <button
                               type="button"
                               className="om-report-btn"
@@ -450,27 +526,14 @@ export default function OrderManagement() {
           </table>
         </div>
 
-        {totalPages > 1 && (
-          <div className="om-pagination">
-            <button
-              type="button"
-              disabled={page === 1 || loading}
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-            >
-              {t('common.previous')}
-            </button>
-            <span>
-              {t('common.page')} {page} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages || loading}
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-            >
-              {t('common.next')}
-            </button>
-          </div>
-        )}
+        <SellerPagination
+          page={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={totalCount}
+          disabled={loading}
+          onPageChange={setPage}
+        />
       </section>
 
       {reportTarget ? (
@@ -484,12 +547,19 @@ export default function OrderManagement() {
           submitting={reportSubmitting}
         />
       ) : null}
+
+      {returnModalTarget ? (
+        <ReturnApprovalModal
+          isOpen={Boolean(returnModalTarget)}
+          order={returnModalTarget}
+          submitting={returnSubmitting}
+          onClose={() => setReturnModalTarget(null)}
+          onApprove={handleApproveReturnModal}
+          onReject={handleRejectReturnModal}
+        />
+      ) : null}
     </div>
   );
-}
-
-function formatVnd(value) {
-  return `${numberFormatter.format(Number(value || 0))} VND`;
 }
 
 function normalizeFilterForm(form) {

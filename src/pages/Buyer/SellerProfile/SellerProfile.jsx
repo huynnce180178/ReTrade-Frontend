@@ -28,13 +28,25 @@ const getInitials = (seller) => {
 
 const formatAddress = (address, t) => {
   if (!address) return t('seller_profile.no_default_address');
-  const parts = [address.street, address.wardCode, address.districtId && `Quận ${address.districtId}`, address.provinceId && `Tỉnh/TP ${address.provinceId}`].filter(Boolean);
+  const parts = [
+    address.street ?? address.streetAddress,
+    address.wardCode,
+    address.districtId && `${t('seller_profile.district')} ${address.districtId}`,
+    address.provinceId && `${t('seller_profile.province')} ${address.provinceId}`,
+  ].filter(Boolean);
   return parts.length ? parts.join(', ') : t('seller_profile.no_default_address');
 };
 
 const hasRole = (user, roleName) => {
   return (user?.roles || []).some((role) => String(role).trim().toLowerCase() === roleName.toLowerCase());
 };
+
+const isProductUnavailable = (product) => (
+  product?.status === 'SoldOut' ||
+  product?.status === 'Sold' ||
+  product?.status === 'Inactive' ||
+  Number(product?.stockQuantity ?? 0) <= 0
+);
 
 function formatReviewDate(dateStr) {
   if (!dateStr) return 'N/A';
@@ -65,6 +77,7 @@ export default function SellerProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [followLoading, setFollowLoading] = useState(false);
+  const followRequestInFlightRef = React.useRef(false);
   const [activeTab, setActiveTab] = useState('items');
   const [sellerProducts, setSellerProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -79,6 +92,7 @@ export default function SellerProfile() {
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewTotalItems, setReviewTotalItems] = useState(0);
   const [reviewTotalPages, setReviewTotalPages] = useState(1);
+  const [activeReviewSummary, setActiveReviewSummary] = useState(null);
 
   useEffect(() => {
     const fetchWishlist = async () => {
@@ -94,15 +108,26 @@ export default function SellerProfile() {
     fetchWishlist();
   }, [user]);
 
-  const handleWishlistToggle = async (productId) => {
+  const handleWishlistToggle = async (product) => {
+    const productId = product?.productId;
+    if (!productId) return;
     if (!user) {
       showToast(t('seller_profile.login_required_chat'), 'error');
       return;
     }
+    const isAdded = wishlistIds.has(productId);
+    if (!isAdded && isProductUnavailable(product)) {
+      showToast(t('product.out_of_stock'), 'warning');
+      return;
+    }
     setTogglingId(productId);
     try {
-      if (wishlistIds.has(productId)) {
-        await wishlistService.removeFromWishlist(productId);
+      if (isAdded) {
+        const data = await wishlistService.getWishlist();
+        const item = (data.items ?? []).find(i => i.productId === productId);
+        if (item) {
+          await wishlistService.removeItem(item.wishlistItemId);
+        }
         setWishlistIds((prev) => {
           const next = new Set(prev);
           next.delete(productId);
@@ -143,23 +168,20 @@ export default function SellerProfile() {
         setSeller((current) => {
           if (!current) return current;
 
-          let updatedFollowers = current.followersCount;
-          let updatedFollowingStatus = current.isFollowing;
-
-          if (payload?.followerId && user && payload.followerId === user.userId) {
-            updatedFollowingStatus = payload.action === 'followed';
-          }
-
-          if (payload?.action === 'followed') {
-            updatedFollowers += 1;
-          } else if (payload?.action === 'unfollowed') {
-            updatedFollowers = Math.max(0, updatedFollowers - 1);
-          }
+          const followerId = payload?.followerId ?? payload?.FollowerId;
+          const isFollowing = payload?.isFollowing ?? payload?.IsFollowing;
+          const followersCount = payload?.followersCount ?? payload?.FollowersCount;
+          const nextFollowersCount = Number.isFinite(Number(followersCount))
+            ? Number(followersCount)
+            : current.followersCount;
+          const isOwnFollowEvent = Boolean(followerId && user && followerId === user.userId);
 
           return {
             ...current,
-            followersCount: updatedFollowers,
-            isFollowing: updatedFollowingStatus,
+            followersCount: Math.max(0, nextFollowersCount),
+            isFollowing: isOwnFollowEvent && typeof isFollowing === 'boolean'
+              ? isFollowing
+              : current.isFollowing,
           };
         });
       });
@@ -203,13 +225,35 @@ export default function SellerProfile() {
       if (!sellerId || activeTab !== 'reviews') return;
       setReviewsLoading(true);
       try {
-        const res = await reviewService.getSellerReviews(sellerId, {
-          page: reviewPage,
-          pageSize: 5,
+        let res;
+        try {
+          res = await reviewService.getPublicSellerReviews(sellerId, {
+            page: reviewPage,
+            pageSize: 5,
+          });
+        } catch {
+          res = await reviewService.getSellerReviews(sellerId, {
+            page: reviewPage,
+            pageSize: 5,
+          });
+        }
+
+        const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+        const cleanItems = items.filter((review) => {
+          const isApprovedReport = Boolean(
+            review.isReportApproved ||
+            review.IsReportApproved ||
+            review.isRemoved ||
+            review.IsRemoved ||
+            ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(review.latestReportStatus?.toLowerCase()) ||
+            ['hidden', 'removed', 'deleted'].includes(review.status?.toLowerCase())
+          );
+          return !isApprovedReport;
         });
-        setSellerReviews(res.items || []);
-        setReviewTotalItems(res.totalItems || 0);
-        setReviewTotalPages(res.totalPages || 1);
+
+        setSellerReviews(cleanItems);
+        setReviewTotalItems(cleanItems.length);
+        setReviewTotalPages(Math.max(1, Math.ceil(cleanItems.length / 5)));
       } catch {
         setSellerReviews([]);
         setReviewTotalItems(0);
@@ -221,6 +265,62 @@ export default function SellerProfile() {
 
     fetchReviews();
   }, [sellerId, activeTab, reviewPage]);
+
+  useEffect(() => {
+    const fetchActiveReviewSummary = async () => {
+      if (!sellerId) return;
+      try {
+        let res;
+        try {
+          res = await reviewService.getPublicSellerReviews(sellerId, { pageSize: 1000 });
+        } catch {
+          res = await reviewService.getSellerReviews(sellerId, { pageSize: 1000 });
+        }
+
+        const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+        const activeItems = items.filter((review) => {
+          const normStatus = (review?.latestReportStatus || '').toLowerCase();
+          const isApproved = Boolean(
+            review?.isReportApproved ||
+            review?.IsReportApproved ||
+            review?.isRemoved ||
+            review?.IsRemoved ||
+            ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(normStatus) ||
+            ['hidden', 'removed', 'deleted'].includes(review?.status?.toLowerCase())
+          );
+          return !isApproved;
+        });
+
+        const activeCount = activeItems.length;
+        const totalRating = activeItems.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+        const avgRating = activeCount > 0 ? totalRating / activeCount : 0;
+
+        const starCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        activeItems.forEach((r) => {
+          const star = Math.round(Number(r.rating || 0));
+          if (starCounts[star] !== undefined) {
+            starCounts[star] += 1;
+          }
+        });
+
+        const statsArray = [5, 4, 3, 2, 1].map((star) => ({
+          rating: star,
+          count: starCounts[star],
+          percentage: activeCount > 0 ? Math.round((starCounts[star] / activeCount) * 100) : 0,
+        }));
+
+        setActiveReviewSummary({
+          reviewCount: activeCount,
+          averageRating: avgRating,
+          ratingStats: statsArray,
+        });
+      } catch {
+        // quiet fail
+      }
+    };
+
+    fetchActiveReviewSummary();
+  }, [sellerId]);
 
   if (loading) {
     return (
@@ -255,18 +355,13 @@ export default function SellerProfile() {
       return;
     }
 
-    if (followLoading || !seller?.sellerId) return;
+    if (followRequestInFlightRef.current || followLoading || !seller?.sellerId) return;
 
     const previousSeller = seller;
     const nextIsFollowing = !previousSeller.isFollowing;
-    const nextFollowersCount = previousSeller.followersCount + (nextIsFollowing ? 1 : -1);
 
+    followRequestInFlightRef.current = true;
     setFollowLoading(true);
-    setSeller((current) => ({
-      ...current,
-      isFollowing: nextIsFollowing,
-      followersCount: Math.max(0, nextFollowersCount),
-    }));
 
     try {
       const result = previousSeller.isFollowing
@@ -283,6 +378,7 @@ export default function SellerProfile() {
       setSeller(previousSeller);
       showToast(err?.response?.data || t('seller_profile.follow_error'), 'error');
     } finally {
+      followRequestInFlightRef.current = false;
       setFollowLoading(false);
     }
   };
@@ -318,20 +414,35 @@ export default function SellerProfile() {
     ))
   );
   const canFollowSeller = Boolean(user && seller.isSeller && !isOwnSellerPage && !hasRole(user, 'Admin'));
-  const reviewCount = Number(seller.reviewCount || 0);
-  const ratingValue = reviewCount && seller.averageRating ? seller.averageRating.toFixed(1) : '-';
-  const ratingText = reviewCount && seller.averageRating ? `${ratingValue} / 5` : t('seller_profile.no_rating_yet');
-  const reviewText = `${reviewCount} ${t('seller_profile.reviews_suffix')}`;
+  const displayReviewCount = activeReviewSummary ? activeReviewSummary.reviewCount : Number(seller.reviewCount || 0);
+  const displayAverageRating = activeReviewSummary ? activeReviewSummary.averageRating : Number(seller.averageRating || 0);
+  const displayRatingStats = activeReviewSummary ? activeReviewSummary.ratingStats : (seller.ratingStats || []);
+
+  const ratingValue = displayReviewCount && displayAverageRating ? displayAverageRating.toFixed(1) : '-';
+  const ratingText = displayReviewCount && displayAverageRating ? `${ratingValue} / 5` : t('seller_profile.no_rating_yet');
+  const reviewText = `${displayReviewCount} ${t('seller_profile.reviews_suffix')}`;
   const visibleProductCount = productsTotal || seller.productCount || 0;
   const memberSince = seller.createdAt ? new Date(seller.createdAt).getFullYear() : t('seller_profile.new_seller');
   const locationText = formatAddress(seller.defaultAddress, t);
   const isBuyerViewingSeller = !isOwnSellerPage;
 
+  const handleTabChange = (key, options = {}) => {
+    if (key === 'reviews') {
+      setReviewPage(1);
+    }
+    setActiveTab(key);
+
+    if (options.resetProducts) {
+      setProductPage(1);
+      setProductStatus(key === 'auction' ? 'Ready' : '');
+    }
+  };
+
   const renderBuyerShopContent = () => {
     if (activeTab === 'reviews') {
       return (
         <SellerRatingPanel
-          seller={seller}
+          seller={{ ...seller, averageRating: displayAverageRating, ratingStats: displayRatingStats }}
           ratingText={ratingText}
           reviewText={reviewText}
           reviews={sellerReviews}
@@ -375,7 +486,7 @@ export default function SellerProfile() {
     if (activeTab === 'reviews') {
       return (
         <SellerRatingPanel
-          seller={seller}
+          seller={{ ...seller, averageRating: displayAverageRating, ratingStats: displayRatingStats }}
           ratingText={ratingText}
           reviewText={reviewText}
           compact
@@ -413,11 +524,11 @@ export default function SellerProfile() {
             <h2>{t('seller_profile.seller_reference')}</h2>
             <div className="profile-view-list">
               <div>
-                <span>Mã người bán</span>
+                <span>{t('seller_profile.seller_code')}</span>
                 <strong>{seller.sellerId}</strong>
               </div>
               <div>
-                <span>Mã tài khoản</span>
+                <span>{t('seller_profile.account_code')}</span>
                 <strong>{seller.accountId || t('common.not_available')}</strong>
               </div>
             </div>
@@ -502,7 +613,7 @@ export default function SellerProfile() {
               <span>{t('seller_profile.rating')}</span>
             </div>
             <div>
-              <strong>{reviewCount}</strong>
+              <strong>{displayReviewCount}</strong>
               <span>{t('seller_profile.reviews_count')}</span>
             </div>
           </div>
@@ -518,11 +629,7 @@ export default function SellerProfile() {
               key={key}
               type="button"
               className={`buyer-shop-tab ${activeTab === key ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab(key);
-                setProductPage(1);
-                setProductStatus(key === 'auction' ? 'Ready' : '');
-              }}
+              onClick={() => handleTabChange(key, { resetProducts: true })}
             >
               {label}
             </button>
@@ -597,7 +704,7 @@ export default function SellerProfile() {
               <span>{t('seller_profile.rating')}</span>
             </div>
             <div className="seller-hero-stat">
-              <strong>{reviewCount}</strong>
+              <strong>{displayReviewCount}</strong>
               <span>{t('seller_profile.reviews_count')}</span>
             </div>
           </div>
@@ -615,7 +722,7 @@ export default function SellerProfile() {
               key={key}
               type="button"
               className={`seller-tab ${activeTab === key ? 'active' : ''}`}
-              onClick={() => setActiveTab(key)}
+              onClick={() => handleTabChange(key)}
             >
               {label}
             </button>
@@ -713,9 +820,10 @@ function SellerProductGrid({ products, loading, total, compact = false, hideStat
 function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle }) {
   const { t, formatCurrency } = useLanguage();
   const isWishlist = wishlistIds?.has(product.productId) ?? false;
+  const isOutOfStock = isProductUnavailable(product);
 
   return (
-    <div className="seller-profile-product-card-wrapper">
+    <div className={`seller-profile-product-card-wrapper ${isOutOfStock ? 'out-of-stock' : ''}`}>
       <Link to={`/product/${product.productId}`} className="seller-profile-product-card">
         <div className="seller-profile-product-media">
           {product.mainImageUrl ? (
@@ -724,6 +832,7 @@ function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle 
             <span className="material-symbols-outlined">inventory_2</span>
           )}
           {product.condition ? <em>{product.condition}</em> : null}
+          {isOutOfStock ? <strong className="seller-product-soldout-label">{t('product.out_of_stock')}</strong> : null}
         </div>
 
         <div className="seller-profile-product-body">
@@ -731,7 +840,9 @@ function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle 
           <strong>{product.name || t('nav.product')}</strong>
           <div>
             <b>{product.price != null ? formatCurrency(product.price) : t('nav.auction')}</b>
-            <small>{t('seller_dashboard.stock_count', { count: product.stockQuantity ?? 0 })}</small>
+            <small className={isOutOfStock ? 'seller-product-stock-badge out-of-stock' : ''}>
+              {isOutOfStock ? t('product.out_of_stock') : t('seller_dashboard.stock_count', { count: product.stockQuantity ?? 0 })}
+            </small>
           </div>
         </div>
       </Link>
@@ -743,9 +854,10 @@ function SellerProductCard({ product, wishlistIds, togglingId, onWishlistToggle 
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onWishlistToggle(product.productId, product.sellerId);
+            onWishlistToggle(product);
           }}
-          disabled={togglingId === product.productId}
+          disabled={togglingId === product.productId || (!isWishlist && isOutOfStock)}
+          title={isOutOfStock && !isWishlist ? t('product.out_of_stock') : t('product.add_to_wishlist')}
         >
           <span className="material-symbols-outlined">
             {isWishlist ? 'favorite' : 'favorite'}
@@ -822,20 +934,31 @@ function SellerRatingPanel({
         ) : (
           <>
             <div className="seller-public-review-items">
-              {reviews.map((review) => (
-                <article
-                  className="seller-public-review-card"
-                  key={review.reviewId}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openReviewPreview(review)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openReviewPreview(review);
-                    }
-                  }}
-                >
+              {reviews.map((review) => {
+                const isApprovedReport = Boolean(
+                  review.isReportApproved ||
+                  review.IsReportApproved ||
+                  review.isRemoved ||
+                  review.IsRemoved ||
+                  ['accepted', 'approved', 'resolved', 'accept review', 'accept buyer', 'accept seller'].includes(review.latestReportStatus?.toLowerCase()) ||
+                  ['hidden', 'removed', 'deleted'].includes(review.status?.toLowerCase())
+                );
+                if (isApprovedReport) return null;
+
+                return (
+                  <article
+                    className="seller-public-review-card"
+                    key={review.reviewId}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openReviewPreview(review)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openReviewPreview(review);
+                      }
+                    }}
+                  >
                   <div className="seller-public-review-avatar">
                     {getReviewInitials(review.reviewerName)}
                   </div>
@@ -861,7 +984,8 @@ function SellerRatingPanel({
                     </div>
                   </div>
                 </article>
-              ))}
+              );
+            })}
             </div>
 
             {reviewTotalPages > 1 && (

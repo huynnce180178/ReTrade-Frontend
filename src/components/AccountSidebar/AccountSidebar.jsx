@@ -99,6 +99,21 @@ export default function AccountSidebar() {
 
       <nav className="profile-sidebar-menu">
         <p className="sidebar-group-title">{t('nav.my_account')}</p>
+
+        {isSeller && (
+          <Link to="/seller-dashboard" className={`menu-item menu-item-highlight seller-highlight ${isActiveSection('/seller-dashboard')}`}>
+            <span className="material-symbols-outlined">storefront</span>
+            <strong>{t('nav.seller_center')}</strong>
+          </Link>
+        )}
+
+        {isAdmin && (
+          <Link to="/admin" className={`menu-item menu-item-highlight admin-highlight ${isActiveSection('/admin')}`}>
+            <span className="material-symbols-outlined">admin_panel_settings</span>
+            <strong>{t('nav.admin_center')}</strong>
+          </Link>
+        )}
+
         <Link to="/my-account" className={`menu-item ${isActive('/my-account')}`}>
           <span className="material-symbols-outlined">account_circle</span>
           {t('nav.profile')}
@@ -111,13 +126,6 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">location_on</span>
           {t('nav.address_book')}
         </Link>
-
-        {isSeller && (
-          <Link to="/seller-dashboard" className={`menu-item ${isActive('/seller-dashboard')}`}>
-            <span className="material-symbols-outlined">storefront</span>
-            {t('nav.seller_center')}
-          </Link>
-        )}
 
         <p className="sidebar-group-title mt-4">{t('history.purchase_title')}</p>
         <Link to="/purchase-history" className={`menu-item ${isActiveSection('/purchase-history')}`}>
@@ -148,17 +156,6 @@ export default function AccountSidebar() {
           <span className="material-symbols-outlined">flag</span>
           {t('nav.report_history')}
         </Link>
-
-
-        {isAdmin && (
-          <>
-            <p className="sidebar-group-title mt-4">{t('nav.admin_center')}</p>
-            <Link to="/category" className={`menu-item ${isActive('/category')}`}>
-              <span className="material-symbols-outlined">category</span>
-              {t('nav.category')}
-            </Link>
-          </>
-        )}
       </nav>
     </aside>
   );

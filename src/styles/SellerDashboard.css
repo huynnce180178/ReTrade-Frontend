@@ -2806,3 +2806,225 @@
 .seller-product-row-clickable:hover {
   background-color: #f7f7f5;
 }
+
+/* Seller Products Pagination */
+.seller-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0 4px;
+  flex-wrap: wrap;
+}
+
+.seller-pagination-info {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.seller-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.seller-page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.seller-page-btn:hover:not(:disabled):not(.active) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.seller-page-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.25);
+}
+
+.seller-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.seller-page-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.seller-page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ============================================
+   Seller Mobile Responsive Rules
+   ============================================ */
+@media (max-width: 992px) {
+  .seller-dashboard-page {
+    grid-template-columns: 1fr;
+  }
+
+  .seller-mobile-header {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .seller-sidebar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: #001b14;
+    cursor: pointer;
+  }
+
+  .seller-dash-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1000;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .seller-dash-sidebar.open {
+    left: 0;
+  }
+
+  .seller-sidebar-overlay {
+    display: block;
+  }
+
+  .seller-dash-main {
+    padding: 16px !important;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Table Horizontal Scrolling */
+  .seller-table-container,
+  .table-responsive,
+  .orders-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .seller-table,
+  .orders-table {
+    min-width: 650px;
+  }
+}
+
+@media (max-width: 576px) {
+  .seller-pagination {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .seller-dash-profile {
+    margin-bottom: 24px;
+  }
+}
+
+/* Confirmation Modal for Seller Dashboard */
+.seller-confirm-modal {
+  max-width: 480px !important;
+}
+
+.seller-confirm-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.seller-confirm-icon.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.danger-text {
+  color: #dc2626 !important;
+}
+
+.seller-confirm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #fcfcfb;
+  border-top: 1px solid rgba(113, 121, 117, 0.12);
+}
+
+.seller-confirm-btn-cancel {
+  padding: 9px 18px;
+  border: 1px solid rgba(113, 121, 117, 0.3);
+  background: #ffffff;
+  color: #2c322e;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seller-confirm-btn-cancel:hover:not(:disabled) {
+  background: #f4f4f0;
+  border-color: rgba(113, 121, 117, 0.5);
+}
+
+.seller-confirm-btn-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seller-confirm-btn-delete:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.seller-confirm-btn-delete:disabled,
+.seller-confirm-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

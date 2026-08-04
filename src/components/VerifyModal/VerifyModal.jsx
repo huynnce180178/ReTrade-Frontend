@@ -89,10 +89,15 @@ export default function VerifyModal({ isOpen, onClose, email }) {
 
     setLoading(true);
     try {
-      await accountService.verify({ email, otp: code });
-      showToast(t('toast.login_success'), 'success');
+      const verifyResult = await accountService.verify({ email, otp: code });
+      const verified = verifyResult === true || verifyResult?.verified === true;
+      if (!verified) {
+        throw new Error(verifyResult?.message || 'Invalid or expired OTP.');
+      }
+
+      showToast(verifyResult?.message || t('toast.register_success'), 'success');
       onClose();
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || t('common.error_occurred');
       showToast(errorMsg, 'error');

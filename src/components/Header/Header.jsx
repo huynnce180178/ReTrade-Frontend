@@ -13,6 +13,54 @@ import { formatNotificationContent } from '../../utils/notificationUtils';
 
 import './Header.css';
 
+const SEARCH_HISTORY_KEY = 'retrade_search_history';
+
+const normalizeSearchTerm = (entry) => {
+  if (typeof entry === 'string') return entry.trim();
+  return (entry?.keyword || entry?.Keyword || '').trim();
+};
+
+const normalizeSearchHistory = (data) => {
+  const raw = Array.isArray(data) ? data : (data?.items || data?.value || []);
+  return raw
+    .map((entry) => {
+      const keyword = normalizeSearchTerm(entry);
+      if (!keyword) return null;
+      return {
+        ...((typeof entry === 'object' && entry !== null) ? entry : {}),
+        searchId: entry?.searchId || entry?.SearchId || entry?.id || entry?.Id || null,
+        keyword,
+      };
+    })
+    .filter(Boolean);
+};
+
+const readLocalSearchHistory = () => {
+  try {
+    return normalizeSearchHistory(JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]'));
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalSearchTerm = (term) => {
+  const keyword = term.trim();
+  if (!keyword) return readLocalSearchHistory();
+  const next = [
+    { keyword },
+    ...readLocalSearchHistory().filter((item) => item.keyword.toLowerCase() !== keyword.toLowerCase()),
+  ].slice(0, 20);
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next.map((item) => item.keyword)));
+  return next;
+};
+
+const removeLocalSearchTerm = (term) => {
+  const keyword = term.trim().toLowerCase();
+  const next = readLocalSearchHistory().filter((item) => item.keyword.toLowerCase() !== keyword);
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next.map((item) => item.keyword)));
+  return next;
+};
+
 export default function Header() {
   const { user, logout } = useAuth();
   const { t, language, formatCurrency } = useLanguage();
@@ -24,6 +72,7 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   // Search History
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,11 +124,32 @@ export default function Header() {
     };
   }, []);
 
-  // Fetch search history (Local Storage)
+  // Fetch search history (API for logged-in users, local fallback for guests)
   useEffect(() => {
-    const history = JSON.parse(localStorage.getItem('retrade_search_history') || '[]');
-    setSearchHistory(history);
-  }, []);
+    let disposed = false;
+
+    const loadSearchHistory = async () => {
+      if (user) {
+        try {
+          const history = await userSearchService.getHistory();
+          if (!disposed) setSearchHistory(normalizeSearchHistory(history));
+          return;
+        } catch {
+          // Fall back to local history if the API is temporarily unavailable.
+        }
+      }
+      if (!disposed) setSearchHistory(readLocalSearchHistory());
+    };
+
+    loadSearchHistory();
+    return () => {
+      disposed = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.avatarUrl]);
 
 
   useEffect(() => {
@@ -147,34 +217,68 @@ export default function Header() {
     };
   }, [user]);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+  const persistSearchTerm = async (term) => {
+    const localHistory = saveLocalSearchTerm(term);
+    setSearchHistory(localHistory);
 
-    userSearchService.saveSearchHistory(searchQuery.trim());
-    setSearchHistory(userSearchService.getSearchHistory());
-
-    setShowHistory(false);
-    navigate(`/product?search=${encodeURIComponent(searchQuery.trim())}`);
+    if (!user) return;
+    try {
+      await userSearchService.saveSearch(term);
+      const history = await userSearchService.getHistory();
+      setSearchHistory(normalizeSearchHistory(history));
+    } catch {
+      // Search navigation should still work even if saving history fails.
+    }
   };
 
-  const handleSelectHistoryItem = (term) => {
-    setSearchQuery(term);
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const term = searchQuery.trim();
+    if (!term) return;
+
+    persistSearchTerm(term);
+
     setShowHistory(false);
-    userSearchService.saveSearchHistory(term);
     navigate(`/product?search=${encodeURIComponent(term)}`);
   };
 
-  const handleRemoveHistoryItem = (e, term) => {
-    e.stopPropagation();
-    const updated = userSearchService.removeSearchHistory(term);
-    setSearchHistory(updated);
+  const handleSelectHistoryItem = (entry) => {
+    const term = normalizeSearchTerm(entry);
+    if (!term) return;
+    setSearchQuery(term);
+    setShowHistory(false);
+    persistSearchTerm(term);
+    navigate(`/product?search=${encodeURIComponent(term)}`);
   };
 
-  const handleClearAllHistory = (e) => {
+  const handleRemoveHistoryItem = async (e, entry) => {
     e.stopPropagation();
-    userSearchService.clearSearchHistory();
+    const term = normalizeSearchTerm(entry);
+    const searchId = entry?.searchId || entry?.SearchId || entry?.id || entry?.Id;
+
+    setSearchHistory((current) => current.filter((item) => normalizeSearchTerm(item).toLowerCase() !== term.toLowerCase()));
+    removeLocalSearchTerm(term);
+
+    if (user && searchId) {
+      try {
+        await userSearchService.deleteSearch(searchId);
+      } catch {
+        // Keep optimistic UI; next load will resync.
+      }
+    }
+  };
+
+  const handleClearAllHistory = async (e) => {
+    e.stopPropagation();
+    localStorage.removeItem(SEARCH_HISTORY_KEY);
     setSearchHistory([]);
+    if (user) {
+      try {
+        await userSearchService.clearAll();
+      } catch {
+        // Keep UI cleared locally.
+      }
+    }
   };
 
   const handleLogoutClick = () => {
@@ -201,6 +305,8 @@ export default function Header() {
     }
     return user.username;
   };
+
+  const hasUsableAvatar = Boolean(user?.avatarUrl) && !avatarLoadFailed;
 
   const getPackageVisual = (serviceId) => {
     switch (serviceId) {
@@ -340,8 +446,13 @@ export default function Header() {
               {user ? (
                 <div className="mobile-user-info">
                   <div className="avatar-circle">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                    {hasUsableAvatar ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt="Avatar"
+                        className="user-avatar-img"
+                        onError={() => setAvatarLoadFailed(true)}
+                      />
                     ) : (
                       getInitials()
                     )}
@@ -384,20 +495,24 @@ export default function Header() {
                   </button>
                 </div>
                 <ul className="search-history-list">
-                  {searchHistory.map((term, index) => (
-                    <li key={index} className="search-history-item" onClick={() => handleSelectHistoryItem(term)}>
+                  {searchHistory.map((entry, index) => {
+                    const term = normalizeSearchTerm(entry);
+                    const key = entry?.searchId || entry?.SearchId || entry?.id || entry?.Id || `${term}-${index}`;
+                    return (
+                    <li key={key} className="search-history-item" onClick={() => handleSelectHistoryItem(entry)}>
                       <span className="material-symbols-outlined history-icon">history</span>
                       <span className="search-history-keyword">{term}</span>
                       <button
                         type="button"
                         className="search-history-delete"
-                        onClick={(e) => handleRemoveHistoryItem(e, term)}
+                        onClick={(e) => handleRemoveHistoryItem(e, entry)}
                         title="Remove"
                       >
                         ×
                       </button>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -486,8 +601,13 @@ export default function Header() {
                   aria-expanded={dropdownOpen}
                 >
                   <div className="avatar-circle">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Avatar" className="user-avatar-img" />
+                    {hasUsableAvatar ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt="Avatar"
+                        className="user-avatar-img"
+                        onError={() => setAvatarLoadFailed(true)}
+                      />
                     ) : (
                       getInitials()
                     )}
@@ -505,6 +625,22 @@ export default function Header() {
                       <div className="dropdown-email">{user.email}</div>
                     </div>
                     <hr className="dropdown-divider" />
+
+                    {(user.roles?.some((r) => String(r).toLowerCase() === 'seller') || user.roles?.includes('Seller')) && (
+                      <Link to="/seller-dashboard" className="dropdown-item dropdown-item-highlight seller-highlight" onClick={() => setDropdownOpen(false)}>
+                        <span className="material-symbols-outlined item-symbol-icon">storefront</span>
+                        <span>{t('nav.seller_center')}</span>
+                        <span className="highlight-badge">Seller</span>
+                      </Link>
+                    )}
+
+                    {(user.roles?.some((r) => String(r).toLowerCase() === 'admin') || user.roles?.includes('Admin')) && (
+                      <Link to="/admin" className="dropdown-item dropdown-item-highlight admin-highlight" onClick={() => setDropdownOpen(false)}>
+                        <span className="material-symbols-outlined item-symbol-icon">admin_panel_settings</span>
+                        <span>{t('nav.admin_center')}</span>
+                        <span className="highlight-badge admin-tag">Admin</span>
+                      </Link>
+                    )}
 
                     <Link to="/my-account" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
                       <span className="material-symbols-outlined item-symbol-icon">person</span>
@@ -531,28 +667,11 @@ export default function Header() {
                       {t('nav.refund_history')}
                     </Link>
 
-                    {user.roles?.includes('Seller') && (
-                      <Link to="/seller-dashboard" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
-                        <span className="material-symbols-outlined item-symbol-icon">storefront</span>
-                        {t('nav.seller_center')}
-                      </Link>
-                    )}
-
                     <Link to={messagesPath} className="dropdown-item" onClick={() => { setDropdownOpen(false); setChatUnreadCount(0); }}>
                       <span className="material-symbols-outlined item-symbol-icon">forum</span>
                       {t('nav.chat')}
                       {chatUnreadCount > 0 && <span className="dropdown-chat-badge">{chatUnreadCount}</span>}
                     </Link>
-
-                    {user.roles?.includes('Admin') && (
-                      <Link to="/admin" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                          <line x1="9" y1="3" x2="9" y2="21"></line>
-                        </svg>
-                        {t('nav.admin_center')}
-                      </Link>
-                    )}
 
                     <button className="dropdown-item logout-item" onClick={handleLogoutClick}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="item-icon">
@@ -607,20 +726,25 @@ export default function Header() {
                   const pkgNameLower = pkgNameStr.toLowerCase();
                   const pkgServiceIdLower = pkgServiceIdStr.toLowerCase();
 
+                  const userRoles = (user?.roles || []).map(r => String(r).toLowerCase());
+                  const isUserSeller = userRoles.includes('seller');
+                  const isSellerUpgradePkg = !pkgServiceIdLower.includes('priority') && (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller'));
+                  const isPriorityPkg = pkgServiceIdLower.includes('priority') || pkgServiceIdLower === 'sub_20260701_100003' || pkgNameLower.includes('priority');
+
                   let displayName = pkgNameStr;
                   if (language === 'vi') {
-                    if (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller')) {
+                    if (isSellerUpgradePkg) {
                       displayName = 'Gói Nâng Cấp Người Bán';
                     } else if (pkgServiceIdLower.includes('voucher') || pkgServiceIdLower === 'sub_20260701_100002' || pkgNameLower.includes('voucher')) {
                       displayName = 'Gói Voucher Ưu Đãi';
-                    } else if (pkgServiceIdLower.includes('priority') || pkgServiceIdLower === 'sub_20260701_100003' || pkgNameLower.includes('priority')) {
+                    } else if (isPriorityPkg) {
                       displayName = 'Gói Ưu Tiên Hiển Thị';
                     }
                   }
 
                   return (
                     <div key={pkg.serviceId || pkg.id} className={visual.cardClass}>
-                      {(pkgServiceIdLower.includes('seller') || pkgServiceIdStr === 'sub_20260701_100001') && (
+                      {isSellerUpgradePkg && (
                         <div className="popular-badge">{t('subscriptions.popular')}</div>
                       )}
                       <div className="sub-card-header">
@@ -670,7 +794,7 @@ export default function Header() {
                           <span className="material-symbols-outlined">verified</span>
                           {t('subscriptions.activated', { days: daysLeft })}
                         </button>
-                      ) : (user?.roles?.includes('Seller') && (pkgServiceIdLower.includes('seller') || pkgServiceIdLower === 'sub_20260701_100001' || pkgNameLower.includes('seller'))) ? (
+                      ) : (isUserSeller && isSellerUpgradePkg) ? (
                         <button
                           className="sub-card-btn white-btn active-package-btn"
                           disabled
@@ -689,14 +813,14 @@ export default function Header() {
                           <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>verified</span>
                           {language === 'vi' ? 'Đã là Người bán (Vô hạn)' : 'Already Seller (Unlimited)'}
                         </button>
-                      ) : (user && user.roles && !user.roles.includes(pkg.targetRole) && !pkgServiceIdLower.includes('voucher') && pkgServiceIdLower !== 'sub_20260701_100002' && !pkgNameLower.includes('voucher')) ? (
+                      ) : (!isUserSeller && isPriorityPkg) ? (
                         <button
                           className={`${visual.buttonClass} role-blocked-btn`}
                           disabled
                           style={{ opacity: 0.5, cursor: 'not-allowed', padding: '10px' }}
-                          title={t('subscriptions.requires_role', { role: pkg.targetRole })}
+                          title={t('subscriptions.requires_role', { role: language === 'vi' ? 'Người bán' : 'Seller' })}
                         >
-                          {t('subscriptions.requires_role', { role: pkg.targetRole })}
+                          {t('subscriptions.requires_role', { role: language === 'vi' ? 'Người bán' : 'Seller' })}
                         </button>
                       ) : (
                         <button

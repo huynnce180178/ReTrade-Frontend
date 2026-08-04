@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import productService from '../../../services/productService';
 import addressService from '../../../services/addressService';
 import checkoutService from '../../../services/checkoutService';
@@ -10,9 +10,17 @@ import { useLanguage } from '../../../context/LanguageContext';
 import vietnamAddressService from '../../../services/vietnamAddressService';
 import { createVnPayPaymentUrl } from '../../../services/paymentService';
 
+const isProductUnavailable = (product) => (
+  product?.status === 'SoldOut' ||
+  product?.status === 'Sold' ||
+  product?.status === 'Inactive' ||
+  Number(product?.stockQuantity ?? 0) <= 0
+);
+
 const Checkout = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const { t, language, formatCurrency } = useLanguage();
 
@@ -98,6 +106,12 @@ const Checkout = () => {
     setLoading(true);
     try {
       const prodData = await productService.getById(productId);
+      if (isProductUnavailable(prodData)) {
+        setProduct(prodData);
+        showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng hoáº·c khÃ´ng cÃ²n Ä‘Æ°á»£c bÃ¡n.' : 'This product is out of stock or no longer available.', 'warning');
+        navigate('/product');
+        return;
+      }
       setProduct(prodData);
 
       const addrsData = await addressService.getMyAddresses();
@@ -239,6 +253,10 @@ const Checkout = () => {
   };
 
   const handleCheckout = async () => {
+    if (isProductUnavailable(product)) {
+      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng hoáº·c khÃ´ng cÃ²n Ä‘Æ°á»£c bÃ¡n.' : 'This product is out of stock or no longer available.', 'warning');
+      return;
+    }
     if (!address) {
       showToast(language === 'vi' ? 'Vui lòng chọn địa chỉ giao hàng.' : 'Please select a delivery address', 'warning');
       return;
@@ -316,7 +334,8 @@ const Checkout = () => {
     );
   }
 
-  const subtotal = product.price || 0;
+  const customPrice = location.state?.price || location.state?.offerPrice;
+  const subtotal = customPrice != null ? Number(customPrice) : (product.price || 0);
   const total = Math.max(0, subtotal + shippingFee - discountAmount);
 
   const bestVoucher = myVouchers.length > 0 ? (

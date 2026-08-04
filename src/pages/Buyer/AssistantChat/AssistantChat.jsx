@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
 import assistantChatService from '../../../services/assistantChatService';
 import './AssistantChat.css';
 
 const SESSION_KEY = 'retrade_assistant_session_id';
+const I18N_CONTENT_PREFIX = 'i18n:';
 
 function formatCurrency(value) {
   if (value === null || value === undefined) return 'Liên hệ';
@@ -35,12 +37,13 @@ function mapHistoryMessage(message) {
 
 export default function AssistantChat() {
   const { showToast } = useToast();
+  const { t, language } = useLanguage();
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messages, setMessages] = useState([
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Hello! I am ReTrade AI Assistant. What product or price range are you looking for today?',
+      content: 'i18n:chat.assistant_welcome',
       products: [],
       createdAt: new Date().toISOString(),
     },
@@ -87,7 +90,7 @@ export default function AssistantChat() {
       {
         id: 'welcome',
         role: 'assistant',
-        content: 'Mình đã mở một cuộc trò chuyện mới. Bạn muốn tìm sản phẩm nào trên ReTrade?',
+        content: 'i18n:chat.assistant_welcome',
         products: [],
         createdAt: new Date().toISOString(),
       },
@@ -112,7 +115,7 @@ export default function AssistantChat() {
     setSending(true);
 
     try {
-      const response = await assistantChatService.sendMessage(text, sessionId);
+      const response = await assistantChatService.sendMessage(text, sessionId, language);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
         setSessionId(response.sessionId);
@@ -123,20 +126,20 @@ export default function AssistantChat() {
         {
           id: response?.messageId || `assistant-${Date.now()}`,
           role: 'assistant',
-          content: response?.content || 'Mình chưa có câu trả lời phù hợp. Bạn thử hỏi lại ngắn gọn hơn nhé.',
+          content: response?.content || t('common.error_occurred'),
           products: Array.isArray(response?.products) ? response.products : [],
           createdAt: response?.createdAt || new Date().toISOString(),
         },
       ]);
     } catch (error) {
-      const msg = error.response?.data || error.message || 'Assistant chat failed.';
+      const msg = error.response?.data || error.message || t('common.error_occurred');
       showToast(String(msg), 'error');
       setMessages((current) => [
         ...current,
         {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: 'Xin lỗi, hiện mình chưa kết nối được với trợ lý AI. Bạn thử lại sau ít phút nhé.',
+          content: t('common.error_occurred'),
           products: [],
           createdAt: new Date().toISOString(),
         },
@@ -144,6 +147,14 @@ export default function AssistantChat() {
     } finally {
       setSending(false);
     }
+  };
+
+  const translateAssistantContent = (content) => {
+    if (!content?.startsWith(I18N_CONTENT_PREFIX)) {
+      return content;
+    }
+
+    return t(content.slice(I18N_CONTENT_PREFIX.length));
   };
 
   return (
@@ -155,18 +166,18 @@ export default function AssistantChat() {
           </div>
           <div>
             <span className="assistant-kicker">ReTrade AI</span>
-            <h1>Gemini Assistant</h1>
-            <p>Hỏi về sản phẩm, tầm giá, tình trạng hàng và gợi ý mua sắm.</p>
+            <h1>{t('chat.assistant_title')}</h1>
+            <p>{t('chat.assistant_page_desc')}</p>
           </div>
           <button type="button" className="assistant-new-chat-btn" onClick={handleNewChat}>
             <span className="material-symbols-outlined">add_comment</span>
-            Trò chuyện mới
+            {t('chat.new_chat')}
           </button>
         </header>
 
         <div className="assistant-messages">
           {loadingHistory ? (
-            <div className="assistant-state">Đang tải lịch sử trò chuyện...</div>
+            <div className="assistant-state">{t('chat.loading_history')}</div>
           ) : (
             messages.map((message) => (
               <div key={message.id} className={`assistant-message-row ${message.role === 'user' ? 'mine' : 'assistant'}`}>
@@ -176,7 +187,7 @@ export default function AssistantChat() {
                   </span>
                 )}
                 <div className="assistant-message-bubble">
-                  <p>{message.content}</p>
+                  <p>{translateAssistantContent(message.content)}</p>
                   {message.products?.length > 0 && (
                     <div className="assistant-products">
                       {message.products.map((product) => (
@@ -187,19 +198,19 @@ export default function AssistantChat() {
                         >
                           <div className="assistant-product-image">
                             {product.mainImageUrl ? (
-                              <img src={product.mainImageUrl} alt={product.name || 'Sản phẩm'} />
+                              <img src={product.mainImageUrl} alt={product.name || t('common.product_image')} />
                             ) : (
                               <span className="material-symbols-outlined">inventory_2</span>
                             )}
                           </div>
                           <div className="assistant-product-info">
-                            <strong>{product.name || 'Sản phẩm ReTrade'}</strong>
-                            <span>{product.categoryName || 'Chưa có danh mục'}</span>
+                            <strong>{product.name || t('common.unnamed_product')}</strong>
+                            <span>{product.categoryName || t('common.not_available')}</span>
                             <b>{formatCurrency(product.price)}</b>
-                            <small>{product.condition || 'Chưa xác định'} • Còn {product.stockQuantity ?? 0}</small>
+                            <small>{product.condition || t('common.unknown')} • {t('common.quantity')}: {product.stockQuantity ?? 0}</small>
                           </div>
                           <div className="assistant-product-action">
-                            <span>Xem</span>
+                            <span>{t('common.view_detail')}</span>
                             <span className="material-symbols-outlined">chevron_right</span>
                           </div>
                         </Link>
@@ -230,7 +241,7 @@ export default function AssistantChat() {
           <textarea
             value={messageText}
             onChange={(event) => setMessageText(event.target.value)}
-            placeholder="e.g., Find a phone under 5,000,000 VND..."
+            placeholder={t('chat.type_message')}
             rows={1}
             maxLength={2000}
             onKeyDown={(event) => {

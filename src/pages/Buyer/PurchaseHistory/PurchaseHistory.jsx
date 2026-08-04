@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Navigate } from 'react-router-dom';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import ReviewModal from '../../../components/ReviewModal/ReviewModal';
@@ -27,6 +28,9 @@ const REPORT_ALLOWED_STATUSES = [
   'Returned',
 ];
 
+const canReportOrder = (status) => REPORT_ALLOWED_STATUSES
+  .some((allowed) => allowed.toLowerCase() === String(status || '').toLowerCase());
+
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
@@ -34,38 +38,39 @@ const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
   year: 'numeric',
 });
 
-const statusTabs = [
-  { key: 'all', label: 'All Orders' },
-  { key: 'AwaitingPayment', label: 'Pending Payment' },
-  { key: 'Pending', label: 'Processing' },
-  { key: 'Shipping', label: 'Shipping' },
-  { key: 'Delivered', label: 'Delivered' },
-  { key: 'Completed', label: 'Completed' },
-  { key: 'ReturnRequested', label: 'Return Requested' },
-  { key: 'Returned', label: 'Returned' },
-  { key: 'ReturnRejected', label: 'Return Rejected' },
-  { key: 'DeliveryFailed', label: 'Delivery Failed' },
-  { key: 'Cancelled', label: 'Cancelled' },
-];
-
-const statusMeta = {
-  AwaitingPayment: { label: 'Waiting for Payment', className: 'awaiting' },
-  Pending: { label: 'Processing', className: 'pending' },
-  Confirmed: { label: 'Confirmed', className: 'confirmed' },
-  Shipping: { label: 'Shipping', className: 'shipping' },
-  Delivered: { label: 'Delivered', className: 'delivered' },
-  Completed: { label: 'Completed', className: 'completed' },
-  DeliveryFailed: { label: 'Delivery Failed', className: 'delivery-failed' },
-  Cancelled: { label: 'Cancelled', className: 'cancelled' },
-  ReturnRequested: { label: 'Return Requested', className: 'return-requested' },
-  ReturnRejected: { label: 'Return Rejected', className: 'return-rejected' },
-  Returned: { label: 'Returned', className: 'returned' },
-};
-
 export default function PurchaseHistory() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { t, language, formatCurrency } = useLanguage();
+
+  const statusTabs = useMemo(() => [
+    { key: 'all', label: t('common.all') },
+    { key: 'AwaitingPayment', label: t('order_status.awaiting_payment') },
+    { key: 'Pending', label: t('order_status.pending') },
+    { key: 'Confirmed', label: t('order_status.confirmed') },
+    { key: 'Shipping', label: t('order_status.shipping') },
+    { key: 'Delivered', label: t('order_status.delivered') },
+    { key: 'Completed', label: t('order_status.completed') },
+    { key: 'ReturnRequested', label: t('order_status.return_requested') },
+    { key: 'Returned', label: t('order_status.returned') },
+    { key: 'ReturnRejected', label: t('order_status.return_rejected') },
+    { key: 'DeliveryFailed', label: t('order_status.delivery_failed') },
+    { key: 'Cancelled', label: t('order_status.cancelled') },
+  ], [t]);
+
+  const statusMeta = useMemo(() => ({
+    AwaitingPayment: { label: t('order_status.awaiting_payment'), className: 'awaiting' },
+    Pending: { label: t('order_status.pending'), className: 'confirmed' },
+    Confirmed: { label: t('order_status.confirmed'), className: 'confirmed' },
+    Shipping: { label: t('order_status.shipping'), className: 'shipping' },
+    Delivered: { label: t('order_status.delivered'), className: 'delivered' },
+    Completed: { label: t('order_status.completed'), className: 'completed' },
+    DeliveryFailed: { label: t('order_status.delivery_failed'), className: 'delivery-failed' },
+    Returned: { label: t('order_status.returned'), className: 'returned' },
+    ReturnRequested: { label: t('order_status.return_requested'), className: 'return-requested' },
+    ReturnRejected: { label: t('order_status.return_rejected'), className: 'return-rejected' },
+    Cancelled: { label: t('order_status.cancelled'), className: 'cancelled' },
+  }), [t]);
 
 
   const [purchases, setPurchases] = useState([]);
@@ -328,7 +333,17 @@ export default function PurchaseHistory() {
     try {
       setReturnSubmitting(true);
       setUpdatingId(returnTarget.orderId);
-      await purchaseService.requestReturn(buyerId, returnTarget.orderId, reason);
+      const updated = await purchaseService.requestReturn(buyerId, returnTarget.orderId, reason);
+      const returnedPatch = updated || {
+        status: 'ReturnRequested',
+        returnReason: reason,
+        updatedAt: new Date().toISOString(),
+      };
+      const markReturnRequested = (purchase) =>
+        purchase.orderId === returnTarget.orderId ? { ...purchase, ...returnedPatch } : purchase;
+      setPurchases((prev) => prev.map(markReturnRequested));
+      setAllPurchases((prev) => prev.map(markReturnRequested));
+      setAllPurchasesGlobal((prev) => prev.map(markReturnRequested));
       showToast(t('common.return_submitted'), 'success');
       setReturnModalOpen(false);
       setReturnTarget(null);
@@ -372,6 +387,9 @@ export default function PurchaseHistory() {
         prev.map((p) => (p.orderId === reviewTarget.orderId ? { ...p, hasReview: true, isReviewed: true } : p))
       );
       setAllPurchases((prev) =>
+        prev.map((p) => (p.orderId === reviewTarget.orderId ? { ...p, hasReview: true, isReviewed: true } : p))
+      );
+      setAllPurchasesGlobal((prev) =>
         prev.map((p) => (p.orderId === reviewTarget.orderId ? { ...p, hasReview: true, isReviewed: true } : p))
       );
       showToast(t('common.review_submitted'), 'success');
@@ -468,7 +486,7 @@ export default function PurchaseHistory() {
                     const tabMapVi = {
                       all: 'Tất cả đơn',
                       AwaitingPayment: 'Chờ thanh toán',
-                      Pending: 'Đang xử lý',
+                      Pending: 'Đã xác nhận',
                       Confirmed: 'Đã xác nhận',
                       Shipping: 'Đang giao',
                       Delivered: 'Đã giao',
@@ -619,7 +637,7 @@ export default function PurchaseHistory() {
 
           <ReviewModal
             isOpen={reviewModalOpen}
-            title="Write a Review"
+            title={t('product.write_review')}
             purchase={reviewTarget}
             submitting={reviewSubmitting}
             onClose={() => {
@@ -648,9 +666,22 @@ export default function PurchaseHistory() {
 
 function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview, onRequestReturn, onPayAgain, onReportSeller, language }) {
   const { t } = useLanguage();
-  const meta = statusMeta[purchase.status] || { label: purchase.status || (t ? t('common.unknown') : 'Unknown'), className: 'default' };
+  const statusMetaMap = {
+    AwaitingPayment: { label: t('order_status.awaiting_payment'), className: 'awaiting' },
+    Pending: { label: t('order_status.pending'), className: 'confirmed' },
+    Confirmed: { label: t('order_status.confirmed'), className: 'confirmed' },
+    Shipping: { label: t('order_status.shipping'), className: 'shipping' },
+    Delivered: { label: t('order_status.delivered'), className: 'delivered' },
+    Completed: { label: t('order_status.completed'), className: 'completed' },
+    DeliveryFailed: { label: t('order_status.delivery_failed'), className: 'delivery-failed' },
+    Returned: { label: t('order_status.returned'), className: 'returned' },
+    ReturnRequested: { label: t('order_status.return_requested'), className: 'return-requested' },
+    ReturnRejected: { label: t('order_status.return_rejected'), className: 'return-rejected' },
+    Cancelled: { label: t('order_status.cancelled'), className: 'cancelled' },
+  };
+  const meta = statusMetaMap[purchase.status] || { label: purchase.status || (t ? t('common.unknown') : 'Unknown'), className: 'default' };
 
-  const canCancel = ['AwaitingPayment', 'Pending', 'Confirmed'].includes(purchase.status);
+  const canCancel = false;
   const canComplete = purchase.status === 'Delivered';
   const isReviewed = Boolean(purchase.hasReview || purchase.isReviewed || purchase.hasReviewed || purchase.isHasReviewed);
   const canReview = purchase.status === 'Completed' && !isReviewed;
@@ -737,7 +768,7 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
             {language === 'vi' ? 'Yêu cầu trả hàng' : 'Request Return'}
           </button>
         )}
-        {REPORT_ALLOWED_STATUSES.includes(purchase.status) && (
+        {canReportOrder(purchase.status) && (
           <button type="button" className="purchase-detail-btn" disabled={updating} onClick={onReportSeller}>
             {language === 'vi' ? 'Báo cáo người bán' : 'Report Seller'}
           </button>
@@ -757,23 +788,25 @@ function PurchaseCard({ purchase, updating, onCancel, onComplete, onWriteReview,
 }
 
 function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onClose, onSubmit }) {
-  return (
+  const { t } = useLanguage();
+
+  return createPortal(
     <div className="purchase-return-modal-overlay" role="presentation" onMouseDown={onClose}>
       <div className="purchase-return-modal" role="dialog" aria-modal="true" aria-labelledby="return-modal-title" onMouseDown={(event) => event.stopPropagation()}>
         <button type="button" className="purchase-return-modal-close" onClick={onClose} disabled={submitting} aria-label="Close return request form">
           <span className="material-symbols-outlined">close</span>
         </button>
         <header>
-          <h2 id="return-modal-title">Request Return</h2>
-          <p>Order #{purchase?.orderCode || purchase?.orderId}</p>
+          <h2 id="return-modal-title">{t('common.return_request_title')}</h2>
+          <p>{t('common.return_order_label', { id: purchase?.orderCode || purchase?.orderId || '' })}</p>
         </header>
         <form onSubmit={onSubmit}>
           <label className="purchase-return-reason">
-            <span>Return reason</span>
+            <span>{t('common.return_reason_label')}</span>
             <textarea
               value={reason}
               onChange={(event) => onReasonChange(event.target.value)}
-              placeholder="Describe why you want to return this purchase..."
+              placeholder={t('common.return_reason_placeholder')}
               rows={5}
               maxLength={1000}
               disabled={submitting}
@@ -781,15 +814,16 @@ function ReturnRequestModal({ purchase, reason, submitting, onReasonChange, onCl
           </label>
           <div className="purchase-return-modal-actions">
             <button type="button" className="purchase-detail-btn" onClick={onClose} disabled={submitting}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button type="submit" className="purchase-primary-btn" disabled={submitting || !reason.trim()}>
-              {submitting ? 'Submitting...' : 'Submit Request'}
+              {submitting ? t('common.submitting') : t('common.return_submit_button')}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

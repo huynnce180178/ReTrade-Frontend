@@ -52,6 +52,10 @@ export default function OfferList() {
   const [counterPrice, setCounterPrice] = useState('');
   const [submittingCounter, setSubmittingCounter] = useState(false);
 
+  // Action Confirm modal state (accept / reject)
+  const [actionConfirm, setActionConfirm] = useState(null); // { type: 'accept' | 'reject', offer: object }
+  const [submittingAction, setSubmittingAction] = useState(false);
+
   // Fetch offers from backend
   const fetchOffers = useCallback(async () => {
     setLoading(true);
@@ -71,27 +75,34 @@ export default function OfferList() {
     }
   }, [user, fetchOffers]);
 
-  // Handle accept offer
-  const handleAccept = async (offerId) => {
-    if (!window.confirm(t('common.confirm'))) return;
-    try {
-      await offerService.acceptOffer(offerId);
-      showToast(t('offer_list.accept_success'), 'success');
-      fetchOffers();
-    } catch (e) {
-      showToast(e?.response?.data || t('common.error_occurred'), 'error');
-    }
+  // Open Action Confirm Modal (Accept / Reject)
+  const handleOpenAcceptModal = (offer) => {
+    setActionConfirm({ type: 'accept', offer });
   };
 
-  // Handle reject offer
-  const handleReject = async (offerId) => {
-    if (!window.confirm(t('common.confirm'))) return;
+  const handleOpenRejectModal = (offer) => {
+    setActionConfirm({ type: 'reject', offer });
+  };
+
+  // Handle Confirm Accept / Reject
+  const handleConfirmAction = async () => {
+    if (!actionConfirm) return;
+    const { type, offer } = actionConfirm;
+    setSubmittingAction(true);
     try {
-      await offerService.rejectOffer(offerId);
-      showToast(t('offer_list.reject_success'), 'info');
+      if (type === 'accept') {
+        await offerService.acceptSellerOffer(offer.offerId);
+        showToast(t('offer_list.accept_success'), 'success');
+      } else {
+        await offerService.rejectSellerOffer(offer.offerId);
+        showToast(t('offer_list.reject_success'), 'info');
+      }
+      setActionConfirm(null);
       fetchOffers();
     } catch (e) {
       showToast(e?.response?.data || t('common.error_occurred'), 'error');
+    } finally {
+      setSubmittingAction(false);
     }
   };
 
@@ -108,7 +119,7 @@ export default function OfferList() {
 
     setSubmittingCounter(true);
     try {
-      await offerService.counterOffer(selectedOffer.offerId, { counterPrice: Number(counterPrice) });
+      await offerService.counterOffer(selectedOffer.offerId, Number(counterPrice));
       showToast(t('toast.saved_success'), 'success');
       setSelectedOffer(null);
       fetchOffers();
@@ -351,7 +362,7 @@ export default function OfferList() {
                               {isPending ? (
                                 <div className="flex items-center justify-end gap-2">
                                   <button
-                                    onClick={() => handleAccept(offer.offerId)}
+                                    onClick={() => handleOpenAcceptModal(offer)}
                                     className="px-3 py-1.5 bg-[#1b6b51] text-white rounded-md hover:bg-[#15533f] text-xs font-semibold transition-all shadow-sm"
                                   >
                                     {t('offer_list.accept')}
@@ -363,7 +374,7 @@ export default function OfferList() {
                                     {t('seller_dashboard.contact')}
                                   </button>
                                   <button
-                                    onClick={() => handleReject(offer.offerId)}
+                                    onClick={() => handleOpenRejectModal(offer)}
                                     className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 text-xs font-semibold transition-all"
                                   >
                                     {t('offer_list.reject')}
@@ -475,6 +486,44 @@ export default function OfferList() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Action Confirm Modal (Accept / Reject) */}
+      {actionConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 font-serif mb-2">
+              {actionConfirm.type === 'accept' ? t('offer_list.accept') : t('offer_list.reject')}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {actionConfirm.type === 'accept'
+                ? t('offer_list.confirm_accept_msg', { price: formatVnd(actionConfirm.offer.offerPrice), product: actionConfirm.offer.productName })
+                : t('offer_list.confirm_reject_msg', { price: formatVnd(actionConfirm.offer.offerPrice), product: actionConfirm.offer.productName })}
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={submittingAction}
+                onClick={() => setActionConfirm(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={submittingAction}
+                onClick={handleConfirmAction}
+                className={`px-4 py-2 text-white rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${
+                  actionConfirm.type === 'accept'
+                    ? 'bg-[#1b6b51] hover:bg-[#15533f]'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {submittingAction ? t('common.submitting') : t('common.confirm')}
+              </button>
+            </div>
           </div>
         </div>
       )}

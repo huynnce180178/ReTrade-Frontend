@@ -51,32 +51,211 @@
   line-height: 1;
 }
 
-.report-action-panel .report-action-confirm {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 8px;
-  background: #fffbeb;
+/* Report Action Panel Styling */
+.report-action-panel {
+  padding: 20px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
 }
 
-.report-action-panel .report-action-confirm p {
-  margin: 0;
-  color: #92400e;
+.report-action-panel .panel-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.action-buttons-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.action-btn.btn-reject {
+  background: #ffffff;
+  color: #dc2626;
+  border: 1.5px solid #fca5a5;
+}
+
+.action-btn.btn-reject:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.action-btn.btn-accept {
+  background: #059669;
+  color: #ffffff;
+  border: 1.5px solid #059669;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+}
+
+.action-btn.btn-accept:hover:not(:disabled) {
+  background: #047857;
+  border-color: #047857;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Confirmation Card */
+.report-action-confirm-card {
+  padding: 16px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+.report-action-confirm-card.confirm-reject {
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+}
+
+.report-action-confirm-card.confirm-accept {
+  background: #ecfdf5;
+  border: 1.5px solid #6ee7b7;
+}
+
+.confirm-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.confirm-icon {
+  font-size: 24px;
+  margin-top: 1px;
+}
+
+.confirm-reject .confirm-icon {
+  color: #dc2626;
+}
+
+.confirm-accept .confirm-icon {
+  color: #059669;
+}
+
+.confirm-title-group strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.confirm-reject .confirm-title-group strong {
+  color: #991b1b;
+}
+
+.confirm-accept .confirm-title-group strong {
+  color: #065f46;
+}
+
+.confirm-title-group p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.confirm-note-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  outline: none;
+  background: #ffffff;
+}
+
+.confirm-note-input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
+}
+
+.confirm-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
 }
 
-.report-action-panel .report-action-confirm .secondary {
-  border: 1px solid #d1d5db;
+.confirm-btn.btn-secondary {
   background: #ffffff;
-  color: #374151;
+  color: #475569;
+  border: 1px solid #cbd5e1;
 }
 
-@media(max-width:767px) {
-  .report-action-panel .report-action-confirm {
-    grid-template-columns: 1fr;
-  }
+.confirm-btn.btn-secondary:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
 }
+
+.confirm-btn.btn-danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.confirm-btn.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.confirm-btn.btn-success {
+  background: #059669;
+  color: #ffffff;
+}
+
+.confirm-btn.btn-success:hover:not(:disabled) {
+  background: #047857;
+}
+
+.report-table tbody tr.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.report-table tbody tr.clickable-row:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.stt-cell {
+  width: 60px;
+  text-align: center;
+  font-weight: 700;
+  color: #64748b;
+}
+

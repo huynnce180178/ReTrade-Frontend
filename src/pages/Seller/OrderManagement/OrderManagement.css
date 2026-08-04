@@ -84,7 +84,7 @@
 
 .om-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -156,15 +156,19 @@
 }
 
 .om-tab-strip {
-  min-height: 52px;
+  min-height: 48px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
+  gap: 4px;
+  padding: 6px;
   border-radius: 10px;
   background: #f1f4f3;
   width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
 }
 
 .om-tab-strip button {
@@ -175,9 +179,12 @@
   color: #334943;
   font-family: var(--font-main, 'Manrope', sans-serif);
   font-size: 12px;
-  font-weight: 900;
-  padding: 0 13px;
+  font-weight: 800;
+  padding: 0 14px;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: all 0.2s ease;
 }
 
 .om-tab-strip button.active {
@@ -393,6 +400,7 @@
   font-style: normal;
   font-weight: 900;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .om-status.awaiting {
@@ -454,6 +462,9 @@
   background: #7c3aed;
   color: #ffffff;
   box-shadow: 0 8px 16px rgba(124, 58, 237, 0.08);
+  font-size: 9.5px;
+  padding: 4px 8px;
+  white-space: nowrap;
 }
 
 .om-status.return-rejected {
@@ -500,6 +511,19 @@
 }
 
 .om-action-btn,
+.om-action-btn {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-family: var(--font-main, 'Manrope', sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
 .om-primary-action {
   min-width: 80px;
   height: 34px;

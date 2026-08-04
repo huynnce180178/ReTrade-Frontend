@@ -198,8 +198,19 @@ export default function Home() {
       showToast(t('auth.login_title'), 'error');
       return;
     }
-    if (product.sellerId === user.userId || product.sellerId === user.id) {
-      showToast(t('common.warning'), 'error');
+    const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+    const productSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+    const isOwnProduct = Boolean(
+      currentUserId &&
+      productSellerId &&
+      String(currentUserId).toLowerCase() === String(productSellerId).toLowerCase()
+    );
+    if (isOwnProduct) {
+      showToast(t('product.cannot_wishlist_own_product'), 'error');
+      return;
+    }
+    if (product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || Number(product.stockQuantity ?? 0) <= 0) {
+      showToast(t('product.out_of_stock'), 'warning');
       return;
     }
     setTogglingId(product.productId);
@@ -311,61 +322,101 @@ export default function Home() {
             </div>
 
             <div className="priority-grid">
-              {priorityProducts.map(product => (
-                <div key={product.productId} className="premium-card" onMouseMove={handlePremiumMouseMove}>
-                  <div className="premium-card-glow"></div>
-                  <div className="premium-image-wrapper">
-                    <span className="premium-badge-tag">
-                      <span className="material-symbols-outlined">workspace_premium</span>
-                      VIP
-                    </span>
-                    {product.mainImageUrl ? (
-                      <img src={product.mainImageUrl} alt={product.name} className="premium-img" />
-                    ) : (
-                      <div className="premium-image-placeholder">
-                        <span className="material-symbols-outlined">image</span>
-                      </div>
-                    )}
-                    <div className="premium-card-actions">
-                      <button
-                        className={`premium-action-btn ${wishlistIds.has(product.productId) ? 'active' : ''}`}
-                        onClick={() => handleToggleWishlist(product)}
-                        disabled={togglingId === product.productId}
-                        title={t('product.add_to_wishlist')}
-                      >
-                        {togglingId === product.productId ? (
-                          <span className="premium-spinner"></span>
-                        ) : (
-                          <span className="material-symbols-outlined">favorite</span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
+              {priorityProducts.map(product => {
+                const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+                const pSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+                const own = Boolean(currentUserId && pSellerId && String(currentUserId).toLowerCase() === String(pSellerId).toLowerCase());
 
-                  <div className="premium-card-body">
-                    <div className="premium-seller-row">
-                      <span className="premium-seller-name">
-                        <span className="material-symbols-outlined">storefront</span>
-                        {product.sellerName || t('product.seller_info')}
+                return (
+                  <div
+                    key={product.productId}
+                    className="premium-card"
+                    onMouseMove={handlePremiumMouseMove}
+                    onClick={() => navigate(`/product/${product.productId}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="premium-card-glow"></div>
+                    <div className="premium-image-wrapper">
+                      <span className="premium-badge-tag">
+                        <span className="material-symbols-outlined">workspace_premium</span>
+                        VIP
                       </span>
-                      <span className="premium-condition-tag">{product.condition || t('product.condition')}</span>
+                      {product.mainImageUrl ? (
+                        <img src={product.mainImageUrl} alt={product.name} className="premium-img" />
+                      ) : (
+                        <div className="premium-image-placeholder">
+                          <span className="material-symbols-outlined">image</span>
+                        </div>
+                      )}
+                      {!own && (
+                        <div className="premium-card-actions">
+                          <button
+                            className={`premium-action-btn ${wishlistIds.has(product.productId) ? 'active' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleWishlist(product);
+                            }}
+                            disabled={togglingId === product.productId}
+                            title={t('product.add_to_wishlist')}
+                          >
+                            {togglingId === product.productId ? (
+                              <span className="premium-spinner"></span>
+                            ) : (
+                              <span className="material-symbols-outlined">favorite</span>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <Link to={`/product/${product.productId}`} className="premium-product-name">
-                      {product.name}
-                    </Link>
-                    <div className="premium-card-footer">
-                      <div className="premium-price-wrap">
-                        <span className="price-label">{t('product.buy_now')}</span>
-                        <span className="premium-price">{formatCurrency(product.price)}</span>
+
+                    <div className="premium-card-body">
+                      <div className="premium-seller-row">
+                        <span className="premium-seller-name">
+                          <span className="material-symbols-outlined">storefront</span>
+                          {product.sellerName || t('product.seller_info')}
+                        </span>
+                        <span className="premium-condition-tag">{product.condition || t('product.condition')}</span>
                       </div>
-                      <Link to={`/product/${product.productId}`} className="premium-view-btn">
-                        {t('home.details')}
-                        <span className="material-symbols-outlined">arrow_forward</span>
+                      <Link to={`/product/${product.productId}`} className="premium-product-name">
+                        {product.name}
                       </Link>
+                      <div className="premium-card-footer">
+                        <div className="premium-price-wrap">
+                          <span className="price-label">{t('common.price')}</span>
+                          <span className="premium-price">{formatCurrency(product.price)}</span>
+                        </div>
+                        {!own && product.price != null && (
+                          <button
+                            type="button"
+                            className="premium-buy-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/checkout/${product.productId}`);
+                            }}
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.16)',
+                              color: '#34d399',
+                              border: '1px solid rgba(52, 211, 153, 0.3)',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>shopping_cart</span>
+                            {t('product.buy_now')}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -579,6 +630,11 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
   const isOutOfStock = product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || product.stockQuantity <= 0;
   const navigate = useNavigate();
   const { t, formatCurrency } = useLanguage();
+  const { user } = useAuth();
+
+  const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+  const pSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+  const isOwn = Boolean(currentUserId && pSellerId && String(currentUserId).toLowerCase() === String(pSellerId).toLowerCase());
 
   return (
     <div
@@ -592,7 +648,7 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
         ) : (
           <div className="home-product-img-placeholder">🛍️</div>
         )}
-        {!isOutOfStock && (
+        {!isOutOfStock && !isOwn && (
           <button
             className={`home-wishlist-btn${isWishlisted ? ' active' : ''}`}
             onClick={(e) => {
@@ -613,7 +669,7 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
             }
           </button>
         )}
-        {!isOutOfStock && product.price != null && (
+        {!isOutOfStock && !isOwn && product.price != null && (
           <button
             className="home-buy-now-btn"
             onClick={(e) => {

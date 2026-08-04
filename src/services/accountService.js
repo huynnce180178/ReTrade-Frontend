@@ -5,12 +5,27 @@ const get = (url) => api.get(url).then(r => r.data);
 
 const accountService = {
   register: (data) => post('/Account/register', data),
-  loginWithGoogle: (accessToken) => post('/Account/login-with-google', { accessToken }),
+  loginWithGoogle: (googleTokenData) => {
+    const token = typeof googleTokenData === 'string'
+      ? googleTokenData
+      : (googleTokenData?.access_token || googleTokenData?.accessToken || googleTokenData?.id_token || googleTokenData?.idToken || googleTokenData?.token);
+    const idToken = typeof googleTokenData === 'object'
+      ? (googleTokenData?.id_token || googleTokenData?.idToken)
+      : null;
+
+    return post('/Account/login-with-google', {
+      accessToken: token,
+      idToken: idToken || token,
+      token: token
+    });
+  },
   verify: (data) => post('/Account/verify', data),
   resendOtp: (email) => post('/Account/resend-otp', { email }),
   login: (data) => post('/Account/login', data),
   getAdminUserList: (query = '') => get(`/Admin/user-list${query}`),
-  banUser: (accountId) => api.patch(`/Admin/users/${accountId}/ban`).then((r) => r.data),
+  banUser: (accountId, reason = null) => api.patch(`/Admin/users/${accountId}/ban`, { reason }).then((r) => r.data),
+  grantSellerUnlimited: (accountId) => api.post(`/Admin/users/${accountId}/grant-seller-unlimited`).then((r) => r.data),
+  revokeSeller: (accountId) => api.post(`/Admin/users/${accountId}/revoke-seller`).then((r) => r.data),
   deactivateMe: () => api.patch('/Account/deactivate-me').then((r) => r.data),
   uploadAvatar: (file) => {
     const form = new FormData();

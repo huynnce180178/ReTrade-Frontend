@@ -9,10 +9,12 @@ import VerifyModal from '../../../components/VerifyModal/VerifyModal';
 import TermsModal from '../../../components/TermsModal/TermsModal';
 import bgRegister from '../../../assets/background-register.png';
 
+const SPECIAL_CHAR_REGEX = /[!@#$%^&*(),.?":{}|<>-]/;
+
 export default function Register() {
-  const { user, register, googleLogin } = useAuth();
+  const { user, register, googleLogin, loginWithGoogle } = useAuth();
   const { showToast } = useToast();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -42,6 +44,10 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const handleVerifyClose = () => {
+    setShowVerifyModal(false);
+  };
+
   const handleChange = (e) => {
     const { id, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -54,15 +60,19 @@ export default function Register() {
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       try {
-        const result = await googleLogin(tokenResponse.access_token);
+        const doGoogleLogin = googleLogin || loginWithGoogle;
+        const result = await doGoogleLogin(tokenResponse);
         if (result.success) {
           showToast(t('toast.register_success'), 'success');
           navigate('/');
         } else {
-          showToast(result.error || t('common.error_occurred'), 'error');
+          const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title || JSON.stringify(result.error));
+          showToast(rawErr || t('common.error_occurred'), 'error');
         }
-      } catch {
-        showToast(t('common.error_occurred'), 'error');
+      } catch (err) {
+        console.error('Google register error:', err);
+        const msg = err.response?.data?.message || err.response?.data || err.message || t('common.error_occurred');
+        showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
       } finally {
         setGoogleLoading(false);
       }
@@ -78,19 +88,40 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.username.trim() || !formData.email.trim() || !formData.password.trim() || !formData.confirmPassword.trim()) {
+    const trimmedUsername = formData.username.trim();
+    const trimmedEmail = formData.email.trim();
+    const trimmedFirstName = formData.firstName.trim();
+    const trimmedLastName = formData.lastName.trim();
+    const password = formData.password;
+
+    if (!trimmedUsername || !trimmedEmail || !password.trim() || !formData.confirmPassword.trim()) {
       showToast(t('validation.required'), 'error');
       return;
     }
     
     if (!formData.agreed) {
-      showToast(language === 'vi' ? 'Vui lòng đồng ý với Điều khoản & Chính sách dịch vụ.' : 'Please agree to the Terms of Service.', 'error');
+      showToast(t('validation.terms_required'), 'error');
       return;
     }
 
-    const password = formData.password;
-    if (password.length < 6) {
-      showToast(t('validation.password_min'), 'error');
+    if (password.length < 8 || password.length > 50) {
+      showToast(t('validation.password_length_range'), 'error');
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      showToast(t('validation.password_uppercase'), 'error');
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      showToast(t('validation.password_lowercase'), 'error');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      showToast(t('validation.password_number'), 'error');
+      return;
+    }
+    if (!SPECIAL_CHAR_REGEX.test(password)) {
+      showToast(t('validation.password_special'), 'error');
       return;
     }
     if (password !== formData.confirmPassword) {
@@ -101,17 +132,17 @@ export default function Register() {
     setLoading(true);
     try {
       const result = await register({
-        username: formData.username,
-        email: formData.email,
+        username: trimmedUsername,
+        email: trimmedEmail,
         password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
         roleId: Number(formData.roleId),
       });
 
       if (result.success) {
         showToast(t('toast.register_success'), 'success');
-        setRegisteredEmail(formData.email);
+        setRegisteredEmail(trimmedEmail);
         setShowVerifyModal(true);
       } else {
         showToast(result.error || t('common.error_occurred'), 'error');
@@ -130,17 +161,15 @@ export default function Register() {
           
           {/* Left Content: Brand Narrative */}
           <div className="register-left-col">
-            <span className="brand-subtitle">{language === 'vi' ? 'TẠO TÀI KHOẢN MỚI' : t('auth.register_title')}</span>
-            <h1 className="brand-title">{language === 'vi' ? 'Tham Gia Cộng Đồng ReTrade' : 'Join ReTrade Marketplace'}</h1>
-            <p className="brand-desc">
-              {language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day. Secure, verified, and trusted.'}
-            </p>
+            <span className="brand-subtitle">{t('auth.brand_subtitle')}</span>
+            <h1 className="brand-title">{t('auth.brand_title')}</h1>
+            <p className="brand-desc">{t('auth.brand_desc')}</p>
             
             <div className="brand-image-wrapper">
               <img src={bgRegister} alt="ReTrade Platform" />
               <div className="brand-image-overlay">
                 <div className="brand-quote-box">
-                  <p className="brand-quote">"{language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day.'}"</p>
+                  <p className="brand-quote">&quot;{t('auth.brand_desc')}&quot;</p>
                   <p className="brand-est">EST. 2024 — TRUSTED MARKETPLACE</p>
                 </div>
               </div>
@@ -234,7 +263,10 @@ export default function Register() {
               <div className="terms-container">
                 <input type="checkbox" id="agreed" checked={formData.agreed} onChange={handleChange} disabled={loading} />
                 <label htmlFor="agreed">
-                  {t('auth.agree_terms')} <span onClick={() => setShowTerms(true)} style={{cursor: 'pointer', color: '#02241b', textDecoration: 'underline', fontWeight: '700'}}>{t('auth.agree_terms')}</span>.
+                  {t('auth.agree_terms_prefix')}
+                  <span onClick={() => setShowTerms(true)} style={{cursor: 'pointer', color: '#02241b', textDecoration: 'underline', fontWeight: '700'}}>
+                    {t('auth.agree_terms_link')}
+                  </span>.
                 </label>
               </div>
 
@@ -265,7 +297,7 @@ export default function Register() {
 
       <VerifyModal 
         isOpen={showVerifyModal} 
-        onClose={() => setShowVerifyModal(false)} 
+        onClose={handleVerifyClose} 
         email={registeredEmail}
       />
       <TermsModal 

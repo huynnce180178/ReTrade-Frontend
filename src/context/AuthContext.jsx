@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import accountService from '../services/accountService';
 import profileService from '../services/profileService';
-import { forceLogout } from '../utils/authUtils';
+import { clearAuthStorage } from '../utils/authUtils';
 import { createAccountHubConnection } from '../services/accountRealtimeService';
 
 const AuthContext = createContext(null);
@@ -54,7 +54,11 @@ export const AuthProvider = ({ children }) => {
     accountHubRef.current = connection;
     let disposed = false;
 
-    const handleForceLogout = () => {
+    const handleForceLogout = (reasonMessage) => {
+      const msg = typeof reasonMessage === 'string' && reasonMessage.trim()
+        ? reasonMessage
+        : 'Quyền hạn tài khoản của bạn đã bị Quản trị viên thay đổi. Hệ thống tự động đăng xuất.';
+      alert(msg);
       handleLogout();
     };
 
@@ -80,6 +84,36 @@ export const AuthProvider = ({ children }) => {
     };
   }, [token, user?.accountId]);
 
+  const buildUserFromAuthData = (authData) => ({
+    accountId: authData.accountId,
+    userId: authData.userId,
+    username: authData.username,
+    email: authData.email,
+    firstName: authData.firstName,
+    lastName: authData.lastName,
+    roles: authData.roles,
+    avatarUrl: authData.avatarUrl,
+    phone: authData.phone,
+    isPasswordSet: authData.isPasswordSet,
+    mustChangePassword: authData.mustChangePassword ?? false,
+  });
+
+  const hydrateUserWithProfile = async (baseUser) => {
+    try {
+      const freshProfile = await profileService.getMyProfile();
+      return {
+        ...baseUser,
+        ...freshProfile,
+        roles: freshProfile.roles || baseUser.roles || [],
+        avatarUrl: freshProfile.avatarUrl || baseUser.avatarUrl,
+        isPasswordSet: freshProfile.isPasswordSet ?? baseUser.isPasswordSet,
+        mustChangePassword: baseUser.mustChangePassword ?? false,
+      };
+    } catch {
+      return baseUser;
+    }
+  };
+
   const handleLogin = async (username, password) => {
     setError(null);
     try {
@@ -87,24 +121,12 @@ export const AuthProvider = ({ children }) => {
       
       if (authData && authData.token) {
         localStorage.setItem('token', authData.token);
-        const userObj = {
-          accountId: authData.accountId,
-          userId: authData.userId,
-          username: authData.username,
-          email: authData.email,
-          firstName: authData.firstName,
-          lastName: authData.lastName,
-          roles: authData.roles,
-          avatarUrl: authData.avatarUrl,
-          phone: authData.phone,
-          isPasswordSet: authData.isPasswordSet,
-          mustChangePassword: authData.mustChangePassword ?? false,
-        };
+        const userObj = buildUserFromAuthData(authData);
+        const hydratedUser = await hydrateUserWithProfile(userObj);
 
         setToken(authData.token);
-        setUser(userObj);
-        localStorage.setItem('user', JSON.stringify(userObj));
-        // propagate mustChangePassword flag to caller
+        setUser(hydratedUser);
+        localStorage.setItem('user', JSON.stringify(hydratedUser));
         return { success: true, mustChangePassword: authData.mustChangePassword };
       }
       return { success: false, error: 'Unauthorized: Invalid credentials' };
@@ -114,111 +136,104 @@ export const AuthProvider = ({ children }) => {
       if (typeof data === 'string' && data.trim()) {
         errMsg = data;
       } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || 'Invalid credentials or account pending verification.';
+        errMsg = data.message || data.title;
       }
       errMsg = errMsg || err.message || 'Login failed. Please check your username and password.';
       
       setError(errMsg);
-      return { success: false, error: errMsg };
+      return { success: false, error: errMsg, code: data?.code };
     }
   };
 
-  const clearMustChangePassword = () => {
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, mustChangePassword: false, isPasswordSet: true };
-      localStorage.setItem('user', JSON.stringify(updated));
-      return updated;
-    });
+  const handleGoogleLogin = async (googleResponse) => {
+    setError(null);
+    try {
+      const authData = await accountService.loginWithGoogle(googleResponse);
+      const tokenVal = authData?.token || authData?.accessToken || authData?.jwtToken;
+      if (authData && tokenVal) {
+        localStorage.setItem('token', tokenVal);
+        const userObj = buildUserFromAuthData(authData);
+        const hydratedUser = await hydrateUserWithProfile(userObj);
+
+        setToken(tokenVal);
+        setUser(hydratedUser);
+        localStorage.setItem('user', JSON.stringify(hydratedUser));
+        return { success: true, mustChangePassword: authData.mustChangePassword };
+      }
+      return { success: false, error: 'Google Login failed: No token returned from backend server.' };
+    } catch (err) {
+      console.error('Google Login Exception:', err);
+      const data = err.response?.data;
+      let errMsg;
+      if (typeof data === 'string' && data.trim()) {
+        errMsg = data;
+      } else if (data && typeof data === 'object') {
+        errMsg = data.message || data.title || data.error || (data.errors ? Object.values(data.errors).flat().join(', ') : '') || (Object.keys(data).length > 0 ? JSON.stringify(data) : '');
+      }
+      errMsg = errMsg || err.message || 'Google authentication failed.';
+      
+      setError(errMsg);
+      return { success: false, error: errMsg, code: data?.code };
+    }
   };
 
   const handleLogout = () => {
+    if (accountHubRef.current) {
+      accountHubRef.current.stop().catch(() => {});
+      accountHubRef.current = null;
+    }
+    clearAuthStorage();
     setUser(null);
     setToken(null);
-    forceLogout();
   };
 
-  const handleGoogleLogin = async (accessToken) => {
-    setError(null);
-    try {
-      const authData = await accountService.loginWithGoogle(accessToken);
-      if (authData && authData.token) {
-        localStorage.setItem('token', authData.token);
-        const userObj = {
-          accountId: authData.accountId,
-          userId: authData.userId,
-          username: authData.username,
-          email: authData.email,
-          firstName: authData.firstName,
-          lastName: authData.lastName,
-          roles: authData.roles,
-          avatarUrl: authData.avatarUrl,
-          phone: authData.phone,
-          isPasswordSet: authData.isPasswordSet,
-          mustChangePassword: authData.mustChangePassword ?? false,
-        };
-        setToken(authData.token);
-        setUser(userObj);
-        localStorage.setItem('user', JSON.stringify(userObj));
-        return { success: true, mustChangePassword: authData.mustChangePassword };
-      }
-
-      return { success: false, error: 'Google login failed. Please try again.' };
-    } catch (err) {
-      const data = err.response?.data;
-      let errMsg;
-      if (typeof data === 'string' && data.trim()) {
-        errMsg = data;
-      } else if (data && typeof data === 'object') {
-        errMsg = data.message || data.title || JSON.stringify(data);
-      }
-      errMsg = errMsg || err.message || 'Google login failed. Try again.';
-      setError(errMsg);
-      return { success: false, error: errMsg };
-    }
+  const updateUserState = (updatedFields) => {
+    setUser((prev) => {
+      const nextUser = { ...prev, ...updatedFields };
+      localStorage.setItem('user', JSON.stringify(nextUser));
+      return nextUser;
+    });
   };
 
   const handleRegister = async (registerData) => {
-
     setError(null);
     try {
-      const responseMsg = await accountService.register(registerData);
-      return { success: true, message: responseMsg };
+      const response = await accountService.register(registerData);
+      return { success: true, data: response };
     } catch (err) {
+      console.error('Register error:', err);
       const data = err.response?.data;
       let errMsg;
       if (typeof data === 'string' && data.trim()) {
         errMsg = data;
       } else if (data && typeof data === 'object') {
-        if (data.message) {
-          errMsg = data.message;
-        } else if (data.errors) {
-          const allErrors = Object.values(data.errors).flat();
-          errMsg = allErrors.join(' ');
-        } else if (data.title) {
-          errMsg = data.title;
-        }
+        errMsg = data.message || data.title || data.error || (data.errors ? Object.values(data.errors).flat().join(', ') : '');
       }
-      errMsg = errMsg || err.message || 'Registration failed. Try again.';
+      errMsg = errMsg || err.message || 'Registration failed.';
       setError(errMsg);
       return { success: false, error: errMsg };
     }
   };
 
-  const value = {
-    user,
-    token,
-    loading,
-    error,
-    login: handleLogin,
-    
-    googleLogin: handleGoogleLogin,
-    logout: handleLogout,
-    register: handleRegister,
-    setUser
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        setUser,
+        token,
+        loading,
+        error,
+        login: handleLogin,
+        register: handleRegister,
+        loginWithGoogle: handleGoogleLogin,
+        googleLogin: handleGoogleLogin,
+        logout: handleLogout,
+        updateUserState,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

@@ -351,6 +351,13 @@
   z-index: 2;
 }
 
+@media (max-width: 992px) {
+  .floating-card-1,
+  .floating-card-2 {
+    display: none !important;
+  }
+}
+
 .float-badge {
   font-weight: 700;
   color: var(--primary);
@@ -1415,5 +1422,42 @@
   .home-scroll-btn.right {
     right: 4px;
   }
+
+  .home-page {
+    gap: 48px;
+  }
+
+  .hero-section {
+    padding: 32px 0 16px 0;
+  }
+
+  .hero-title {
+    font-size: 32px;
+  }
+
+  .hero-subtitle {
+    font-size: 15px;
+  }
 }
+
+@media (max-width: 576px) {
+  .home-page {
+    gap: 36px;
+  }
+
+  .hero-title {
+    font-size: 26px;
+    letter-spacing: -0.5px;
+  }
+
+  .home-scroll-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .home-scroll-btn .material-symbols-outlined {
+    font-size: 18px;
+  }
+}
+
 
