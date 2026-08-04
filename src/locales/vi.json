@@ -142,6 +142,7 @@
     "password": "Mật khẩu",
     "remember_me": "Ghi nhớ đăng nhập",
     "forgot_password": "Quên mật khẩu?",
+    "reset_password": "Đặt lại mật khẩu",
     "login_button": "Đăng nhập",
     "logging_in": "Đang đăng nhập...",
     "or_continue_with": "Hoặc tiếp tục với",

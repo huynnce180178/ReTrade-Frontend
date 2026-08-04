@@ -184,6 +184,22 @@ export default function MyAccount() {
     fileInputRef.current?.click();
   };
 
+  const getErrorMessage = (err, fallback) => {
+    const data = err?.response?.data;
+    if (typeof data === 'string' && data.trim()) return data;
+    if (data?.message && typeof data.message === 'string') return data.message;
+    if (data?.title && typeof data.title === 'string') return data.title;
+    if (data?.errors && typeof data.errors === 'object') {
+      const keys = Object.keys(data.errors);
+      if (keys.length > 0) {
+        const firstErr = data.errors[keys[0]];
+        const msg = Array.isArray(firstErr) ? firstErr[0] : firstErr;
+        return `${keys[0]}: ${msg}`;
+      }
+    }
+    return err?.message || fallback;
+  };
+
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -201,7 +217,7 @@ export default function MyAccount() {
         showToast(language === 'vi' ? 'Tải ảnh thành công nhưng không nhận được link.' : 'Upload succeeded but no url returned.', 'warning');
       }
     } catch (err) {
-      showToast(err?.response?.data || (language === 'vi' ? 'Không thể tải ảnh lên.' : 'Failed to upload image.'), 'error');
+      showToast(getErrorMessage(err, language === 'vi' ? 'Không thể tải ảnh lên.' : 'Failed to upload image.'), 'error');
     }
   };
 
@@ -244,7 +260,7 @@ export default function MyAccount() {
         throw new Error('Profile update returned no data.');
       }
     } catch (err) {
-      showToast(err?.response?.data || (language === 'vi' ? 'Không thể cập nhật hồ sơ.' : 'Failed to update profile.'), 'error');
+      showToast(getErrorMessage(err, language === 'vi' ? 'Không thể cập nhật hồ sơ.' : 'Failed to update profile.'), 'error');
     }
   };
 

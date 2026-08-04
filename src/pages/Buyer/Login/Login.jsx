@@ -31,14 +31,17 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!username.trim() || !password.trim()) {
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanUsername || !cleanPassword) {
       showToast(t('validation.required'), 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const result = await login(username, password);
+      const result = await login(cleanUsername, cleanPassword);
       if (result.success) {
         if (result.mustChangePassword) {
           showToast(t('auth.change_pw_title'), 'info');
@@ -181,14 +184,9 @@ export default function Login() {
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                          {t('auth.password')}
-                        </label>
-                        <Link to="/forgot-password" className="text-xs text-[#1b6b51] hover:underline font-medium">
-                          {t('auth.forgot_password')}
-                        </Link>
-                      </div>
+                      <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        {t('auth.password')}
+                      </label>
                       <div className="relative">
                         <input
                           type={showPassword ? 'text' : 'password'}
@@ -221,6 +219,16 @@ export default function Login() {
                         t('auth.login_button')
                       )}
                     </button>
+
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mt-3">
+                      <Link to="/forgot-password" className="text-[#1b6b51] hover:underline font-medium">
+                        {t('auth.forgot_password')}
+                      </Link>
+                      <span className="text-gray-300">•</span>
+                      <Link to="/reset-password" className="text-[#1b6b51] hover:underline font-medium">
+                        {t('auth.reset_password')}
+                      </Link>
+                    </div>
                   </form>
               </>
 

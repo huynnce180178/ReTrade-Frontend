@@ -142,6 +142,7 @@
     "password": "Password",
     "remember_me": "Remember me",
     "forgot_password": "Forgot password?",
+    "reset_password": "Reset password",
     "login_button": "Sign In",
     "logging_in": "Signing in...",
     "or_continue_with": "Or continue with",

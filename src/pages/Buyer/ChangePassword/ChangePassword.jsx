@@ -9,7 +9,7 @@ import '../../../styles/MyAccount.css';
 
 export default function ChangePassword() {
   const { showToast } = useToast();
-  const { user, setUser } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const { t, language } = useLanguage();
   const isPasswordSet = user?.isPasswordSet !== false;
 
@@ -37,7 +37,13 @@ export default function ChangePassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if ((isPasswordSet && !oldPassword) || !newPassword || !confirmPassword) {
+
+    if (loading) return;
+
+    const cleanOldPassword = oldPassword.trim();
+    const cleanNewPassword = newPassword.trim();
+
+    if ((isPasswordSet && !cleanOldPassword) || !cleanNewPassword || !confirmPassword) {
       showToast(language === 'vi' ? 'Vui lòng nhập đầy đủ các trường.' : 'All fields are required.', 'error');
       return;
     }
@@ -49,9 +55,9 @@ export default function ChangePassword() {
     setLoading(true);
     try {
       if (isPasswordSet) {
-        await accountService.changePassword(oldPassword, newPassword);
+        await accountService.changePassword(cleanOldPassword, cleanNewPassword);
       } else {
-        await accountService.setPassword(newPassword);
+        await accountService.setPassword(cleanNewPassword);
       }
       showToast(
         isPasswordSet
@@ -63,13 +69,10 @@ export default function ChangePassword() {
       setNewPassword('');
       setConfirmPassword('');
       
-      const updatedUser = { ...user, isPasswordSet: true };
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-
       setTimeout(() => {
+        if (logout) logout();
         forceLogout();
-      }, 1500);
+      }, 1000);
     } catch (err) {
       const serverMsg = err?.response?.data?.message || err?.response?.data;
       showToast(
@@ -78,7 +81,6 @@ export default function ChangePassword() {
           : (language === 'vi' ? `Không thể ${isPasswordSet ? 'đổi' : 'đặt'} mật khẩu.` : `Failed to ${isPasswordSet ? 'change' : 'set'} password.`),
         'error'
       );
-    } finally {
       setLoading(false);
     }
   };
