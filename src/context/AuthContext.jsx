@@ -195,6 +195,13 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const clearMustChangePassword = () => {
+    updateUserState({
+      mustChangePassword: false,
+      isPasswordSet: true,
+    });
+  };
+
   const handleRegister = async (registerData) => {
     setError(null);
     try {
@@ -229,6 +236,7 @@ export const AuthProvider = ({ children }) => {
         googleLogin: handleGoogleLogin,
         logout: handleLogout,
         updateUserState,
+        clearMustChangePassword,
       }}
     >
       {children}

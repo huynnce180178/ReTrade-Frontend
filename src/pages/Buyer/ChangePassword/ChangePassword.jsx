@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import accountService from '../../../services/accountService';
 import { useToast } from '../../../context/ToastContext';
-import { forceLogout } from '../../../utils/authUtils';
 import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/MyAccount.css';
 
 export default function ChangePassword() {
   const { showToast } = useToast();
-  const { user, setUser, logout } = useAuth();
+  const { user, clearMustChangePassword } = useAuth();
   const { t, language } = useLanguage();
   const isPasswordSet = user?.isPasswordSet !== false;
 
@@ -61,18 +60,15 @@ export default function ChangePassword() {
       }
       showToast(
         isPasswordSet
-          ? (language === 'vi' ? 'Đổi mật khẩu thành công. Đang đăng xuất...' : 'Password changed successfully. Logging out...')
-          : (language === 'vi' ? 'Đặt mật khẩu thành công. Đang đăng xuất...' : 'Password set successfully. Logging out...'),
+          ? (language === 'vi' ? 'Đổi mật khẩu thành công.' : 'Password changed successfully.')
+          : (language === 'vi' ? 'Đặt mật khẩu thành công.' : 'Password set successfully.'),
         'success'
       );
+      clearMustChangePassword?.();
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      
-      setTimeout(() => {
-        if (logout) logout();
-        forceLogout();
-      }, 1000);
+      setLoading(false);
     } catch (err) {
       const serverMsg = err?.response?.data?.message || err?.response?.data;
       showToast(
