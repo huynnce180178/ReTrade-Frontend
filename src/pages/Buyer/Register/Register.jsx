@@ -14,7 +14,7 @@ const SPECIAL_CHAR_REGEX = /[!@#$%^&*(),.?":{}|<>-]/;
 export default function Register() {
   const { user, register, googleLogin, loginWithGoogle } = useAuth();
   const { showToast } = useToast();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -100,28 +100,28 @@ export default function Register() {
     }
     
     if (!formData.agreed) {
-      showToast(language === 'vi' ? 'Vui lòng đồng ý với Điều khoản & Chính sách dịch vụ.' : 'Please agree to the Terms of Service.', 'error');
+      showToast(t('validation.terms_required'), 'error');
       return;
     }
 
     if (password.length < 8 || password.length > 50) {
-      showToast(language === 'vi' ? 'Mật khẩu phải dài từ 8 đến 50 ký tự.' : 'Password must be 8 to 50 characters long.', 'error');
+      showToast(t('validation.password_length_range'), 'error');
       return;
     }
     if (!/[A-Z]/.test(password)) {
-      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 chữ cái viết hoa.' : 'Password must contain at least 1 uppercase letter.', 'error');
+      showToast(t('validation.password_uppercase'), 'error');
       return;
     }
     if (!/[a-z]/.test(password)) {
-      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 chữ cái viết thường.' : 'Password must contain at least 1 lowercase letter.', 'error');
+      showToast(t('validation.password_lowercase'), 'error');
       return;
     }
     if (!/[0-9]/.test(password)) {
-      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 chữ số.' : 'Password must contain at least 1 number.', 'error');
+      showToast(t('validation.password_number'), 'error');
       return;
     }
     if (!SPECIAL_CHAR_REGEX.test(password)) {
-      showToast(language === 'vi' ? 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt.' : 'Password must contain at least 1 special character.', 'error');
+      showToast(t('validation.password_special'), 'error');
       return;
     }
     if (password !== formData.confirmPassword) {
@@ -161,17 +161,15 @@ export default function Register() {
           
           {/* Left Content: Brand Narrative */}
           <div className="register-left-col">
-            <span className="brand-subtitle">{language === 'vi' ? 'TẠO TÀI KHOẢN MỚI' : t('auth.register_title')}</span>
-            <h1 className="brand-title">{language === 'vi' ? 'Tham Gia Cộng Đồng ReTrade' : 'Join ReTrade Marketplace'}</h1>
-            <p className="brand-desc">
-              {language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day. Secure, verified, and trusted.'}
-            </p>
+            <span className="brand-subtitle">{t('auth.brand_subtitle')}</span>
+            <h1 className="brand-title">{t('auth.brand_title')}</h1>
+            <p className="brand-desc">{t('auth.brand_desc')}</p>
             
             <div className="brand-image-wrapper">
               <img src={bgRegister} alt="ReTrade Platform" />
               <div className="brand-image-overlay">
                 <div className="brand-quote-box">
-                  <p className="brand-quote">&quot;{language === 'vi' ? 'Mua bán, thanh lý và tham gia đấu giá hàng ngàn sản phẩm chất lượng mỗi ngày. Bảo mật an toàn, xác thực uy tín.' : 'Buy, sell, and bid on thousands of quality items every day.'}&quot;</p>
+                  <p className="brand-quote">&quot;{t('auth.brand_desc')}&quot;</p>
                   <p className="brand-est">EST. 2024 — TRUSTED MARKETPLACE</p>
                 </div>
               </div>
@@ -265,7 +263,10 @@ export default function Register() {
               <div className="terms-container">
                 <input type="checkbox" id="agreed" checked={formData.agreed} onChange={handleChange} disabled={loading} />
                 <label htmlFor="agreed">
-                  {t('auth.agree_terms')} <span onClick={() => setShowTerms(true)} style={{cursor: 'pointer', color: '#02241b', textDecoration: 'underline', fontWeight: '700'}}>{t('auth.agree_terms')}</span>.
+                  {t('auth.agree_terms_prefix')}
+                  <span onClick={() => setShowTerms(true)} style={{cursor: 'pointer', color: '#02241b', textDecoration: 'underline', fontWeight: '700'}}>
+                    {t('auth.agree_terms_link')}
+                  </span>.
                 </label>
               </div>
 

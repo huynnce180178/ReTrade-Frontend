@@ -195,6 +195,26 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const handleRegister = async (registerData) => {
+    setError(null);
+    try {
+      const response = await accountService.register(registerData);
+      return { success: true, data: response };
+    } catch (err) {
+      console.error('Register error:', err);
+      const data = err.response?.data;
+      let errMsg;
+      if (typeof data === 'string' && data.trim()) {
+        errMsg = data;
+      } else if (data && typeof data === 'object') {
+        errMsg = data.message || data.title || data.error || (data.errors ? Object.values(data.errors).flat().join(', ') : '');
+      }
+      errMsg = errMsg || err.message || 'Registration failed.';
+      setError(errMsg);
+      return { success: false, error: errMsg };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -203,6 +223,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         error,
         login: handleLogin,
+        register: handleRegister,
         loginWithGoogle: handleGoogleLogin,
         googleLogin: handleGoogleLogin,
         logout: handleLogout,
