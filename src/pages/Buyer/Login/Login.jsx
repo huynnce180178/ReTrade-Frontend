@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../../context/AuthContext';
@@ -10,7 +10,7 @@ import ChangePasswordAfterRecoveryModal from '../../../components/ChangePassword
 import '../../../styles/Login.css';
 
 export default function Login() {
-  const { user, login, googleLogin, loginWithGoogle } = useAuth();
+  const { user, login, googleLogin, loginWithGoogle, clearMustChangePassword } = useAuth();
   const { showToast } = useToast();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
@@ -249,6 +249,11 @@ export default function Login() {
         <ChangePasswordAfterRecoveryModal
           isOpen={showFirstChangeModal}
           onClose={() => {
+            setShowFirstChangeModal(false);
+            navigate('/');
+          }}
+          onSuccess={() => {
+            clearMustChangePassword?.();
             setShowFirstChangeModal(false);
             navigate('/');
           }}

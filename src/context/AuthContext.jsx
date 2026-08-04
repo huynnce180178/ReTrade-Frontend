@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+﻿import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import accountService from '../services/accountService';
 import profileService from '../services/profileService';
 import { clearAuthStorage } from '../utils/authUtils';
@@ -195,6 +195,13 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const clearMustChangePassword = () => {
+    updateUserState({
+      mustChangePassword: false,
+      isPasswordSet: true,
+    });
+  };
+
   const handleRegister = async (registerData) => {
     setError(null);
     try {
@@ -229,6 +236,7 @@ export const AuthProvider = ({ children }) => {
         googleLogin: handleGoogleLogin,
         logout: handleLogout,
         updateUserState,
+        clearMustChangePassword,
       }}
     >
       {children}
