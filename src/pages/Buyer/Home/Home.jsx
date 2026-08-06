@@ -4,6 +4,7 @@ import productService from '../../../services/productService';
 import wishlistService from '../../../services/wishlistService';
 import categoryService from '../../../services/categoryService';
 import userFavoriteService from '../../../services/userFavoriteService';
+import auctionService from '../../../services/auctionService';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -15,8 +16,23 @@ function HomeProductSlider({ children }) {
 
   const scroll = (direction) => {
     if (!scrollRef.current) return;
-    const amount = direction === 'left' ? -360 : 360;
-    scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    const amount = 360;
+
+    if (direction === 'left') {
+      if (scrollLeft <= 10) {
+        scrollRef.current.scrollTo({ left: maxScroll, behavior: 'smooth' });
+      } else {
+        scrollRef.current.scrollBy({ left: -amount, behavior: 'smooth' });
+      }
+    } else {
+      if (scrollLeft >= maxScroll - 10) {
+        scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+      }
+    }
   };
 
   return (
@@ -70,6 +86,17 @@ export default function Home() {
   // Priority products (recommended seller subscription products)
   const [priorityProducts, setPriorityProducts] = useState([]);
   const [loadingPriority, setLoadingPriority] = useState(true);
+  const priorityTrackRef = useRef(null);
+
+  // Ongoing & Upcoming auctions
+  const [ongoingAuctions, setOngoingAuctions] = useState([]);
+  const [upcomingAuctions, setUpcomingAuctions] = useState([]);
+  const [loadingAuctions, setLoadingAuctions] = useState(true);
+
+  // Normal, Top & Random Products
+  const [normalProducts, setNormalProducts] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [randomProducts, setRandomProducts] = useState([]);
 
   // Categories
   const [categories, setCategories] = useState([]);
@@ -112,13 +139,44 @@ export default function Home() {
         IsPriorityOnly: true,
         Status: 'Accepted',
         Page: 1,
-        PageSize: 4,
+        PageSize: 8,
       });
       setPriorityProducts(data.items || []);
     } catch {
       // Silently fail
     } finally {
       setLoadingPriority(false);
+    }
+  }, []);
+
+  const fetchOngoingAuctions = useCallback(async () => {
+    setLoadingAuctions(true);
+    try {
+      const [ongoingRes, upcomingRes] = await Promise.all([
+        auctionService.getAll({ Page: 1, PageSize: 6, Status: 'Ongoing' }),
+        auctionService.getAll({ Page: 1, PageSize: 6, Status: 'Upcoming' }),
+      ]);
+      setOngoingAuctions(ongoingRes?.items || []);
+      setUpcomingAuctions(upcomingRes?.items || []);
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingAuctions(false);
+    }
+  }, []);
+
+  const fetchProductSections = useCallback(async () => {
+    try {
+      const [normalRes, topRes] = await Promise.all([
+        productService.getAll({ Status: 'Accepted', Page: 1, PageSize: 12, SortBy: 'newest' }),
+        productService.getAll({ Status: 'Accepted', Page: 1, PageSize: 8, SortBy: 'top_seller' }),
+      ]);
+      const normItems = (normalRes?.items || []).filter(p => p.price != null);
+      setNormalProducts(normItems);
+      setTopProducts(topRes?.items || []);
+      setRandomProducts([...normItems].sort(() => 0.5 - Math.random()));
+    } catch {
+      // Silently fail
     }
   }, []);
 
@@ -140,22 +198,31 @@ export default function Home() {
         }
       } else {
         const productMap = {};
+        const allFavItems = [];
         await Promise.all(
-          favs.slice(0, 6).map(async (fav) => {
+          favs.slice(0, 7).map(async (fav) => {
             try {
               const result = await productService.getAll({
                 CategoryId: fav.categoryId,
                 Status: 'Accepted',
                 Page: 1,
-                PageSize: 6,
+                PageSize: 8,
+                SortBy: 'newest'
               });
-              productMap[fav.categoryId] = result.items || [];
+              const items = (result?.items || []).filter(p => p.price != null);
+              productMap[fav.categoryId] = items;
+              allFavItems.push(...items);
             } catch {
               productMap[fav.categoryId] = [];
             }
           })
         );
         setFavoriteProducts(productMap);
+
+        const uniqueFavItems = Array.from(new Map(allFavItems.map(p => [p.productId, p])).values());
+        if (uniqueFavItems.length > 0) {
+          setNormalProducts(uniqueFavItems);
+        }
       }
     } catch {
       // Silently fail
@@ -177,7 +244,9 @@ export default function Home() {
   useEffect(() => {
     fetchLatestProducts();
     fetchPriorityProducts();
-  }, [fetchLatestProducts, fetchPriorityProducts]);
+    fetchOngoingAuctions();
+    fetchProductSections();
+  }, [fetchLatestProducts, fetchPriorityProducts, fetchOngoingAuctions, fetchProductSections]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -246,69 +315,32 @@ export default function Home() {
     card.style.setProperty('--y', `${y}px`);
   };
 
+  const scrollPriority = (dir) => {
+    if (priorityTrackRef.current) {
+      const el = priorityTrackRef.current;
+      const maxScrollLeft = el.scrollWidth - el.clientWidth;
+
+      if (dir === 'right') {
+        if (el.scrollLeft >= maxScrollLeft - 15) {
+          el.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          el.scrollBy({ left: 320, behavior: 'smooth' });
+        }
+      } else {
+        if (el.scrollLeft <= 15) {
+          el.scrollTo({ left: maxScrollLeft, behavior: 'smooth' });
+        } else {
+          el.scrollBy({ left: -320, behavior: 'smooth' });
+        }
+      }
+    }
+  };
+
   return (
     <div className="home-page animate-fade-in">
-      <section className="hero-section">
-        <div className="hero-glow hero-glow-1"></div>
-        <div className="hero-glow hero-glow-2"></div>
-
-        <div className="container hero-container">
-          <div className="hero-content">
-            <span className="hero-badge">{t('home.hero_badge')}</span>
-            <h1 className="hero-title">
-              {t('home.hero_title_1')}<br />
-              <span className="gradient-primary-text">{t('home.hero_title_2')}</span>
-            </h1>
-            <p className="hero-subtitle">
-              {t('home.hero_subtitle')}
-            </p>
-
-            <div className="hero-tags">
-              <span className="tag-label">{t('home.popular')}</span>
-              <button className="tag-btn" onClick={() => handleTagClick('iPhone')}>iPhone</button>
-              <button className="tag-btn" onClick={() => handleTagClick('Laptop')}>Laptop</button>
-              <button className="tag-btn" onClick={() => handleTagClick('Sneakers')}>Sneakers</button>
-              <button className="tag-btn" onClick={() => handleTagClick('Camera')}>Camera</button>
-            </div>
-          </div>
-
-          <div className="hero-visual">
-            <div className="visual-card main-visual-card" onClick={() => navigate('/auction')} style={{ cursor: 'pointer' }}>
-              <div className="card-header">
-                <span className="card-badge">{t('home.live_auction')}</span>
-                <span className="card-timer">02h 41m left</span>
-              </div>
-              <div className="card-image-placeholder">
-                <span className="placeholder-text">Premium Vespa Sprint</span>
-                <div className="image-overlay-glow"></div>
-              </div>
-              <div className="card-info">
-                <h4>Vespa Sprint 150 ABS 2022</h4>
-                <div className="price-row">
-                  <div>
-                    <span className="price-label">{t('home.current_bid')}</span>
-                    <p className="price-value">{formatCurrency(65000000)}</p>
-                  </div>
-                  <button className="btn btn-primary bid-btn" onClick={(e) => { e.stopPropagation(); navigate('/auction'); }}>{t('home.place_bid')}</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="visual-card floating-card-1" onClick={() => navigate('/product')} style={{ cursor: 'pointer' }}>
-              <div className="float-badge">🚀 {t('home.fast_deal')}</div>
-              <p>MacBook Pro M2 — {formatCurrency(26500000)}</p>
-            </div>
-            <div className="visual-card floating-card-2">
-              <div className="float-badge">⭐ {t('home.top_seller')}</div>
-              <p>Alex Johnson (4.9★)</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Priority/Premium Recommended Listings */}
       {priorityProducts.length > 0 && (
-        <section className="priority-recommendations-section">
+        <section className="priority-recommendations-section" style={{ paddingTop: '40px' }}>
           <div className="container">
             <div className="priority-header-row">
               <div className="section-title-wrap">
@@ -321,7 +353,27 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="priority-grid">
+            <div className="priority-carousel-wrapper" style={{ position: 'relative' }}>
+              {priorityProducts.length > 4 && (
+                <>
+                  <button
+                    className="priority-nav-btn prev"
+                    onClick={() => scrollPriority('left')}
+                    aria-label="Previous products"
+                  >
+                    <span className="material-symbols-outlined">chevron_left</span>
+                  </button>
+                  <button
+                    className="priority-nav-btn next"
+                    onClick={() => scrollPriority('right')}
+                    aria-label="Next products"
+                  >
+                    <span className="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </>
+              )}
+
+              <div className="priority-grid-slider" ref={priorityTrackRef}>
               {priorityProducts.map(product => {
                 const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
                 const pSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
@@ -404,8 +456,6 @@ export default function Home() {
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '4px',
-                              whiteSpace: 'nowrap',
                             }}
                           >
                             <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>shopping_cart</span>
@@ -417,10 +467,12 @@ export default function Home() {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         </section>
       )}
+
 
       {/* Horizontal Category List */}
       {categories.length > 0 && (
@@ -440,108 +492,213 @@ export default function Home() {
         </section>
       )}
 
-      <section className="home-main-section">
-        <div className="container stats-grid grid-4-col">
-          <div className="stat-card glass-card">
-            <h3>$3.5M+</h3>
-            <p>{t('home.trading_volume')}</p>
-          </div>
-          <div className="stat-card glass-card">
-            <h3>45,000+</h3>
-            <p>{t('home.items_traded')}</p>
-          </div>
-          <div className="stat-card glass-card">
-            <h3>12,000+</h3>
-            <p>{t('home.verified_traders')}</p>
-          </div>
-          <div className="stat-card glass-card">
-            <h3>99.4%</h3>
-            <p>{t('home.success_rate')}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Favorite Categories / Latest Products Section */}
-      <section className="home-products-section">
-        <div className="container">
-          {isLoggedIn && favorites.length > 0 && (
-            <>
-              <div className="home-section-header">
-                <div>
-                  <h2 className="section-title">{t('home.your_favorites')}</h2>
-                  <p className="section-subtitle">{t('home.favorites_subtitle')}</p>
-                </div>
-                <button className="btn btn-outline" onClick={() => setShowFavModal(true)} style={{ fontSize: '13px', padding: '8px 16px' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }}>
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                  {t('home.edit_favorites')}
-                </button>
-              </div>
-              {favorites.slice(0, 6).map(fav => {
-                const products = favoriteProducts[fav.categoryId] || [];
-                if (products.length === 0) return null;
-                return (
-                  <div key={fav.categoryId} className="home-category-section">
-                    <div className="home-category-header">
-                      <h3>{fav.categoryName || t('common.category')}</h3>
-                      <Link to={`/category/${fav.categoryId}`} className="home-view-all-link">
-                        {t('common.view_all')} →
-                      </Link>
-                    </div>
-                    <HomeProductSlider>
-                      {products.map(p => (
-                        <HomeProductCard
-                          key={p.productId}
-                          product={p}
-                          isWishlisted={wishlistIds.has(p.productId)}
-                          toggling={togglingId === p.productId}
-                          onToggleWishlist={handleToggleWishlist}
-                        />
-                      ))}
-                    </HomeProductSlider>
-                  </div>
-                );
-              })}
-            </>
-          )}
-
-          {/* Always show Latest Products / Random Products at the bottom */}
-          <div style={{ marginTop: isLoggedIn && favorites.length > 0 ? '60px' : '0' }}>
+      {/* Real Live Auctions Showcase Section */}
+      {ongoingAuctions.length > 0 && (
+        <section className="home-auctions-section">
+          <div className="container">
             <div className="home-section-header">
               <div>
-                <h2 className="section-title">
-                  {isLoggedIn ? t('home.products_interested') : t('home.latest_products')}
-                </h2>
-                <p className="section-subtitle">
-                  {isLoggedIn ? t('home.latest_subtitle_user') : t('home.latest_subtitle_guest')}
-                </p>
+                <span className="live-pill-badge">
+                  <span className="live-dot"></span>
+                  {t('home.live_auction')}
+                </span>
+                <h2 className="section-title" style={{ marginTop: '8px' }}>{t('home.live_auction_title')}</h2>
+                <p className="section-subtitle">{t('home.live_auction_subtitle')}</p>
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                {isLoggedIn && (
-                  <button className="btn btn-outline" onClick={() => setShowFavModal(true)} style={{ fontSize: '13px', padding: '8px 16px' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }}>
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                    {t('home.set_favorite_categories')}
-                  </button>
-                )}
-                <Link to="/product" className="btn btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
-                  {t('home.browse_all')} →
-                </Link>
-              </div>
+              <Link to="/auction" className="btn btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
+                {t('home.view_all_auctions')}
+              </Link>
             </div>
 
-            {loadingLatest ? (
-              <div className="home-products-loading">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="home-product-skeleton" />
-                ))}
+            <div className="home-auctions-grid">
+              {ongoingAuctions.map((auction) => (
+                <div
+                  key={auction.auctionId}
+                  className="home-auction-card glass-card"
+                  onClick={() => navigate('/auction')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="home-auction-img-wrap">
+                    {auction.productImageUrl ? (
+                      <img src={auction.productImageUrl} alt={auction.productName} className="home-auction-img" />
+                    ) : (
+                      <div className="home-auction-img-placeholder">⚡</div>
+                    )}
+                    <span className="home-auction-status-badge">
+                      <span className="live-dot"></span> LIVE
+                    </span>
+                  </div>
+
+                  <div className="home-auction-body">
+                    <span className="home-auction-category">{auction.categoryName || t('common.none')}</span>
+                    <h3 className="home-auction-title">{auction.productName}</h3>
+                    
+                    <div className="home-auction-price-box">
+                      <div>
+                        <span className="price-label">{t('auction.current_bid')}</span>
+                        <strong className="price-val">{formatCurrency(auction.currentPrice)}</strong>
+                      </div>
+                      <div>
+                        <span className="price-label">{t('auction.bid_count')}</span>
+                        <span className="bids-val">{auction.bidCount || 0} {t('home.bids_suffix')}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      className="home-auction-bid-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate('/auction');
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '4px' }}>gavel</span>
+                      {t('home.join_auction')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Upcoming Auctions Section */}
+      {upcomingAuctions.length > 0 && (
+        <section className="home-auctions-section" style={{ background: 'linear-gradient(180deg, rgba(234, 179, 8, 0.04) 0%, rgba(234, 179, 8, 0.08) 100%)' }}>
+          <div className="container">
+            <div className="home-section-header">
+              <div>
+                <span className="live-pill-badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04', borderColor: 'rgba(234, 179, 8, 0.4)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px', marginRight: '4px' }}>schedule</span>
+                  {t('auction.status_upcoming')}
+                </span>
+                <h2 className="section-title" style={{ marginTop: '8px' }}>{t('home.upcoming_auction_title')}</h2>
+                <p className="section-subtitle">{t('home.upcoming_auction_subtitle')}</p>
               </div>
-            ) : latestProducts.length > 0 ? (
+              <Link to="/auction" className="btn btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
+                {t('home.view_more_auctions')}
+              </Link>
+            </div>
+
+            <div className="home-auctions-grid">
+              {upcomingAuctions.map((auction) => (
+                <div
+                  key={auction.auctionId}
+                  className="home-auction-card glass-card"
+                  onClick={() => navigate('/auction')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="home-auction-img-wrap">
+                    {auction.productImageUrl ? (
+                      <img src={auction.productImageUrl} alt={auction.productName} className="home-auction-img" />
+                    ) : (
+                      <div className="home-auction-img-placeholder">⏳</div>
+                    )}
+                    <span className="home-auction-status-badge" style={{ color: '#ca8a04', borderColor: 'rgba(234, 179, 8, 0.4)' }}>
+                      {t('home.upcoming_status')}
+                    </span>
+                  </div>
+
+                  <div className="home-auction-body">
+                    <span className="home-auction-category">{auction.categoryName || t('common.none')}</span>
+                    <h3 className="home-auction-title">{auction.productName}</h3>
+                    
+                    <div className="home-auction-price-box">
+                      <div>
+                        <span className="price-label">{t('auction.starting_price')}</span>
+                        <strong className="price-val" style={{ color: '#ca8a04' }}>{formatCurrency(auction.startPrice || auction.currentPrice)}</strong>
+                      </div>
+                      <div>
+                        <span className="price-label">{t('auction.min_step')}</span>
+                        <span className="bids-val">+{formatCurrency(auction.minIncrement)}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      className="home-auction-bid-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate('/auction');
+                      }}
+                      style={{ background: '#ca8a04' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '4px' }}>notifications_active</span>
+                      {t('home.watch_auction')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Standard Buy-Now Products Section */}
+      <section className="home-products-section">
+        <div className="container">
+          <div className="home-section-header">
+            <div>
+              <span className="live-pill-badge" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#059669', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '14px', marginRight: '4px' }}>shopping_bag</span>
+                {t('home.direct_sale_badge')}
+              </span>
+              <h2 className="section-title" style={{ marginTop: '8px' }}>
+                {isLoggedIn ? t('home.products_interested') : t('home.latest_products')}
+              </h2>
+              <p className="section-subtitle">{t('home.direct_sale_subtitle')}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {isLoggedIn && (
+                <button className="btn btn-outline" onClick={() => setShowFavModal(true)} style={{ fontSize: '13px', padding: '8px 16px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', verticalAlign: 'text-bottom' }}>
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  {t('home.set_favorite_categories')}
+                </button>
+              )}
+              <Link to="/product" className="btn btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
+                {t('home.browse_all')} →
+              </Link>
+            </div>
+          </div>
+
+          {normalProducts.length > 0 ? (
+            <HomeProductSlider>
+              {normalProducts.map(p => (
+                <HomeProductCard
+                  key={p.productId}
+                  product={p}
+                  isWishlisted={wishlistIds.has(p.productId)}
+                  toggling={togglingId === p.productId}
+                  onToggleWishlist={handleToggleWishlist}
+                />
+              ))}
+            </HomeProductSlider>
+          ) : (
+            <div className="home-products-empty">
+              <span>🛍️</span>
+              <p>{t('common.no_data')}</p>
+            </div>
+          )}
+
+          {/* Top Popular Products Showcase */}
+          {topProducts.length > 0 && (
+            <div style={{ marginTop: '50px' }}>
+              <div className="home-section-header">
+                <div>
+                  <span className="live-pill-badge" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5', borderColor: 'rgba(99, 102, 241, 0.3)' }}>
+                    {t('home.top_deals_badge')}
+                  </span>
+                  <h2 className="section-title" style={{ marginTop: '8px' }}>{t('home.top_deals_title')}</h2>
+                  <p className="section-subtitle">{t('home.top_deals_subtitle')}</p>
+                </div>
+                <Link to="/product" className="home-view-all-link">
+                  {t('common.view_all')} →
+                </Link>
+              </div>
+
               <HomeProductSlider>
-                {latestProducts.map(p => (
+                {topProducts.map(p => (
                   <HomeProductCard
                     key={p.productId}
                     product={p}
@@ -551,55 +708,42 @@ export default function Home() {
                   />
                 ))}
               </HomeProductSlider>
-            ) : (
-              <div className="home-products-empty">
-                <span>🛍️</span>
-                <p>{t('common.no_data')}</p>
+            </div>
+          )}
+
+          {/* Random Discovery Section */}
+          {randomProducts.length > 0 && (
+            <div style={{ marginTop: '50px' }}>
+              <div className="home-section-header">
+                <div>
+                  <span className="live-pill-badge" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#db2777', borderColor: 'rgba(236, 72, 153, 0.3)' }}>
+                    {t('home.random_discovery_badge')}
+                  </span>
+                  <h2 className="section-title" style={{ marginTop: '8px' }}>{t('home.random_discovery_title')}</h2>
+                  <p className="section-subtitle">{t('home.random_discovery_subtitle')}</p>
+                </div>
+                <Link to="/product" className="home-view-all-link">
+                  {t('common.view_all')} →
+                </Link>
               </div>
-            )}
-          </div>
+
+              <HomeProductSlider>
+                {randomProducts.map(p => (
+                  <HomeProductCard
+                    key={p.productId}
+                    product={p}
+                    isWishlisted={wishlistIds.has(p.productId)}
+                    toggling={togglingId === p.productId}
+                    onToggleWishlist={handleToggleWishlist}
+                  />
+                ))}
+              </HomeProductSlider>
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="features-section">
-        <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">{t('home.why_choose_us')}</h2>
-            <p className="section-subtitle">{t('home.why_choose_subtitle')}</p>
-          </div>
 
-          <div className="features-grid grid-3-col">
-            <div className="feature-item glass-card">
-              <div className="feature-icon">🛡️</div>
-              <h3>{t('home.verified_sellers')}</h3>
-              <p>{t('home.verified_sellers_desc')}</p>
-            </div>
-            <div className="feature-item glass-card">
-              <div className="feature-icon">⚡</div>
-              <h3>{t('home.secure_payment')}</h3>
-              <p>{t('home.secure_payment_desc')}</p>
-            </div>
-            <div className="feature-item glass-card">
-              <div className="feature-icon">📈</div>
-              <h3>{t('home.ai_assistant')}</h3>
-              <p>{t('home.ai_assistant_desc')}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="cta-section">
-        <div className="container">
-          <div className="cta-card glass-panel">
-            <h2>{t('home.cta_title')}</h2>
-            <p>{t('home.cta_subtitle')}</p>
-            <div className="cta-buttons">
-              <Link to="/register" className="btn btn-primary">{t('home.cta_create_btn')}</Link>
-              <Link to="/product" className="btn btn-secondary">{t('home.cta_browse_btn')}</Link>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Favorite Categories Modal */}
       <FavoriteCategoriesModal
@@ -638,7 +782,7 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
 
   return (
     <div
-      className="home-product-card glass-card"
+      className={`home-product-card glass-card${isOutOfStock ? ' out-of-stock-card' : ''}`}
       onClick={() => navigate(`/product/${product.productId}`)}
       style={{ cursor: 'pointer' }}
     >
@@ -648,6 +792,13 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
         ) : (
           <div className="home-product-img-placeholder">🛍️</div>
         )}
+
+        {isOutOfStock && (
+          <span className="home-sold-out-badge">
+            {t('product.out_of_stock')}
+          </span>
+        )}
+
         {!isOutOfStock && !isOwn && (
           <button
             className={`home-wishlist-btn${isWishlisted ? ' active' : ''}`}
@@ -681,7 +832,7 @@ function HomeProductCard({ product, isWishlisted, toggling, onToggleWishlist }) 
             <span className="material-symbols-outlined">shopping_cart</span>
           </button>
         )}
-        {product.condition && (
+        {product.condition && !isOutOfStock && (
           <span className="home-product-condition">{product.condition}</span>
         )}
       </div>

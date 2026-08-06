@@ -55,7 +55,7 @@ export default function OrderManagement() {
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
-  const sellerId = user?.userId;
+  const sellerId = user?.userId || user?.id || user?.accountId;
 
   const statusMeta = useMemo(() => ({
     AwaitingPayment: { label: t('order_status.awaiting_payment'), className: 'awaiting' },

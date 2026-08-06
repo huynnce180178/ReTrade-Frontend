@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../../context/AuthContext';
@@ -178,7 +178,6 @@ export default function Login() {
                         required
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        placeholder="user@example.com"
                         className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm"
                       />
                     </div>
@@ -193,7 +192,6 @@ export default function Login() {
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
                           className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm pr-10"
                         />
                         <button

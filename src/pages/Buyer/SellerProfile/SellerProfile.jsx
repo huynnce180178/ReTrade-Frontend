@@ -202,12 +202,12 @@ export default function SellerProfile() {
         const queryStatus = productStatus !== '' ? productStatus : (activeTab === 'auction' ? 'Ready' : undefined);
         const res = await productService.getSellerProducts(sellerId, {
           page: productPage,
-          pageSize: 8,
+          pageSize: 6,
           status: queryStatus,
         });
         setSellerProducts(res.items || []);
         setProductsTotal(res.totalItems || 0);
-        setTotalPages(res.totalPages || 1);
+        setTotalPages(res.totalPages || Math.ceil((res.totalItems || res.items?.length || 0) / 6) || 1);
       } catch {
         setSellerProducts([]);
         setProductsTotal(0);
@@ -783,14 +783,14 @@ function SellerProductGrid({ products, loading, total, compact = false, hideStat
             ))}
           </div>
 
-          {totalPages > 1 && (
+          {products.length > 0 && (
             <div className="seller-products-pagination">
               <button
                 type="button"
                 disabled={productPage <= 1}
                 onClick={() => setProductPage(productPage - 1)}
               >
-                <span className="material-symbols-outlined">chevron_left</span>
+                ‹
               </button>
               {[...Array(totalPages)].map((_, i) => (
                 <button
@@ -807,7 +807,7 @@ function SellerProductGrid({ products, loading, total, compact = false, hideStat
                 disabled={productPage >= totalPages}
                 onClick={() => setProductPage(productPage + 1)}
               >
-                <span className="material-symbols-outlined">chevron_right</span>
+                ›
               </button>
             </div>
           )}

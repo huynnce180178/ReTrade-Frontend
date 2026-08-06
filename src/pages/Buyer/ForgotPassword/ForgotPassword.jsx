@@ -35,6 +35,7 @@ export default function ForgotPassword() {
   const [otp, setOtp] = useState(INITIAL_OTP);
   const [countdown, setCountdown] = useState(0);
   const [resending, setResending] = useState(false);
+  const [resendCount, setResendCount] = useState(0);
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -59,12 +60,9 @@ export default function ForgotPassword() {
     setLoading(true);
     try {
       await accountService.forgotPassword(trimmed);
-      showToast(language === 'vi' ? 'Mã OTP đã được gửi đến email của bạn.' : 'OTP code sent to your email.', 'success');
-      setEmail(trimmed);
-      setStep('resetForm');
+      setResendCount(1);
       setCountdown(60);
-      setOtp([...INITIAL_OTP]);
-    } catch (err) {
+      setStep('resetForm');
       showToast(getErrorMsg(err, language === 'vi' ? 'Email không tồn tại trong hệ thống.' : 'Email address not found.'), 'error');
     } finally {
       setLoading(false);
@@ -281,10 +279,12 @@ export default function ForgotPassword() {
                       type="button"
                       className="fp-resend-btn"
                       onClick={handleResendOtp}
-                      disabled={countdown > 0 || resending || loading}
+                      disabled={countdown > 0 || resending || loading || resendCount >= 3}
                     >
                       {resending
                         ? (language === 'vi' ? 'Đang gửi...' : 'Resending...')
+                        : resendCount >= 3
+                        ? (language === 'vi' ? 'Đã đạt giới hạn gửi (3/3)' : 'Resend limit reached (3/3)')
                         : countdown > 0
                         ? (language === 'vi' ? `Gửi lại sau (${countdown}s)` : `Resend in (${countdown}s)`)
                         : (language === 'vi' ? 'Bấm để gửi lại' : 'Resend Code')}

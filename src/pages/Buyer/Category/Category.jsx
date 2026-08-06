@@ -26,6 +26,8 @@ export default function Category() {
   const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Active' | 'Inactive'
   const [isRootOnly, setIsRootOnly] = useState(false);
   const [sortBy, setSortBy] = useState('NameAsc'); // 'NameAsc' | 'NameDesc' | 'Newest' | 'Oldest'
+  const [page, setPage] = useState(1);
+  const pageSize = 9;
   const [statusConfirmModal, setStatusConfirmModal] = useState({
     open: false,
     category: null,
@@ -69,6 +71,12 @@ export default function Category() {
 
     return roots;
   }, [categories]);
+
+  const totalPages = Math.ceil(categoryTree.length / pageSize) || 1;
+  const paginatedTree = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return categoryTree.slice(start, start + pageSize);
+  }, [categoryTree, page, pageSize]);
 
   const renderActionButtons = (cat) => (
     <div className="cat-actions-cell" onClick={(e) => e.stopPropagation()}>
@@ -140,6 +148,7 @@ export default function Category() {
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
   const [editingCategory, setEditingCategory] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -231,6 +240,7 @@ export default function Category() {
   };
 
   useEffect(() => {
+    setPage(1);
     fetchCategories();
   }, [debouncedSearchTerm, statusFilter, isRootOnly, sortBy, isAdminView]);
 
@@ -475,6 +485,8 @@ export default function Category() {
 
   const handleSaveCategory = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
+
     if (!name.trim()) {
       showToast(t('admin.categories.msg_name_required'), 'warning');
       return;
@@ -488,6 +500,7 @@ export default function Category() {
       }
     }
 
+    setIsSaving(true);
     const payload = {
       name: name.trim(),
       description: description.trim(),
@@ -511,28 +524,29 @@ export default function Category() {
       const targetCatId = modalMode === 'create' ? null : (editingCategory?.categoryId || selectedCategory?.categoryId);
 
       if (modalMode === 'create') {
-        showToast(t('admin.categories.msg_creating'), 'info');
         savedCategory = await categoryService.create(payload);
-        showToast(t('admin.categories.msg_create_success'), 'success');
       } else {
-        showToast(t('admin.categories.msg_updating'), 'info');
         savedCategory = await categoryService.update(targetCatId, payload);
-        showToast(t('admin.categories.msg_update_success'), 'success');
       }
 
       if (selectedImageFile && (savedCategory || modalMode === 'edit')) {
-        const categoryIdToUpload = modalMode === 'create' ? savedCategory.categoryId : targetCatId;
-        showToast(t('admin.categories.msg_uploading_img'), 'info');
-        const imgRes = await categoryService.uploadImage(categoryIdToUpload, selectedImageFile);
-        if (imgRes?.imageUrl && modalMode === 'edit') {
-          setSelectedCategory(prev => ({ ...prev, imageUrl: imgRes.imageUrl }));
+        const categoryIdToUpload = modalMode === 'create' ? (savedCategory?.categoryId || savedCategory?.data?.categoryId) : targetCatId;
+        if (categoryIdToUpload) {
+          const imgRes = await categoryService.uploadImage(categoryIdToUpload, selectedImageFile);
+          if (imgRes?.imageUrl && modalMode === 'edit') {
+            setSelectedCategory(prev => ({ ...prev, imageUrl: imgRes.imageUrl }));
+          }
         }
       }
+
+      showToast(modalMode === 'create' ? t('admin.categories.msg_create_success') : t('admin.categories.msg_update_success'), 'success');
 
       handleCloseModal();
       await fetchCategories();
     } catch (err) {
       showToast(getApiErrorMessage(err, 'admin.categories.msg_save_error'), 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -732,7 +746,7 @@ export default function Category() {
               </div>
 
               <div className="diagram-nodes-grid">
-                {categoryTree.map((rootCat) => {
+                {paginatedTree.map((rootCat) => {
                   const childCount = rootCat.children?.length || 0;
                   const validAttrs = rootCat.attributes?.filter((a) => !a.isDeleted) || [];
 
@@ -836,6 +850,60 @@ export default function Category() {
                   );
                 })}
               </div>
+
+              {categoryTree.length > 0 && (
+                <div className="admin-category-pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '32px', paddingBottom: '16px' }}>
+                  <button 
+                    type="button"
+                    disabled={page === 1} 
+                    onClick={() => setPage(p => p - 1)}
+                    style={{ 
+                      width: '36px', height: '36px', 
+                      display: 'flex', justifyContent: 'center', alignItems: 'center', 
+                      backgroundColor: 'white', border: '1px solid #eaeaea', 
+                      borderRadius: '6px', cursor: page === 1 ? 'not-allowed' : 'pointer',
+                      color: page === 1 ? '#ccc' : '#333'
+                    }}
+                  >
+                    &lt;
+                  </button>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(num => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setPage(num)}
+                      style={{
+                        width: '36px', height: '36px', 
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        backgroundColor: page === num ? '#0a2a1f' : 'white',
+                        color: page === num ? 'white' : '#333',
+                        border: page === num ? 'none' : '1px solid #eaeaea',
+                        borderRadius: '6px',
+                        fontWeight: page === num ? '600' : 'normal',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {num}
+                    </button>
+                  ))}
+
+                  <button 
+                    type="button"
+                    disabled={page >= totalPages} 
+                    onClick={() => setPage(p => p + 1)}
+                    style={{ 
+                      width: '36px', height: '36px', 
+                      display: 'flex', justifyContent: 'center', alignItems: 'center', 
+                      backgroundColor: 'white', border: '1px solid #eaeaea', 
+                      borderRadius: '6px', cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+                      color: page >= totalPages ? '#ccc' : '#333'
+                    }}
+                  >
+                    &gt;
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="category-list-container">
@@ -1045,24 +1113,7 @@ export default function Category() {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">{t('admin.categories.col_parent')}</label>
-                  <select 
-                    className="form-input" 
-                    value={parentId} 
-                    onChange={(e) => setParentId(e.target.value)}
-                  >
-                    <option value="">{t('admin.categories.root_category')}</option>
-                    {categories
-                      .filter(c => modalMode === 'create' || c.categoryId !== selectedCategory?.categoryId) // prevent self-referencing loop
-                      .map(c => (
-                        <option key={c.categoryId} value={c.categoryId}>
-                          {c.name} ({c.categoryId})
-                        </option>
-                      ))
-                    }
-                  </select>
-                </div>
+
 
                 <div className="form-group">
                   <label className="form-label">{t('admin.categories.description')}</label>
@@ -1224,7 +1275,9 @@ export default function Category() {
 
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>{t('common.cancel')}</button>
-                <button type="submit" className="btn btn-primary">{t('admin.categories.save_changes')}</button>
+                <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                  {isSaving ? <span className="btn-spinner"></span> : t('admin.categories.save_changes')}
+                </button>
               </div>
             </form>
           </div>

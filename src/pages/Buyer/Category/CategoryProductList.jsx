@@ -1,35 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link, useParams } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
+import { useLanguage } from '../../../context/LanguageContext';
+import { formatFormattedNumber, parseRawNumber } from '../../../utils/numberUtils';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 import '../../../styles/Product.css';
 
-const CONDITIONS = ['New', 'Like New', 'Good', 'Fair'];
-const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest First' },
-  { value: 'oldest', label: 'Oldest First' },
-  { value: 'price_asc', label: 'Price: Low to High' },
-  { value: 'price_desc', label: 'Price: High to Low' },
-  { value: 'name_asc', label: 'Name: A → Z' },
-  { value: 'name_desc', label: 'Name: Z → A' },
-];
-
-function formatPrice(price) {
-  if (price == null) return null;
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-}
-
-function timeAgo(dateStr) {
+function timeAgo(dateStr, language = 'en') {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return language === 'vi' ? `${mins} phút trước` : `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return language === 'vi' ? `${hrs} giờ trước` : `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('vi-VN');
+  if (days < 30) return language === 'vi' ? `${days} ngày trước` : `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US');
 }
 
 // Skeleton Card
@@ -52,6 +39,23 @@ export default function CategoryProductList() {
   const { categoryId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
+  const { t, language, formatCurrency } = useLanguage();
+
+  const CONDITIONS = [
+    { value: 'New', label: t('product_list.cond_new') },
+    { value: 'Like New', label: t('product_list.cond_likenew') },
+    { value: 'Good', label: t('product_list.cond_good') },
+    { value: 'Fair', label: t('product_list.cond_fair') },
+  ];
+
+  const SORT_OPTIONS = [
+    { value: 'newest', label: t('product_list.sort_newest') },
+    { value: 'oldest', label: t('product_list.sort_oldest') },
+    { value: 'price_asc', label: t('product_list.sort_price_asc') },
+    { value: 'price_desc', label: t('product_list.sort_price_desc') },
+    { value: 'name_asc', label: t('product_list.sort_name_asc') },
+    { value: 'name_desc', label: t('product_list.sort_name_desc') },
+  ];
 
   // Data states
   const [products, setProducts] = useState([]);
@@ -86,7 +90,7 @@ export default function CategoryProductList() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const data = await categoryService.getAllActive("?$filter=Status eq 'Active'&$orderby=Name asc");
+        const data = await categoryService.getAllActive("?$filter=Status eq 'Active'&$orderby=Name asc&$top=100");
         const arr = Array.isArray(data) ? data : (data?.value || []);
         setCategories(arr);
       } catch {
@@ -115,7 +119,7 @@ export default function CategoryProductList() {
         const params = {
           Status: 'Accepted',
           Page: currentPage,
-          PageSize: 12,
+          PageSize: 6,
           CategoryId: categoryId
         };
         if (searchTerm) params.SearchTerm = searchTerm;
@@ -129,13 +133,13 @@ export default function CategoryProductList() {
         setTotalItems(data.totalItems || 0);
         setTotalPages(data.totalPages || 1);
       } catch (err) {
-        showToast('Failed to load products.', 'error');
+        showToast(t('product_list.failed_load'), 'error');
       } finally {
         setLoading(false);
       }
     };
     fetchProducts();
-  }, [currentPage, searchTerm, categoryId, condition, sortBy, minPriceParam, maxPriceParam]);
+  }, [currentPage, searchTerm, categoryId, condition, sortBy, minPriceParam, maxPriceParam, showToast, t]);
 
   // Update URL search params helper
   const updateParams = useCallback((updates) => {
@@ -162,7 +166,7 @@ export default function CategoryProductList() {
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [minPriceInput, maxPriceInput]);
+  }, [minPriceInput, maxPriceInput, minPriceParam, maxPriceParam, updateParams]);
 
   const handlePageChange = (page) => {
     updateParams({ page: String(page) });
@@ -185,8 +189,7 @@ export default function CategoryProductList() {
 
   // Pagination renderer
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
-    const pages = [];
+    if (products.length === 0) return null;
     const maxVisible = 5;
     let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let end = Math.min(totalPages, start + maxVisible - 1);
@@ -194,65 +197,83 @@ export default function CategoryProductList() {
       start = Math.max(1, end - maxVisible + 1);
     }
 
-    pages.push(
-      <button key="prev" className="pagination-btn" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage <= 1}>
-        ‹ Prev
-      </button>
-    );
-
-    if (start > 1) {
-      pages.push(<button key={1} className="pagination-btn" onClick={() => handlePageChange(1)}>1</button>);
-      if (start > 2) pages.push(<span key="e1" className="pagination-ellipsis">…</span>);
-    }
-
-    for (let i = start; i <= end; i++) {
-      pages.push(
-        <button key={i} className={`pagination-btn ${i === currentPage ? 'active' : ''}`} onClick={() => handlePageChange(i)}>
-          {i}
+    return (
+      <div className="pagination-container">
+        <button
+          type="button"
+          className="pagination-btn"
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+        >
+          ‹
         </button>
-      );
-    }
 
-    if (end < totalPages) {
-      if (end < totalPages - 1) pages.push(<span key="e2" className="pagination-ellipsis">…</span>);
-      pages.push(<button key={totalPages} className="pagination-btn" onClick={() => handlePageChange(totalPages)}>{totalPages}</button>);
-    }
+        {start > 1 && (
+          <>
+            <button type="button" className="pagination-btn" onClick={() => handlePageChange(1)}>1</button>
+            {start > 2 && <span className="pagination-ellipsis">…</span>}
+          </>
+        )}
 
-    pages.push(
-      <button key="next" className="pagination-btn" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages}>
-        Next ›
-      </button>
+        {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(num => (
+          <button
+            key={num}
+            type="button"
+            className={`pagination-btn ${num === currentPage ? 'active' : ''}`}
+            onClick={() => handlePageChange(num)}
+          >
+            {num}
+          </button>
+        ))}
+
+        {end < totalPages && (
+          <>
+            {end < totalPages - 1 && <span className="pagination-ellipsis">…</span>}
+            <button type="button" className="pagination-btn" onClick={() => handlePageChange(totalPages)}>{totalPages}</button>
+          </>
+        )}
+
+        <button
+          type="button"
+          className="pagination-btn"
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+        >
+          ›
+        </button>
+      </div>
     );
-
-    return <div className="pagination-container">{pages}</div>;
   };
 
   const hasActiveFilters = condition || minPriceParam || maxPriceParam;
 
   return (
     <div className="product-page container animate-fade-in">
-      {/* Page Header */}
-      <div className="product-page-header">
-        <div className="product-page-header-left">
-          <div className="product-breadcrumb">
-            <Link to="/">Home</Link>
+      {/* Breadcrumb */}
+      <div className="product-breadcrumb" style={{ marginBottom: '16px' }}>
+        <Link to="/">{t('product_list.home')}</Link>
+        <span className="breadcrumb-sep">›</span>
+        <Link to="/product">{t('product_list.products')}</Link>
+        {categoryName && (
+          <>
             <span className="breadcrumb-sep">›</span>
-            <Link to="/product">Products</Link>
-            {categoryName && (
-              <>
-                <span className="breadcrumb-sep">›</span>
-                <span>{categoryName}</span>
-              </>
-            )}
-          </div>
-          <h1>{categoryName || 'Category Products'}</h1>
-          <p>Discover quality pre-owned goods in this category</p>
+            <span>{categoryName}</span>
+          </>
+        )}
+      </div>
+
+      {/* Category Hero Banner */}
+      <div className="category-hero-banner">
+        <div className="category-hero-content">
+          <span className="category-hero-badge">{t('product_list.category_badge')}</span>
+          <h1>{categoryName || t('product_list.category_products')}</h1>
+          <p>{t('product_list.category_subtitle')}</p>
         </div>
         <button className="mobile-filter-toggle" onClick={() => setShowMobileFilter(!showMobileFilter)}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
           </svg>
-          Filters
+          {t('product_list.filters')}
         </button>
       </div>
 
@@ -263,18 +284,18 @@ export default function CategoryProductList() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
             </svg>
-            Filters
+            {t('product_list.filters')}
           </div>
 
           {/* Category Filter */}
           <div className="filter-section">
-            <div className="filter-section-title">Category</div>
+            <div className="filter-section-title">{t('product_list.category')}</div>
             <div className="filter-category-list">
               <div
-                className={`filter-category-item`}
+                className={`filter-category-item ${!categoryId ? 'active' : ''}`}
                 onClick={() => navigate('/product')}
               >
-                All Categories
+                <span>{t('product_list.all_categories')}</span>
               </div>
               {rootCategories.map(cat => (
                 <React.Fragment key={cat.categoryId}>
@@ -282,8 +303,8 @@ export default function CategoryProductList() {
                     className={`filter-category-item ${categoryId === cat.categoryId ? 'active' : ''}`}
                     onClick={() => navigate(`/category/${cat.categoryId}`)}
                   >
-                    {cat.imageUrl && <img src={cat.imageUrl} alt={cat.name} />}
-                    {cat.name}
+                    {cat.imageUrl && <img src={cat.imageUrl} alt={cat.name} className="filter-category-thumb" />}
+                    <span>{cat.name}</span>
                   </div>
                   {getCategoryChildren(cat.categoryId).map(child => (
                     <div
@@ -292,7 +313,8 @@ export default function CategoryProductList() {
                       style={{ paddingLeft: '32px', fontSize: '12px' }}
                       onClick={() => navigate(`/category/${child.categoryId}`)}
                     >
-                      {child.name}
+                      {child.imageUrl && <img src={child.imageUrl} alt={child.name} className="filter-category-thumb" />}
+                      <span>{child.name}</span>
                     </div>
                   ))}
                 </React.Fragment>
@@ -302,43 +324,43 @@ export default function CategoryProductList() {
 
           {/* Price Range */}
           <div className="filter-section">
-            <div className="filter-section-title">Price Range</div>
+            <div className="filter-section-title">{t('product_list.price_range')}</div>
             <div className="price-range-inputs">
               <input
-                type="number"
-                placeholder="Min"
-                value={minPriceInput}
-                onChange={(e) => setMinPriceInput(e.target.value)}
-                min="0"
+                type="text"
+                inputMode="numeric"
+                placeholder={t('product_list.min')}
+                value={formatFormattedNumber(minPriceInput)}
+                onChange={(e) => setMinPriceInput(parseRawNumber(e.target.value))}
               />
               <span className="price-range-sep">—</span>
               <input
-                type="number"
-                placeholder="Max"
-                value={maxPriceInput}
-                onChange={(e) => setMaxPriceInput(e.target.value)}
-                min="0"
+                type="text"
+                inputMode="numeric"
+                placeholder={t('product_list.max')}
+                value={formatFormattedNumber(maxPriceInput)}
+                onChange={(e) => setMaxPriceInput(parseRawNumber(e.target.value))}
               />
             </div>
           </div>
 
           {/* Condition */}
           <div className="filter-section">
-            <div className="filter-section-title">Condition</div>
+            <div className="filter-section-title">{t('product_list.condition')}</div>
             <div className="condition-chips">
               <button
                 className={`condition-chip ${!condition ? 'active' : ''}`}
                 onClick={() => updateParams({ condition: '' })}
               >
-                All
+                {t('product_list.all')}
               </button>
               {CONDITIONS.map(c => (
                 <button
-                  key={c}
-                  className={`condition-chip ${condition === c ? 'active' : ''}`}
-                  onClick={() => updateParams({ condition: condition === c ? '' : c })}
+                  key={c.value}
+                  className={`condition-chip ${condition === c.value ? 'active' : ''}`}
+                  onClick={() => updateParams({ condition: condition === c.value ? '' : c.value })}
                 >
-                  {c}
+                  {c.label}
                 </button>
               ))}
             </div>
@@ -351,7 +373,7 @@ export default function CategoryProductList() {
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </svg>
-              Reset Filters
+              {t('product_list.reset_filters')}
             </button>
           )}
         </aside>
@@ -364,20 +386,20 @@ export default function CategoryProductList() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              Search results for: <strong>"{searchTerm}"</strong>
-              <button className="active-search-clear" onClick={handleClearSearch}>Clear</button>
+              {t('product_list.search_results_for')} <strong>"{searchTerm}"</strong>
+              <button className="active-search-clear" onClick={handleClearSearch}>{t('product_list.clear')}</button>
             </div>
           )}
 
           {/* Toolbar: results count + sort */}
           <div className="product-toolbar">
             <div className="product-result-count">
-              {loading ? 'Loading...' : (
-                <>Showing <strong>{products.length}</strong> of <strong>{totalItems}</strong> products</>
+              {loading ? t('product_list.loading') : (
+                t('product_list.showing_count', { count: products.length, total: totalItems })
               )}
             </div>
             <div className="product-sort-wrapper">
-              <span className="product-sort-label">Sort:</span>
+              <span className="product-sort-label">{t('product_list.sort')}</span>
               <select
                 className="product-sort-select"
                 value={sortBy}
@@ -398,15 +420,15 @@ export default function CategoryProductList() {
           ) : products.length === 0 ? (
             <div className="product-empty-state">
               <span className="material-symbols-outlined product-empty-icon-symbol" style={{ fontSize: '64px', color: 'var(--text-muted)', marginBottom: '16px' }}>search</span>
-              <h3>No Products Found</h3>
+              <h3>{t('product_list.no_products_found')}</h3>
               <p>
                 {searchTerm
-                  ? `We couldn't find any products matching "${searchTerm}". Try different keywords or remove some filters.`
-                  : 'No products match your current filters. Try adjusting your search criteria.'}
+                  ? t('product_list.no_products_search_match', { search: searchTerm })
+                  : t('product_list.no_products_filter_match')}
               </p>
               {hasActiveFilters && (
                 <button className="btn btn-outline" style={{ marginTop: '16px' }} onClick={handleResetFilters}>
-                  Clear All Filters
+                  {t('product_list.clear_all_filters')}
                 </button>
               )}
             </div>
@@ -429,23 +451,23 @@ export default function CategoryProductList() {
                     )}
                   </div>
                   <div className="product-card-body">
-                    <span className="product-card-category">{product.categoryName || 'Uncategorized'}</span>
+                    <span className="product-card-category">{product.categoryName || t('product_list.uncategorized')}</span>
                     <span className="product-card-name">{product.name}</span>
                     <span className="product-card-seller">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
                       </svg>
-                      {product.sellerName || 'Unknown Seller'}
+                      {product.sellerName || t('product_list.unknown_seller')}
                     </span>
                   </div>
                   <div className="product-card-footer">
                     {product.price != null ? (
-                      <span className="product-card-price">{formatPrice(product.price)}</span>
+                      <span className="product-card-price">{formatCurrency(product.price)}</span>
                     ) : (
-                      <span className="product-card-price-no">Auction</span>
+                      <span className="product-card-price-no">{t('product_list.auction')}</span>
                     )}
-                    <span className="product-card-date">{timeAgo(product.createdAt)}</span>
+                    <span className="product-card-date">{timeAgo(product.createdAt, language)}</span>
                   </div>
                 </div>
               ))}

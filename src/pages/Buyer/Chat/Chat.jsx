@@ -463,9 +463,13 @@ export default function Chat({ basePath = '/chat' }) {
     let disposed = false;
 
     const upsertMessage = (message) => {
+      if (!message || !message.chatId) return;
+
       setMessages((current) => {
         if (activeRoomRef.current !== message.roomId) return current;
-        if (current.some((item) => item.chatId === message.chatId)) return current;
+        if (current.some((item) => item.chatId === message.chatId)) {
+          return current.map((item) => (item.chatId === message.chatId ? { ...item, ...message } : item));
+        }
         return [...current, message];
       });
 
@@ -488,35 +492,90 @@ export default function Chat({ basePath = '/chat' }) {
 
     const handleNotification = (payload) => {
       const message = payload?.message || payload?.Message;
-      if (!message || activeRoomRef.current === message.roomId) return;
-      setRooms((current) => current.map((room) => (
-        room.roomId === message.roomId
-          ? {
-              ...room,
-              lastMessage: message,
-              unreadCount: (room.unreadCount || 0) + 1,
-              updatedAt: message.createdAt || new Date().toISOString(),
-            }
-          : room
-      )));
+      const notificationRoomId = payload?.roomId || payload?.RoomId || message?.roomId;
+      if (!message) return;
+
+      if (activeRoomRef.current === notificationRoomId) {
+        setMessages((current) => {
+          if (current.some((item) => item.chatId === message.chatId)) {
+            return current.map((item) => (item.chatId === message.chatId ? { ...item, ...message } : item));
+          }
+          return [...current, message];
+        });
+        if (message.senderId !== user.userId) {
+          chatService.markAsRead(notificationRoomId).catch(() => {});
+        }
+      }
+
+      setRooms((current) => {
+        const roomExists = current.some((r) => r.roomId === notificationRoomId);
+        if (!roomExists) {
+          chatService.getRooms().then((list) => {
+            if (Array.isArray(list)) setRooms(list);
+          }).catch(() => {});
+          return current;
+        }
+
+        return current.map((room) => (
+          room.roomId === notificationRoomId
+            ? {
+                ...room,
+                lastMessage: message,
+                unreadCount: activeRoomRef.current === notificationRoomId ? room.unreadCount : (room.unreadCount || 0) + 1,
+                updatedAt: message.createdAt || new Date().toISOString(),
+              }
+            : room
+        ));
+      });
     };
 
     const handleMessagesRead = (payload) => {
       const readerId = payload?.readerId || payload?.ReaderId;
+      const readRoomId = payload?.roomId || payload?.RoomId;
       if (!readerId || readerId === user.userId) return;
-      setMessages((current) => current.map((message) =>
-        message.senderId === user.userId ? { ...message, isRead: true, readAt: payload.readAt || payload.ReadAt } : message
+
+      if (readRoomId === activeRoomRef.current) {
+        setMessages((current) => current.map((message) =>
+          message.senderId === user.userId ? { ...message, isRead: true, readAt: payload.readAt || payload.ReadAt } : message
+        ));
+      }
+
+      setRooms((current) => current.map((room) =>
+        room.roomId === readRoomId ? { ...room, unreadCount: 0 } : room
       ));
     };
 
-    const handleMessageRecalled = (message) => {
-      if (!message?.chatId) return;
+    const handleMessageRecalled = (payload) => {
+      const message = payload?.chatId ? payload : (payload?.message || payload?.Message);
+      const chatId = message?.chatId || message?.ChatId || payload?.chatId || payload?.ChatId;
+      const rId = message?.roomId || message?.RoomId || payload?.roomId || payload?.RoomId;
+      if (!chatId) return;
+
       setMessages((current) => current.map((item) =>
-        item.chatId === message.chatId ? { ...item, ...message, isRecalled: true } : item
+        item.chatId === chatId
+          ? {
+              ...item,
+              ...message,
+              isRecalled: true,
+              message: 'Tin nhắn đã bị thu hồi',
+              messageType: 'Recall',
+              canRecall: false,
+            }
+          : item
       ));
+
       setRooms((current) => current.map((room) =>
-        room.roomId === message.roomId && room.lastMessage?.chatId === message.chatId
-          ? { ...room, lastMessage: { ...room.lastMessage, ...message, isRecalled: true } }
+        room.roomId === rId && room.lastMessage?.chatId === chatId
+          ? {
+              ...room,
+              lastMessage: {
+                ...room.lastMessage,
+                ...message,
+                isRecalled: true,
+                message: 'Tin nhắn đã bị thu hồi',
+                messageType: 'Recall',
+              },
+            }
           : room
       ));
     };
@@ -524,8 +583,25 @@ export default function Chat({ basePath = '/chat' }) {
     const handleMessageDeleted = (payload) => {
       const chatId = payload?.chatId || payload?.ChatId;
       const payloadRoomId = payload?.roomId || payload?.RoomId;
-      if (!chatId || payloadRoomId !== activeRoomRef.current) return;
-      setMessages((current) => current.filter((message) => message.chatId !== chatId));
+      if (!chatId) return;
+
+      if (payloadRoomId === activeRoomRef.current) {
+        setMessages((current) => current.filter((message) => message.chatId !== chatId));
+      }
+
+      setRooms((current) => current.map((room) => {
+        if (room.roomId !== payloadRoomId) return room;
+        if (room.lastMessage?.chatId === chatId) {
+          return {
+            ...room,
+            lastMessage: {
+              ...room.lastMessage,
+              message: 'Tin nhắn đã xóa',
+            },
+          };
+        }
+        return room;
+      }));
     };
 
     connection.on('ReceiveMessage', upsertMessage);
@@ -534,11 +610,21 @@ export default function Chat({ basePath = '/chat' }) {
     connection.on('MessageRecalled', handleMessageRecalled);
     connection.on('MessageDeleted', handleMessageDeleted);
 
+    connection.onreconnected(async () => {
+      await connection.invoke('JoinUserNotifications').catch(() => {});
+      if (activeRoomRef.current) {
+        await connection.invoke('JoinRoom', activeRoomRef.current).catch(() => {});
+      }
+    });
+
     const start = async () => {
       try {
         await connection.start();
         if (!disposed) {
           await connection.invoke('JoinUserNotifications');
+          if (activeRoomRef.current) {
+            await connection.invoke('JoinRoom', activeRoomRef.current).catch(() => {});
+          }
           setConnectionReady(true);
         }
       } catch (error) {

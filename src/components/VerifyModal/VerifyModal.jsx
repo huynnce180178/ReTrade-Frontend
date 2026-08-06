@@ -12,6 +12,7 @@ export default function VerifyModal({ isOpen, onClose, email }) {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [resendCount, setResendCount] = useState(0);
   
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -28,18 +29,19 @@ export default function VerifyModal({ isOpen, onClose, email }) {
   useEffect(() => {
     if (isOpen) {
       setOtp(['', '', '', '', '', '']);
-      if (inputRefs.current[0]) {
-        setTimeout(() => inputRefs.current[0].focus(), 100);
-      }
+      setResendCount(0);
+      setCountdown(0);
+      setTimeout(() => inputRefs.current[0]?.focus(), 100);
     }
   }, [isOpen]);
 
   const handleChange = (index, value) => {
-    if (isNaN(value)) return;
+    if (!/^\d*$/.test(value)) return;
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    if (value !== '' && index < 5) {
+
+    if (value && index < 5) {
       inputRefs.current[index + 1].focus();
     }
   };
@@ -67,13 +69,20 @@ export default function VerifyModal({ isOpen, onClose, email }) {
   };
 
   const handleResend = async () => {
+    if (resendCount >= 3) {
+      showToast('Bạn đã đạt giới hạn gửi lại mã OTP 3 lần trong 15 phút. Vui lòng thử lại sau.', 'error');
+      return;
+    }
     setResending(true);
     try {
       await accountService.resendOtp(email);
+      const nextCount = resendCount + 1;
+      setResendCount(nextCount);
       showToast(t('toast.saved_success'), 'success');
       setCountdown(60);
     } catch (err) {
-      showToast(t('common.error_occurred'), 'error');
+      const errorMsg = err.response?.data?.message || err.message || t('common.error_occurred');
+      showToast(errorMsg, 'error');
     } finally {
       setResending(false);
     }

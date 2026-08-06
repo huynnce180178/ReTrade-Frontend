@@ -45,6 +45,10 @@ export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSu
       showToast(t('change_password_recovery.fill_all_fields_err'), 'error');
       return;
     }
+    if (cleanOld === cleanNew) {
+      showToast(t('change_password_recovery.same_password_err') || 'Mật khẩu mới phải khác mật khẩu hiện tại.', 'error');
+      return;
+    }
     if (!isPasswordValid) {
       showToast(t('change_password_recovery.satisfy_req_err'), 'error');
       return;

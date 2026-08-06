@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import accountService from '../../../services/accountService';
 import { useToast } from '../../../context/ToastContext';
@@ -8,7 +8,7 @@ import '../../../styles/MyAccount.css';
 
 export default function ChangePassword() {
   const { showToast } = useToast();
-  const { user, clearMustChangePassword } = useAuth();
+  const { user, logout, clearMustChangePassword } = useAuth();
   const { t, language } = useLanguage();
   const isPasswordSet = user?.isPasswordSet !== false;
 
@@ -46,6 +46,10 @@ export default function ChangePassword() {
       showToast(language === 'vi' ? 'Vui lòng nhập đầy đủ các trường.' : 'All fields are required.', 'error');
       return;
     }
+    if (isPasswordSet && cleanOldPassword === cleanNewPassword) {
+      showToast(language === 'vi' ? 'Mật khẩu mới phải khác mật khẩu hiện tại.' : 'New password must be different from current password.', 'error');
+      return;
+    }
     if (!isPasswordValid) {
       showToast(language === 'vi' ? 'Vui lòng đáp ứng đầy đủ yêu cầu mật khẩu.' : 'Please satisfy all password requirements.', 'error');
       return;
@@ -60,8 +64,8 @@ export default function ChangePassword() {
       }
       showToast(
         isPasswordSet
-          ? (language === 'vi' ? 'Đổi mật khẩu thành công.' : 'Password changed successfully.')
-          : (language === 'vi' ? 'Đặt mật khẩu thành công.' : 'Password set successfully.'),
+          ? (language === 'vi' ? 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' : 'Password changed successfully. Please log in again.')
+          : (language === 'vi' ? 'Đặt mật khẩu thành công. Vui lòng đăng nhập lại.' : 'Password set successfully. Please log in again.'),
         'success'
       );
       clearMustChangePassword?.();
@@ -69,6 +73,9 @@ export default function ChangePassword() {
       setNewPassword('');
       setConfirmPassword('');
       setLoading(false);
+      setTimeout(() => {
+        logout();
+      }, 1500);
     } catch (err) {
       const serverMsg = err?.response?.data?.message || err?.response?.data;
       showToast(

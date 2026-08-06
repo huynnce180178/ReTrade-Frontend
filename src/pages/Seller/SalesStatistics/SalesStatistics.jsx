@@ -31,7 +31,7 @@ export default function SalesStatistics() {
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
-  const sellerId = user?.userId || user?.id;
+  const sellerId = user?.userId || user?.id || user?.accountId;
 
   const fetchSalesStats = useCallback(async () => {
     if (!sellerId) return;

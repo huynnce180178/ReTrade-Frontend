@@ -201,19 +201,28 @@ export default function Header() {
     const connection = createChatHubConnection();
     let isSubscribed = true;
 
-    connection.on('ReceiveMessage', (message) => {
+    const handleChatNotification = (payload) => {
       if (!isSubscribed) return;
+      const message = payload?.message || payload?.Message;
       const uId = user.userId || user.id;
       if (message && message.senderId !== uId) {
         setChatUnreadCount((prev) => prev + 1);
       }
+    };
+
+    connection.on('ChatNotification', handleChatNotification);
+    connection.onreconnected(() => {
+      connection.invoke('JoinUserNotifications').catch(() => {});
     });
 
-    connection.start().catch(() => { });
+    connection.start()
+      .then(() => connection.invoke('JoinUserNotifications'))
+      .catch(() => {});
 
     return () => {
       isSubscribed = false;
-      connection.stop().catch(() => { });
+      connection.off('ChatNotification', handleChatNotification);
+      connection.stop().catch(() => {});
     };
   }, [user]);
 

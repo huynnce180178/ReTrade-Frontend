@@ -356,6 +356,10 @@ export default function UserAccounts() {
 
   const openStatusActionModal = (user) => {
     if (!user?.accountId) return;
+    if (user?.primaryRole?.toLowerCase() === 'admin') {
+      showToast('Không thể thực hiện khóa/mở khóa đối với tài khoản Admin.', 'error');
+      return;
+    }
     setPendingActionUser(user);
     setSelectedBanReasonKey('');
     setCustomBanReason('');
@@ -677,9 +681,9 @@ export default function UserAccounts() {
                               <button
                                 type="button"
                                 className={`admin-tbl-action-btn ${isInactiveStatus(user.status) ? 'unban-btn' : 'ban-btn'}`}
-                                title={isInactiveStatus(user.status) ? t('admin.users.unban') : t('admin.users.ban')}
+                                title={user.primaryRole?.toLowerCase() === 'admin' ? 'Không thể thao tác Admin' : isInactiveStatus(user.status) ? t('admin.users.unban') : t('admin.users.ban')}
                                 onClick={() => openStatusActionModal(user)}
-                                disabled={currentUser?.accountId === user.accountId}
+                                disabled={currentUser?.accountId === user.accountId || user.primaryRole?.toLowerCase() === 'admin'}
                               >
                                 <span className="material-symbols-outlined">
                                   {isInactiveStatus(user.status) ? 'check_circle' : 'block'}

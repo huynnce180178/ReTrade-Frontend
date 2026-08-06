@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import offerService from '../../../services/offerService';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { formatFormattedNumber, parseRawNumber } from '../../../utils/numberUtils';
 
 function formatVnd(value) {
   if (value == null) return '—';
@@ -460,11 +461,11 @@ export default function OfferList() {
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">{t('offer_list.th_offer_amount')} *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   required
-                  placeholder={t('common.search_placeholder')}
-                  value={counterPrice}
-                  onChange={(e) => setCounterPrice(e.target.value)}
+                  value={formatFormattedNumber(counterPrice)}
+                  onChange={(e) => setCounterPrice(parseRawNumber(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#1b6b51]"
                 />
               </div>

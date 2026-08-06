@@ -4,19 +4,25 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { formatFormattedNumber, parseRawNumber } from '../../../utils/numberUtils';
 import auctionService from '../../../services/auctionService';
 import { createAuctionHubConnection } from '../../../services/auctionRealtimeService';
 import { auctionDateTimeLocalToApiValue, formatAuctionDateTime, getFutureAuctionDateTimeLocal, parseAuctionDateTime } from '../../../utils/auctionTime';
 import './Auction.css';
 import './AuctionDetail.css';
+import { AUCTION_DURATION_PRESETS, calculateEndTimeFromDuration, formatDateTimePreview } from '../../../utils/auctionDurationUtils';
 
 function toAuctionPayload(form) {
+  const calculatedEndTime = form.durationMinutes
+    ? calculateEndTimeFromDuration(form.startTime, form.durationMinutes)
+    : form.endTime;
   return {
     startingPrice: Number(form.startingPrice),
     minIncrement: Number(form.minIncrement),
     buyNowPrice: form.buyNowPrice ? Number(form.buyNowPrice) : null,
     startTime: auctionDateTimeLocalToApiValue(form.startTime),
-    endTime: auctionDateTimeLocalToApiValue(form.endTime),
+    endTime: auctionDateTimeLocalToApiValue(calculatedEndTime || form.endTime),
+    durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : undefined,
   };
 }
 
@@ -522,12 +528,15 @@ export default function AuctionDetail() {
   };
 
   const openRelistModal = () => {
+    const startTime = getFutureAuctionDateTimeLocal(0);
+    const durationMinutes = 60;
     setRelistForm({
       startingPrice: auction?.startingPrice ?? '',
       minIncrement: auction?.minIncrement ?? '',
       buyNowPrice: auction?.buyNowPrice ?? '',
-      startTime: getFutureAuctionDateTimeLocal(0),
-      endTime: getFutureAuctionDateTimeLocal(24 * 60 * 60 * 1000),
+      startTime: startTime,
+      durationMinutes: durationMinutes,
+      endTime: calculateEndTimeFromDuration(startTime, durationMinutes),
     });
   };
 
@@ -538,7 +547,14 @@ export default function AuctionDetail() {
 
   const handleRelistChange = (event) => {
     const { name, value } = event.target;
-    setRelistForm((current) => ({ ...current, [name]: value }));
+    setRelistForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === 'startTime' || name === 'durationMinutes') {
+        const duration = next.durationMinutes || 60;
+        next.endTime = calculateEndTimeFromDuration(next.startTime, duration);
+      }
+      return next;
+    });
   };
 
   const handleRelistSubmit = async (event) => {
@@ -787,11 +803,10 @@ export default function AuctionDetail() {
                 <label>
                   <span>{t('auction.deposit_amount')}</span>
                   <input
-                    type="number"
-                    min="20000"
-                    value={depositAmount}
-                    onChange={(event) => setDepositAmount(event.target.value)}
-                    placeholder={isVi ? 'Tối thiểu 20.000' : 'Min 20000'}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatFormattedNumber(depositAmount)}
+                    onChange={(event) => setDepositAmount(parseRawNumber(event.target.value))}
                     disabled={!canDeposit || actionLoading}
                   />
                 </label>
@@ -838,12 +853,10 @@ export default function AuctionDetail() {
                   <label>
                     <span>{t('auction.enter_bid_amount')}</span>
                     <input
-                      type="number"
-                      min={minimumNextBid}
-                      max={highestAllowedBid}
-                      value={bidAmount}
-                      onChange={(event) => setBidAmount(event.target.value)}
-                      placeholder={isVi ? `Tối đa ${formatMoney(highestAllowedBid)}` : `Max ${formatMoney(highestAllowedBid)}`}
+                      type="text"
+                      inputMode="numeric"
+                      value={formatFormattedNumber(bidAmount)}
+                      onChange={(event) => setBidAmount(parseRawNumber(event.target.value))}
                       disabled={!canBid || actionLoading}
                     />
                   </label>
@@ -1135,16 +1148,16 @@ export default function AuctionDetail() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.starting_price')} (VND) *</label>
-                  <input type="number" name="startingPrice" value={relistForm.startingPrice} onChange={handleRelistChange} required min="1" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                  <input type="text" inputMode="numeric" name="startingPrice" value={formatFormattedNumber(relistForm.startingPrice)} onChange={(e) => handleRelistChange({ target: { name: 'startingPrice', value: parseRawNumber(e.target.value) } })} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.min_step')} (VND) *</label>
-                  <input type="number" name="minIncrement" value={relistForm.minIncrement} onChange={handleRelistChange} required min="1" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                  <input type="text" inputMode="numeric" name="minIncrement" value={formatFormattedNumber(relistForm.minIncrement)} onChange={(e) => handleRelistChange({ target: { name: 'minIncrement', value: parseRawNumber(e.target.value) } })} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
                 </div>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.buy_now_price')} (VND) *</label>
-                <input type="number" name="buyNowPrice" value={relistForm.buyNowPrice} onChange={handleRelistChange} required min="1" style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                <input type="text" inputMode="numeric" name="buyNowPrice" value={formatFormattedNumber(relistForm.buyNowPrice)} onChange={(e) => handleRelistChange({ target: { name: 'buyNowPrice', value: parseRawNumber(e.target.value) } })} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
@@ -1152,9 +1165,19 @@ export default function AuctionDetail() {
                   <input type="datetime-local" name="startTime" value={relistForm.startTime} onChange={handleRelistChange} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{t('auction.end_time')} *</label>
-                  <input type="datetime-local" name="endTime" value={relistForm.endTime} onChange={handleRelistChange} min={relistForm.startTime || undefined} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }} />
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Thời lượng phiên (Duration) *</label>
+                  <select name="durationMinutes" value={relistForm.durationMinutes || 60} onChange={handleRelistChange} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+                    {AUCTION_DURATION_PRESETS.map((preset) => (
+                      <option key={preset.value} value={preset.value}>
+                        {preset.labelVi}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '8px', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontSize: '13px', fontWeight: 500 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>schedule</span>
+                <span>Thời gian kết thúc dự kiến: <strong>{formatDateTimePreview(calculateEndTimeFromDuration(relistForm.startTime, relistForm.durationMinutes || 60), true)}</strong></span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
                 <button type="button" onClick={closeRelistModal} disabled={actionLoading} style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: '8px', background: '#fff', cursor: 'pointer' }}>{t('common.cancel')}</button>

@@ -63,11 +63,12 @@ export default function MyProducts() {
   const [isAddressPopupOpen, setIsAddressPopupOpen] = useState(false);
 
   const fetchMyProducts = useCallback(async (page = currentPage) => {
-    if (!user?.userId) return;
+    const sellerId = user?.userId || user?.id || user?.accountId;
+    if (!sellerId) return;
     try {
       setProductsLoading(true);
       const params = {
-        sellerId: user.userId,
+        sellerId: sellerId,
         SortBy: sellerSort,
         PageSize: PAGE_SIZE,
         Page: page,

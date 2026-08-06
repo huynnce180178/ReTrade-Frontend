@@ -44,7 +44,7 @@ export default function SellerLayout() {
     );
   };
 
-  const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
+  const isSeller = (user?.roles || []).some((role) => ['seller', 'admin'].includes(String(role).toLowerCase()));
 
   useEffect(() => {
     if (!user || !isSeller) {

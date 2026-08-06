@@ -174,7 +174,7 @@ export default function Auction() {
         setLoading(true);
         const params = {
           Page: page,
-          PageSize: 12,
+          PageSize: 6,
           SortBy: sort,
         };
         if (searchTerm) params.SearchTerm = searchTerm;
@@ -252,12 +252,58 @@ export default function Auction() {
   };
 
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
+    if (auctions.length === 0) return null;
+    const maxVisible = 5;
+    let start = Math.max(1, page - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    if (end - start < maxVisible - 1) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
     return (
-      <div className="auction-pagination">
-        <button disabled={page <= 1} onClick={() => updateParams({ page: String(page - 1) })}>{t('common.previous')}</button>
-        <span>{page} / {totalPages}</span>
-        <button disabled={page >= totalPages} onClick={() => updateParams({ page: String(page + 1) })}>{t('common.next')}</button>
+      <div className="pagination-container" style={{ marginTop: '36px', paddingBottom: '24px' }}>
+        <button
+          type="button"
+          className="pagination-btn"
+          onClick={() => updateParams({ page: String(page - 1) })}
+          disabled={page <= 1}
+        >
+          ‹
+        </button>
+
+        {start > 1 && (
+          <>
+            <button type="button" className="pagination-btn" onClick={() => updateParams({ page: '1' })}>1</button>
+            {start > 2 && <span className="pagination-ellipsis">…</span>}
+          </>
+        )}
+
+        {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(num => (
+          <button
+            key={num}
+            type="button"
+            className={`pagination-btn ${num === page ? 'active' : ''}`}
+            onClick={() => updateParams({ page: String(num) })}
+          >
+            {num}
+          </button>
+        ))}
+
+        {end < totalPages && (
+          <>
+            {end < totalPages - 1 && <span className="pagination-ellipsis">…</span>}
+            <button type="button" className="pagination-btn" onClick={() => updateParams({ page: String(totalPages) })}>{totalPages}</button>
+          </>
+        )}
+
+        <button
+          type="button"
+          className="pagination-btn"
+          onClick={() => updateParams({ page: String(page + 1) })}
+          disabled={page >= totalPages}
+        >
+          ›
+        </button>
       </div>
     );
   };

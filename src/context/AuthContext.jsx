@@ -1,8 +1,10 @@
-﻿import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import accountService from '../services/accountService';
 import profileService from '../services/profileService';
 import { clearAuthStorage } from '../utils/authUtils';
 import { createAccountHubConnection } from '../services/accountRealtimeService';
+
+import { useLanguage } from './LanguageContext';
 
 const AuthContext = createContext(null);
 
@@ -52,6 +54,7 @@ const extractErrorDetails = (err, fallback) => {
 };
 
 export const AuthProvider = ({ children }) => {
+  const { t } = useLanguage();
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -76,12 +79,17 @@ export const AuthProvider = ({ children }) => {
             ...freshProfile,
             roles: freshProfile.roles || storedUser?.roles || [],
             isPasswordSet: freshProfile.isPasswordSet ?? storedUser?.isPasswordSet,
+            mustChangePassword: freshProfile.mustChangePassword ?? storedUser?.mustChangePassword,
           };
           setUser(mergedProfile);
           localStorage.setItem('user', JSON.stringify(mergedProfile));
         } catch (err) {
-          console.error('Failed to validate token on startup:', err);
-          handleLogout();
+          console.error('Failed to load profile on startup:', err);
+          if (err.response?.status === 401) {
+            clearAuthStorage();
+            setUser(null);
+            setToken(null);
+          }
         }
       }
       setLoading(false);
@@ -102,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     const handleForceLogout = (reasonMessage) => {
       const msg = typeof reasonMessage === 'string' && reasonMessage.trim()
         ? reasonMessage
-        : 'Quyền hạn tài khoản của bạn đã bị Quản trị viên thay đổi. Hệ thống tự động đăng xuất.';
+        : t('auth.force_logout_default');
       alert(msg);
       handleLogout();
     };
