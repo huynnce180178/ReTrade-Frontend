@@ -75,6 +75,7 @@ export default function SellerLayout() {
     };
 
     connection.on('ChatNotification', handleNotification);
+    connection.on('RoomCreated', handleNotification);
     connection.onreconnected(() => {
       connection.invoke('JoinUserNotifications').catch(() => {});
       loadUnread();
@@ -86,6 +87,7 @@ export default function SellerLayout() {
     return () => {
       disposed = true;
       connection.off('ChatNotification', handleNotification);
+      connection.off('RoomCreated', handleNotification);
       connection.stop().catch(() => {});
     };
   }, [isSeller, location.pathname, user]);

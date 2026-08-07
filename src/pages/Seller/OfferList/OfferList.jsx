@@ -195,15 +195,6 @@ export default function OfferList() {
                 {t('offer_list.subtitle')}
               </p>
             </div>
-            <div>
-              <button
-                onClick={() => navigate('/seller-dashboard/products/new')}
-                className="flex items-center justify-center gap-2 bg-[#1b6b51] text-white px-6 py-3 rounded-lg hover:bg-[#15533f] transition-all text-sm font-semibold shadow-md"
-              >
-                <span className="material-symbols-outlined text-lg">add</span>
-                {t('my_products.add_product_btn')}
-              </button>
-            </div>
           </div>
         </header>
 

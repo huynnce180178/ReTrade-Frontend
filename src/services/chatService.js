@@ -2,7 +2,19 @@ import api from './api';
 
 const chatService = {
   getRooms: () => api.get('/Chat/rooms').then((response) => response.data),
-  getOrCreateRoom: (productId) => api.post('/Chat/rooms', { productId }).then((response) => response.data),
+  getOrCreateRoom: (productIdOrRequest, sellerId) => {
+    if (typeof productIdOrRequest === 'object' && productIdOrRequest !== null) {
+      return api.post('/Chat/rooms', productIdOrRequest).then((response) => response.data);
+    }
+    if (productIdOrRequest) {
+      return api.post('/Chat/rooms', { productId: productIdOrRequest }).then((response) => response.data);
+    }
+    if (sellerId) {
+      return api.post('/Chat/rooms', { sellerId }).then((response) => response.data);
+    }
+    return api.post('/Chat/rooms', {}).then((response) => response.data);
+  },
+  createRoom: (request) => api.post('/Chat/rooms', request).then((response) => response.data),
   getOrCreateSellerRoom: (sellerId) => api.post('/Chat/rooms', { sellerId }).then((response) => response.data),
   getMessages: (roomId, page = 1, limit = 30) =>
     api.get(`/Chat/${roomId}/messages`, { params: { page, limit } }).then((response) => response.data),

@@ -319,6 +319,18 @@ export default function Chat({ basePath = '/chat' }) {
     });
   };
 
+  const handlePartnerGroupClick = (group) => {
+    setExpandedPartners((prev) => ({
+      ...prev,
+      [group.partnerId]: true,
+    }));
+
+    const targetRoom = group.productRooms[0] || group.businessRoom || group.rooms[0];
+    if (targetRoom && targetRoom.roomId !== roomId) {
+      navigate(`${basePath}/${targetRoom.roomId}`);
+    }
+  };
+
   const saveCustomTitle = (targetRoomId, newTitle) => {
     setCustomTitles((prev) => {
       const updated = { ...prev };
@@ -391,9 +403,6 @@ export default function Chat({ basePath = '/chat' }) {
       const data = await chatService.getRooms();
       const list = Array.isArray(data) ? data : [];
       setRooms(list);
-      if (!roomId && list.length > 0) {
-        navigate(`${basePath}/${list[0].roomId}`, { replace: true });
-      }
     } catch (error) {
       const msg = error.response?.data || error.message || t('chat.load_conversations_error');
       showToast(String(msg), 'error');
@@ -604,8 +613,19 @@ export default function Chat({ basePath = '/chat' }) {
       }));
     };
 
+    const handleRoomCreated = (newRoom) => {
+      if (!newRoom || !newRoom.roomId) return;
+      setRooms((current) => {
+        if (current.some((r) => r.roomId === newRoom.roomId)) {
+          return current.map((r) => (r.roomId === newRoom.roomId ? { ...r, ...newRoom } : r));
+        }
+        return [newRoom, ...current];
+      });
+    };
+
     connection.on('ReceiveMessage', upsertMessage);
     connection.on('ChatNotification', handleNotification);
+    connection.on('RoomCreated', handleRoomCreated);
     connection.on('MessagesRead', handleMessagesRead);
     connection.on('MessageRecalled', handleMessageRecalled);
     connection.on('MessageDeleted', handleMessageDeleted);
@@ -791,7 +811,7 @@ export default function Chat({ basePath = '/chat' }) {
   }
 
   return (
-    <div className={`chat-page ${showInfoSidebar && activeRoom ? 'has-right-sidebar' : ''}`}>
+    <div className={`chat-page ${roomId ? 'has-room' : ''} ${showInfoSidebar && activeRoom ? 'has-right-sidebar' : ''}`}>
 
       <aside className="chat-sidebar">
         <div className="chat-sidebar-header">
@@ -830,7 +850,7 @@ export default function Chat({ basePath = '/chat' }) {
                   <div key={group.partnerId} className={`chat-partner-group ${hasActiveChild ? 'has-active' : ''}`}>
                     <div
                       className={`chat-partner-header ${isExpanded ? 'expanded' : ''}`}
-                      onClick={() => togglePartnerExpand(group.partnerId)}
+                      onClick={() => handlePartnerGroupClick(group)}
                     >
                       <div className="chat-room-avatar">
                         {group.partner?.avatarUrl ? (
@@ -943,6 +963,14 @@ export default function Chat({ basePath = '/chat' }) {
         ) : (
           <>
             <header className="chat-panel-header">
+              <button
+                type="button"
+                className="chat-mobile-back-btn"
+                onClick={() => navigate(basePath)}
+                title={t('common.back')}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
               <div className="chat-peer-avatar">
                 {activeRoom?.productImageUrl ? (
                   <img src={activeRoom.productImageUrl} alt={activeRoom.productName || getRoomTitle(activeRoom, t, customTitles)} />

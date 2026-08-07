@@ -303,10 +303,10 @@
   },
   "fav_modal": {
     "title": "Chọn Danh Mục Yêu Thích",
-    "subtitle": "Vui lòng chọn từ 3 đến 7 danh mục bạn quan tâm nhất",
-    "min_3_warning": "Vui lòng chọn tối thiểu 3 danh mục yêu thích.",
-    "max_7_warning": "Bạn chỉ có thể chọn tối đa 7 danh mục yêu thích.",
-    "select_counter": "{count}/7 Đã chọn"
+    "subtitle": "Vui lòng chọn tối đa 5 danh mục bạn quan tâm nhất",
+    "min_1_warning": "Vui lòng chọn tối thiểu 1 danh mục yêu thích.",
+    "max_5_warning": "Bạn chỉ có thể chọn tối đa 5 danh mục yêu thích.",
+    "select_counter": "{count}/5 Đã chọn"
   },
   "subscriptions": {
     "title": "Nâng tầm trải nghiệm",
@@ -1729,6 +1729,13 @@
     "assistant_query_start_selling": "Tôi muốn đăng bán sản phẩm đồ cũ trên ReTrade",
     "assistant_query_featured_products": "Cho tôi xem danh sách các sản phẩm mới nhất",
     "assistant_query_wishlist": "Xem danh sách sản phẩm yêu thích của tôi",
+    "assistant_query_recommend_demand": "Tư vấn gợi ý sản phẩm phù hợp theo nhu cầu của tôi",
+    "assistant_query_apparel": "Tìm áo khoác và quần áo thời trang nam nữ phù hợp",
+    "chip_recommend_demand": "Gợi ý theo nhu cầu",
+    "chip_apparel_fashion": "Áo khoác & Thời trang",
+    "attach_image": "Tải ảnh sản phẩm lên",
+    "image_attached": "Đã đính kèm 1 ảnh",
+    "image_too_large": "Dung lượng ảnh quá lớn. Vui lòng chọn ảnh dưới 8MB.",
     "assistant_language_instruction": "Vui lòng trả lời hoàn toàn bằng Tiếng Việt",
     "assistant_error_unavailable": "Trợ lý AI tạm thời không phản hồi. Vui lòng thử lại sau.",
     "assistant_offline_purchase_login": "Bạn cần đăng nhập để mình kiểm tra lịch sử mua hàng. Sau khi đăng nhập, mở lại trợ lý và hỏi về lịch sử mua hàng của bạn.",

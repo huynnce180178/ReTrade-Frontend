@@ -303,10 +303,10 @@
   },
   "fav_modal": {
     "title": "Set Favorite Categories",
-    "subtitle": "Please select between 3 and 7 categories of interest",
-    "min_3_warning": "Please select at least 3 favorite categories.",
-    "max_7_warning": "You can select at most 7 favorite categories.",
-    "select_counter": "{count}/7 Selected"
+    "subtitle": "Please select up to 5 categories of interest",
+    "min_1_warning": "Please select at least 1 favorite category.",
+    "max_5_warning": "You can select at most 5 favorite categories.",
+    "select_counter": "{count}/5 Selected"
   },
   "subscriptions": {
     "title": "Elevate your experience",
@@ -1723,6 +1723,13 @@
     "assistant_query_start_selling": "I want to sell a second-hand product on ReTrade",
     "assistant_query_featured_products": "Show me the latest products on ReTrade",
     "assistant_query_wishlist": "View my wishlist items",
+    "assistant_query_recommend_demand": "Recommend products matching my specific needs",
+    "assistant_query_apparel": "Find jackets and fashion clothing",
+    "chip_recommend_demand": "Recommend by Demand",
+    "chip_apparel_fashion": "Jackets & Apparel",
+    "attach_image": "Upload product photo",
+    "image_attached": "1 photo attached",
+    "image_too_large": "Image file too large. Please select an image under 8MB.",
     "assistant_language_instruction": "",
     "assistant_error_unavailable": "The AI assistant is temporarily unavailable. Please try again later.",
     "assistant_offline_purchase_login": "Please sign in so I can check your purchase history. After signing in, open the assistant again and ask about your orders.",

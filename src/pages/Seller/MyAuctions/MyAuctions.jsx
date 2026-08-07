@@ -107,7 +107,7 @@ function validateAuctionForm(form, { requireProduct = false, requireFutureStart 
 export default function MyAuctions() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const { t } = useLanguage();
+  const { t, isVi } = useLanguage();
 
   const [auctions, setAuctions] = useState([]);
   const [eligibleProducts, setEligibleProducts] = useState([]);

@@ -211,6 +211,10 @@ export default function Header() {
     };
 
     connection.on('ChatNotification', handleChatNotification);
+    connection.on('RoomCreated', () => {
+      if (!isSubscribed) return;
+      chatService.getUnreadCount().then((total) => setChatUnreadCount(total)).catch(() => {});
+    });
     connection.onreconnected(() => {
       connection.invoke('JoinUserNotifications').catch(() => {});
     });
@@ -222,6 +226,7 @@ export default function Header() {
     return () => {
       isSubscribed = false;
       connection.off('ChatNotification', handleChatNotification);
+      connection.off('RoomCreated');
       connection.stop().catch(() => {});
     };
   }, [user]);

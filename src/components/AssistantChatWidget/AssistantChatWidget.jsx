@@ -105,6 +105,7 @@ export default function AssistantChatWidget() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messageText, setMessageText] = useState('');
+  const [selectedImage, setSelectedImage] = useState(null);
   const [sending, setSending] = useState(false);
   const [wishlistSet, setWishlistSet] = useState(new Set());
   const [messages, setMessages] = useState([
@@ -117,11 +118,14 @@ export default function AssistantChatWidget() {
   ]);
   
   const bottomRef = useRef(null);
+  const imageInputRef = useRef(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
 
   const QUICK_SUGGESTIONS = [
     { label: t('history.purchase_title'), query: t('chat.assistant_query_purchase_history') },
+    { label: t('chat.chip_recommend_demand') || 'Gợi ý theo nhu cầu', query: t('chat.assistant_query_recommend_demand') || 'Gợi ý sản phẩm phù hợp với nhu cầu của tôi' },
+    { label: t('chat.chip_apparel_fashion') || 'Áo khoác & Thời trang', query: t('chat.assistant_query_apparel') || 'Tìm áo khoác và quần áo thời trang mới nhất' },
     { label: t('auction.title'), query: t('chat.assistant_query_auction_help') },
     { label: t('home.start_selling'), query: t('chat.assistant_query_start_selling') },
     { label: t('home.featured_products'), query: t('chat.assistant_query_featured_products') },
@@ -134,6 +138,23 @@ export default function AssistantChatWidget() {
     }
 
     return t(content.slice(I18N_CONTENT_PREFIX.length));
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      showToast(t('chat.image_too_large') || 'Dung lượng ảnh tối đa 8MB', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSelectedImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   useEffect(() => {
@@ -203,24 +224,30 @@ export default function AssistantChatWidget() {
     navigate(`/checkout/${product.productId}`);
   };
 
-  const sendQuery = async (textToSend) => {
-    const text = textToSend.trim();
-    if (!text || sending) return;
+  const sendQuery = async (textToSend, imageToSend = selectedImage) => {
+    const text = (textToSend || '').trim();
+    if ((!text && !imageToSend) || sending) return;
+
+    const userContent = imageToSend
+      ? (text ? `![Attached Image](${imageToSend})\n${text}` : `![Attached Image](${imageToSend})`)
+      : text;
 
     setMessages((current) => [
       ...current,
       {
         id: `local-${Date.now()}`,
         role: 'user',
-        content: text,
+        content: userContent,
         products: [],
       },
     ]);
+
     setMessageText('');
+    setSelectedImage(null);
     setSending(true);
 
     try {
-      const response = await assistantChatService.sendMessage(text, sessionId, language);
+      const response = await assistantChatService.sendMessage(text, imageToSend, sessionId, language);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
         setSessionId(response.sessionId);
@@ -252,7 +279,7 @@ export default function AssistantChatWidget() {
 
   const handleSend = (event) => {
     event.preventDefault();
-    sendQuery(messageText);
+    sendQuery(messageText, selectedImage);
   };
 
   const handleNewChat = () => {
@@ -408,7 +435,41 @@ export default function AssistantChatWidget() {
             ))}
           </div>
 
+          {selectedImage && (
+            <div className="assistant-widget-image-preview-bar">
+              <div className="assistant-widget-preview-item">
+                <img src={selectedImage} alt="Attachment" className="assistant-widget-preview-img" />
+                <button
+                  type="button"
+                  className="assistant-widget-preview-remove"
+                  onClick={() => setSelectedImage(null)}
+                  title={t('common.delete') || 'Remove Image'}
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <span className="assistant-widget-preview-label">{t('chat.image_attached') || 'Đã đính kèm 1 ảnh'}</span>
+            </div>
+          )}
+
           <form className="assistant-widget-footer" onSubmit={handleSend}>
+            <input
+              type="file"
+              ref={imageInputRef}
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleImageChange}
+            />
+            <button
+              type="button"
+              className="assistant-widget-attach-btn"
+              onClick={() => imageInputRef.current?.click()}
+              title={t('chat.attach_image') || 'Tải ảnh lên'}
+              disabled={sending}
+            >
+              <span className="material-symbols-outlined">add_photo_alternate</span>
+            </button>
+
             <input
               type="text"
               value={messageText}
@@ -416,7 +477,7 @@ export default function AssistantChatWidget() {
               placeholder={assistantTypeMessage}
               maxLength={2000}
             />
-            <button type="submit" disabled={!messageText.trim() || sending} title={assistantSendTitle}>
+            <button type="submit" disabled={(!messageText.trim() && !selectedImage) || sending} title={assistantSendTitle}>
               <span className="material-symbols-outlined">{sending ? 'sync' : 'send'}</span>
             </button>
           </form>

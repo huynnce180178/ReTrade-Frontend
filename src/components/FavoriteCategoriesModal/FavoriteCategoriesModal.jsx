@@ -39,7 +39,7 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
       if (next.has(categoryId)) {
         next.delete(categoryId);
       } else {
-        if (next.size >= 7) {
+        if (next.size >= 5) {
           return prev;
         }
         next.add(categoryId);
@@ -49,12 +49,12 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
   };
 
   const handleSave = async () => {
-    if (selectedIds.size < 3) {
-      showToast(t('fav_modal.min_3_warning'), 'warning');
+    if (selectedIds.size < 1) {
+      showToast(t('fav_modal.min_1_warning'), 'warning');
       return;
     }
-    if (selectedIds.size > 7) {
-      showToast(t('fav_modal.max_7_warning'), 'warning');
+    if (selectedIds.size > 5) {
+      showToast(t('fav_modal.max_5_warning'), 'warning');
       return;
     }
 
@@ -126,7 +126,7 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto' }}>
               {categories.map(cat => {
                 const isChecked = selectedIds.has(cat.categoryId);
-                const isDisabled = !isChecked && selectedIds.size >= 7;
+                const isDisabled = !isChecked && selectedIds.size >= 5;
 
                 return (
                   <label
