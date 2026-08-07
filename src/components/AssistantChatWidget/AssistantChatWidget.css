@@ -527,6 +527,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .assistant-widget-footer input {
@@ -679,5 +680,13 @@
   .assistant-widget-panel {
     width: calc(100vw - 28px);
     bottom: 68px;
+  }
+}
+
+@media (max-height: 640px) {
+  .assistant-widget-panel {
+    height: calc(100vh - 84px) !important;
+    min-height: 320px !important;
+    bottom: 64px !important;
   }
 }

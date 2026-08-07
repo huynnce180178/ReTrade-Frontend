@@ -7,6 +7,7 @@ import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 import wishlistService from '../../../services/wishlistService';
 import { useAuth } from '../../../context/AuthContext';
+import SponsoredSpotlight from '../../../components/SponsoredSpotlight/SponsoredSpotlight';
 import '../../../styles/Product.css';
 
 function timeAgo(dateStr, language) {
@@ -302,6 +303,8 @@ export default function Product() {
           {t('common.filter')}
         </button>
       </div>
+
+      <SponsoredSpotlight mode="grid" limit={4} />
 
       <div className="product-layout">
           {showMobileFilter && (

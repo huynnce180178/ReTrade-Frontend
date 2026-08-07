@@ -12,6 +12,7 @@ import addressService from '../../../services/addressService';
 import checkoutService from '../../../services/checkoutService';
 import { createVnPayPaymentUrl } from '../../../services/paymentService';
 import chatService from '../../../services/chatService';
+import SponsoredSpotlight from '../../../components/SponsoredSpotlight/SponsoredSpotlight';
 import '../../../styles/ProductDetail.css';
 
 function formatDate(dateStr, language) {
@@ -822,6 +823,14 @@ export default function ProductDetail() {
             </div>
           </div>
         )}
+
+        {/* Sponsored Spotlight Recommendations */}
+        <SponsoredSpotlight
+          mode="carousel"
+          limit={6}
+          currentProductId={productId}
+          title={language === 'vi' ? '⭐ Gợi ý Ưu tiên Tài trợ (Sponsored Spotlight)' : '⭐ Sponsored Priority Recommendations'}
+        />
       </div>
 
       {/* Lightbox Modal via Portal */}

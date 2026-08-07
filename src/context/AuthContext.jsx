@@ -111,7 +111,9 @@ export const AuthProvider = ({ children }) => {
       const msg = typeof reasonMessage === 'string' && reasonMessage.trim()
         ? reasonMessage
         : t('auth.force_logout_default');
-      alert(msg);
+      window.dispatchEvent(new CustomEvent('retrade:toast', {
+        detail: { message: msg, type: 'warning', duration: 5000 }
+      }));
       handleLogout();
     };
 

@@ -73,11 +73,8 @@ function getProgress(auction) {
 
 function getAuctionEditBlockReason(auction, t) {
   if (!auction) return t('common.no_data');
-  if (auction.status !== 'Upcoming') return t('my_auctions.cancel_error');
-  if (Number(auction.bidCount || 0) > 0) return t('auction.err_limit_exceeded');
-
-  const startTime = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
-  if (!startTime || startTime <= Date.now()) return t('auction.auction_ended');
+  if (isEndedStatus(auction.status)) return t('auction.auction_ended');
+  if (Number(auction.bidCount || 0) > 0) return t('auction.cannot_edit_has_bids');
 
   return '';
 }
@@ -316,13 +313,16 @@ export default function MyAuctions() {
       showToast(blockReason, 'warning');
       return;
     }
-    const startStr = toAuctionDateTimeLocal(auction.startTime);
-    const endStr = toAuctionDateTimeLocal(auction.endTime);
+    const currentStart = parseAuctionDateTime(auction.startTime);
+    const isPastStart = !currentStart || currentStart.getTime() <= Date.now();
+    const startStr = isPastStart ? getFutureAuctionDateTimeLocal(0) : toAuctionDateTimeLocal(auction.startTime);
     let duration = 60;
     if (auction.startTime && auction.endTime) {
       const diffMs = new Date(auction.endTime).getTime() - new Date(auction.startTime).getTime();
       if (diffMs > 0) duration = Math.round(diffMs / 60000);
     }
+    const endStr = calculateEndTimeFromDuration(startStr, duration);
+
     setEditingAuction(auction);
     setEditForm({
       startingPrice: auction.startingPrice ?? '',
@@ -590,13 +590,14 @@ export default function MyAuctions() {
                       <Link to={`/auction/${auction.auctionId}`} className="btn-secondary">
                         {t('auction.title')}
                       </Link>
-                      {auction.status === 'Upcoming' && Number(auction.bidCount || 0) === 0 && (
+                      {(!auction.winnerId && auction.status !== 'Cancelled') && (
                         <button
                           type="button"
-                          className="btn-outline"
+                          className="btn-primary"
                           onClick={() => openEditModal(auction)}
+                          disabled={saving}
                         >
-                          {t('common.edit')}
+                          {t('common.update')}
                         </button>
                       )}
                       {auction.status === 'Ongoing' && (
@@ -608,16 +609,6 @@ export default function MyAuctions() {
                           disabled={saving}
                         >
                           {t('my_auctions.end_auction')}
-                        </button>
-                      )}
-                      {(auction.status === 'EndedNoBid' || (isEndedStatus(auction.status) && Number(auction.bidCount || 0) === 0)) && (
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          onClick={() => openRelistModal(auction)}
-                          disabled={saving}
-                        >
-                          {t('my_auctions.relist_auction')}
                         </button>
                       )}
                     </div>

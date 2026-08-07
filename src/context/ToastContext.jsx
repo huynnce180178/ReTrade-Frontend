@@ -11,6 +11,25 @@ export const useToast = () => {
   return context;
 };
 
+function sanitizeErrorMessage(msg) {
+  if (!msg) return '';
+  const str = typeof msg === 'string'
+    ? msg
+    : (msg?.message || msg?.title || (typeof msg === 'object' ? JSON.stringify(msg) : String(msg || '')));
+
+  if (
+    str.includes('EMAXCONNSESSION') ||
+    str.includes('XX000') ||
+    str.includes('pool_size') ||
+    str.includes('NpgsqlException') ||
+    str.includes('PostgresException') ||
+    str.includes('ConnectionPool')
+  ) {
+    return 'Hệ thống đang quá tải lượt truy cập. Vui lòng thử lại sau ít phút!';
+  }
+  return str;
+}
+
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
@@ -20,9 +39,7 @@ export const ToastProvider = ({ children }) => {
 
   const showToast = useCallback((message, type = 'error', duration = 4000) => {
     const id = Date.now() + Math.random();
-    const formattedMsg = typeof message === 'string'
-      ? message
-      : (message?.message || message?.title || (typeof message === 'object' ? JSON.stringify(message) : String(message || '')));
+    const formattedMsg = sanitizeErrorMessage(message);
 
     setToasts((prev) => [...prev, { id, message: formattedMsg, type }]);
     
@@ -33,6 +50,15 @@ export const ToastProvider = ({ children }) => {
     return id;
   }, [removeToast]);
 
+  React.useEffect(() => {
+    const handleCustomToast = (event) => {
+      if (event.detail && event.detail.message) {
+        showToast(event.detail.message, event.detail.type || 'info', event.detail.duration || 4000);
+      }
+    };
+    window.addEventListener('retrade:toast', handleCustomToast);
+    return () => window.removeEventListener('retrade:toast', handleCustomToast);
+  }, [showToast]);
 
   return (
     <ToastContext.Provider value={{ showToast, removeToast }}>

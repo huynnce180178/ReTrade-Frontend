@@ -22,7 +22,10 @@ const productService = {
   // Admin endpoints
   getForApproval: (params) => get('/AdminProduct', { params }),
   getAdminProductById: (id) => get(`/AdminProduct/${id}`),
-  approve: (id, isApproved, rejectReason) => put(`/AdminProduct/${id}/approve`, { isApproved, rejectReason })
+  approve: (id, isApproved, rejectReason) => put(`/AdminProduct/${id}/approve`, { isApproved, rejectReason }),
+
+  // Priority Products (Sponsored Spotlight)
+  getPriorityProducts: (limit = 8) => get('/Product', { params: { IsPriorityOnly: true, Status: 'Accepted', Page: 1, PageSize: limit } }),
 };
 
 export default productService;

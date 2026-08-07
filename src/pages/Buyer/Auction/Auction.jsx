@@ -308,19 +308,6 @@ export default function Auction() {
     );
   };
 
-  if (!authLoading && !user) {
-    return (
-      <div className="auction-page container animate-fade-in">
-        <section className="auction-auth-panel">
-          <span className="material-symbols-outlined">gavel</span>
-          <h1>{t('auction.title')}</h1>
-          <p>{t('auth.login_subtitle')}</p>
-          <Link to="/login" className="auction-auth-link">{t('auth.login_title')}</Link>
-        </section>
-      </div>
-    );
-  }
-
   return (
     <div className="auction-page container animate-fade-in">
       <section className="auction-page-hero">
@@ -374,8 +361,8 @@ export default function Auction() {
       ) : auctions.length === 0 ? (
         <div className="auction-empty">
           <span className="material-symbols-outlined">search_off</span>
-          <h3>{t('common.no_data')}</h3>
-          <p>{t('common.error_occurred')}</p>
+          <h3>{t('auction.no_auctions_found')}</h3>
+          <p>{t('auction.no_auctions_sub')}</p>
         </div>
       ) : (
         <div className="auction-grid">
