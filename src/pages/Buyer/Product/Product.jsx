@@ -131,6 +131,7 @@ export default function Product() {
     setLoading(true);
     try {
       const params = {
+        Status: 'Accepted',
         Page: currentPage,
         PageSize: 6,
         SortBy: sortBy,

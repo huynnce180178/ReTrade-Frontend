@@ -44,6 +44,26 @@ const isProductUnavailable = (product) => (
   Number(product?.stockQuantity ?? 0) <= 0
 );
 
+const PUBLIC_PRODUCT_DETAIL_STATUSES = new Set(['accepted', 'ready', 'sold', 'soldout']);
+
+const canViewProductDetail = (product, user) => {
+  const status = String(product?.status || '').trim().toLowerCase();
+  if (PUBLIC_PRODUCT_DETAIL_STATUSES.has(status)) return true;
+
+  const roles = user?.roles || [];
+  const isAdmin = roles.some((role) => String(role).toLowerCase() === 'admin');
+  if (isAdmin) return true;
+
+  const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+  const productSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+
+  return Boolean(
+    currentUserId &&
+    productSellerId &&
+    String(currentUserId).toLowerCase() === String(productSellerId).toLowerCase()
+  );
+};
+
 function getOfferStatusConfig(status, language) {
   switch (status) {
     case 'Pending': return { label: language === 'vi' ? 'Chờ duyệt' : 'Pending', color: '#f59e0b', bg: '#fef3c7', icon: 'schedule' };
@@ -428,6 +448,10 @@ export default function ProductDetail() {
       setLoading(true);
       try {
         const data = await productService.getById(productId);
+        if (!canViewProductDetail(data, user)) {
+          setProduct(null);
+          return;
+        }
         setProduct(data);
         setMainImageIndex(0);
       } catch (err) {
@@ -444,7 +468,7 @@ export default function ProductDetail() {
       fetchProduct();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [productId, language, showToast]);
+  }, [productId, language, showToast, user]);
 
   // Determine if current user is the seller
   const isSeller = user && product && (

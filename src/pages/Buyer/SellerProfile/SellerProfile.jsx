@@ -48,6 +48,41 @@ const isProductUnavailable = (product) => (
   Number(product?.stockQuantity ?? 0) <= 0
 );
 
+const PUBLIC_SELLER_BLOCKED_STATUSES = new Set([
+  'pending',
+  'waiting',
+  'rejected',
+  'inactive',
+  'disabled',
+  'deleted',
+  'suspended',
+]);
+
+const isSellerPubliclyApproved = (seller) => {
+  if (!seller) return false;
+  if (seller.isSeller === false || seller.IsSeller === false) return false;
+
+  const statusValue = [
+    seller.sellerStatus,
+    seller.SellerStatus,
+    seller.approvalStatus,
+    seller.ApprovalStatus,
+    seller.sellerApprovalStatus,
+    seller.SellerApprovalStatus,
+    seller.verificationStatus,
+    seller.VerificationStatus,
+  ]
+    .find((value) => value != null);
+
+  if (!statusValue) return true;
+  return !PUBLIC_SELLER_BLOCKED_STATUSES.has(String(statusValue).trim().toLowerCase());
+};
+
+const getPublicProductStatus = (activeTab, productStatus) => {
+  if (activeTab === 'auction') return 'Ready';
+  return productStatus || 'Accepted';
+};
+
 function formatReviewDate(dateStr) {
   if (!dateStr) return 'N/A';
   return new Date(dateStr).toLocaleDateString('vi-VN', {
@@ -82,7 +117,7 @@ export default function SellerProfile() {
   const [sellerProducts, setSellerProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsTotal, setProductsTotal] = useState(0);
-  const [productStatus, setProductStatus] = useState('');
+  const [productStatus, setProductStatus] = useState('Accepted');
   const [productPage, setProductPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [wishlistIds, setWishlistIds] = useState(new Set());
@@ -196,18 +231,27 @@ export default function SellerProfile() {
 
   useEffect(() => {
     const fetchSellerProducts = async () => {
-      if (!sellerId) return;
+      if (!sellerId || !seller) return;
+
+      if (!isSellerPubliclyApproved(seller)) {
+        setSellerProducts([]);
+        setProductsTotal(0);
+        setTotalPages(1);
+        return;
+      }
+
       setProductsLoading(true);
       try {
-        const queryStatus = productStatus !== '' ? productStatus : (activeTab === 'auction' ? 'Ready' : undefined);
+        const queryStatus = getPublicProductStatus(activeTab, productStatus);
         const res = await productService.getSellerProducts(sellerId, {
           page: productPage,
           pageSize: 6,
           status: queryStatus,
         });
-        setSellerProducts(res.items || []);
-        setProductsTotal(res.totalItems || 0);
-        setTotalPages(res.totalPages || Math.ceil((res.totalItems || res.items?.length || 0) / 6) || 1);
+        const items = (res.items || []).filter((product) => product.status === queryStatus);
+        setSellerProducts(items);
+        setProductsTotal(res.totalItems ?? items.length);
+        setTotalPages(res.totalPages || Math.ceil((res.totalItems || items.length || 0) / 6) || 1);
       } catch {
         setSellerProducts([]);
         setProductsTotal(0);
@@ -218,7 +262,7 @@ export default function SellerProfile() {
     };
 
     fetchSellerProducts();
-  }, [sellerId, productPage, productStatus, activeTab]);
+  }, [seller, sellerId, productPage, productStatus, activeTab]);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -434,7 +478,7 @@ export default function SellerProfile() {
 
     if (options.resetProducts) {
       setProductPage(1);
-      setProductStatus(key === 'auction' ? 'Ready' : '');
+      setProductStatus(key === 'auction' ? 'Ready' : 'Accepted');
     }
   };
 
@@ -737,7 +781,6 @@ export default function SellerProfile() {
 function SellerProductGrid({ products, loading, total, compact = false, hideStatusTabs = false, productStatus, setProductStatus, productPage, setProductPage, totalPages, wishlistIds, togglingId, onWishlistToggle }) {
   const { t } = useLanguage();
   const statusTabs = [
-    { key: '', label: t('common.all') },
     { key: 'Accepted', label: t('my_products.tab_approved') },
     { key: 'Ready', label: t('my_products.tab_auction_ready') },
     { key: 'Sold', label: t('seller_dashboard.status_sold') },
