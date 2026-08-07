@@ -157,19 +157,30 @@ export default function AssistantChatWidget() {
     e.target.value = '';
   };
 
+  const skipHistoryFetchRef = useRef(false);
+
   useEffect(() => {
     if (!sessionId) return;
+    if (skipHistoryFetchRef.current) {
+      skipHistoryFetchRef.current = false;
+      return;
+    }
 
     let disposed = false;
     assistantChatService.getHistory(sessionId)
       .then((history) => {
         if (disposed || !Array.isArray(history) || history.length === 0) return;
-        setMessages(history.map((item) => ({
-          id: item.messageId,
-          role: item.role === 'model' || item.role === 'assistant' ? 'assistant' : 'user',
-          content: item.content || '',
-          products: [],
-        })));
+        setMessages((prevMessages) => {
+          return history.map((item) => {
+            const existing = prevMessages.find((m) => m.id === item.messageId);
+            return {
+              id: item.messageId,
+              role: item.role === 'model' || item.role === 'assistant' ? 'assistant' : 'user',
+              content: item.content || '',
+              products: existing?.products?.length ? existing.products : (item.products || []),
+            };
+          });
+        });
       })
       .catch(() => {
         localStorage.removeItem(SESSION_KEY);
@@ -250,6 +261,7 @@ export default function AssistantChatWidget() {
       const response = await assistantChatService.sendMessage(text, imageToSend, sessionId, language);
       if (response?.sessionId && response.sessionId !== sessionId) {
         localStorage.setItem(SESSION_KEY, response.sessionId);
+        skipHistoryFetchRef.current = true;
         setSessionId(response.sessionId);
       }
 
