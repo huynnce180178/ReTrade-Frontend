@@ -38,6 +38,33 @@ function getPercent(value, total) {
   return Math.round((value / total) * 100);
 }
 
+function groupBidsByAuction(bids) {
+  const groups = new Map();
+
+  bids.forEach((bid) => {
+    const key = bid.auctionId || bid.productId || bid.bidId;
+    const current = groups.get(key) || [];
+    current.push(bid);
+    groups.set(key, current);
+  });
+
+  return Array.from(groups.values()).map((group) => {
+    const sortedByHighest = [...group].sort((a, b) => {
+      const amountDiff = Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
+      if (amountDiff !== 0) return amountDiff;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+
+    const displayBid = sortedByHighest[0];
+    return {
+      ...displayBid,
+      bidHistory: [...group].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()),
+      bidRoundCount: group.length,
+      highestUserBidAmount: displayBid.bidAmount,
+    };
+  }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+}
+
 const filterTabs = [
   { key: 'all', label: 'All Bids' },
   { key: 'active', label: 'Ongoing' },
@@ -87,6 +114,7 @@ export default function BidHistory() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
+  const [selectedBidGroup, setSelectedBidGroup] = useState(null);
   const pageSize = 5;
 
   const loadBids = async () => {
@@ -120,9 +148,11 @@ export default function BidHistory() {
     setPage(1);
   }, [activeTab, searchTerm]);
 
-  // Filter bids by status & search term
+  const groupedBids = useMemo(() => groupBidsByAuction(bids), [bids]);
+
+  // Filter highest bid per auction by status & search term
   const filteredBids = useMemo(() => {
-    return bids.filter((bid) => {
+    return groupedBids.filter((bid) => {
       const outcome = resolveBidOutcome(bid.bidStatus, bid.auctionStatus, language);
       const matchesSearch =
         !searchTerm.trim() ||
@@ -141,7 +171,7 @@ export default function BidHistory() {
       }
       return true;
     });
-  }, [bids, activeTab, searchTerm, language]);
+  }, [groupedBids, activeTab, searchTerm, language]);
 
   // Total count after filtering
   const totalItems = filteredBids.length;
@@ -158,7 +188,7 @@ export default function BidHistory() {
     let activeCount = 0;
     let wonCount = 0;
 
-    bids.forEach((bid) => {
+    groupedBids.forEach((bid) => {
       const outcome = resolveBidOutcome(bid.bidStatus, bid.auctionStatus, language);
       const amount = Number(bid.bidAmount || 0);
 
@@ -173,16 +203,16 @@ export default function BidHistory() {
     });
 
     return {
-      totalCount: bids.length,
+      totalCount: groupedBids.length,
       activeCount,
       wonCount,
       committedValue,
     };
-  }, [bids, language]);
+  }, [groupedBids, language]);
 
   // Calculate counts per tab
   const tabCounts = useMemo(() => {
-    return bids.reduce(
+    return groupedBids.reduce(
       (acc, bid) => {
         const outcome = resolveBidOutcome(bid.bidStatus, bid.auctionStatus, language);
         acc.all += 1;
@@ -199,7 +229,7 @@ export default function BidHistory() {
       },
       { all: 0, active: 0, winning: 0, outbid: 0 }
     );
-  }, [bids, language]);
+  }, [groupedBids, language]);
 
   if (authLoading) {
     return (
@@ -281,11 +311,28 @@ export default function BidHistory() {
                   paginatedBids.map((bid) => {
                     const outcome = resolveBidOutcome(bid.bidStatus, bid.auctionStatus, language);
                     return (
-                      <article key={bid.bidId} className="bid-card">
+                      <article
+                        key={bid.bidId}
+                        className="bid-card"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedBidGroup(bid)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setSelectedBidGroup(bid);
+                          }
+                        }}
+                      >
                         <header className="bid-card-header">
                           <div className="bid-card-header-left">
                             <strong className="bid-card-order-code">{isVi ? 'Lượt ra giá #' : 'Bid #'}{bid.bidId.split('_').pop().toUpperCase()}</strong>
                             <span className="bid-card-date">{formatDate(bid.createdAt)}</span>
+                            {bid.bidRoundCount > 1 && (
+                              <span className="bid-round-count">
+                                {bid.bidRoundCount} {isVi ? 'lÆ°á»£t' : 'rounds'}
+                              </span>
+                            )}
                           </div>
                           <em className={`bid-status ${outcome.className}`}>{outcome.label}</em>
                         </header>
@@ -298,7 +345,11 @@ export default function BidHistory() {
                               alt={bid.productName}
                             />
                             <div className="bid-product-details">
-                              <Link to={`/auction/${bid.auctionId}`} className="bid-product-title-link">
+                              <Link
+                                to={`/auction/${bid.auctionId}`}
+                                className="bid-product-title-link"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 <h3 className="bid-product-title">{bid.productName}</h3>
                               </Link>
                               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
@@ -309,8 +360,17 @@ export default function BidHistory() {
 
                           <div className="bid-detail-row">
                             <div className="bid-info-group">
-                              <span className="bid-info-label">{isVi ? 'Giá bạn đặt' : 'Your Bid'}</span>
-                              <strong className="bid-info-value my-bid">{formatVnd(bid.bidAmount)}</strong>
+                              <span className="bid-info-label">{isVi ? 'Giá cao nhất của bạn' : 'Your Highest Bid'}</span>
+                              <button
+                                type="button"
+                                className="bid-info-value my-bid bid-history-trigger"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedBidGroup(bid);
+                                }}
+                              >
+                                {formatVnd(bid.highestUserBidAmount)}
+                              </button>
                             </div>
                             <div className="bid-info-group" style={{ alignItems: 'flex-end' }}>
                               <span className="bid-info-label">{isVi ? 'Giá đấu hiện tại' : 'Current Auction Price'}</span>
@@ -320,7 +380,11 @@ export default function BidHistory() {
                         </div>
 
                         <footer className="bid-card-actions">
-                          <Link to={`/auction/${bid.auctionId}`} className="bid-primary-btn">
+                          <Link
+                            to={`/auction/${bid.auctionId}`}
+                            className="bid-primary-btn"
+                            onClick={(event) => event.stopPropagation()}
+                          >
                             {isVi ? 'Xem chi tiết đấu giá' : 'View Auction Detail'}
                           </Link>
                         </footer>
@@ -335,8 +399,8 @@ export default function BidHistory() {
                   <div>
                     <span>
                       {isVi 
-                        ? `Hiển thị ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalItems)} trong ${totalItems} lượt ra giá`
-                        : `Showing ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalItems)} of ${totalItems} bids`}
+                        ? `Hiển thị ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalItems)} trong ${totalItems} phiên đấu giá`
+                        : `Showing ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalItems)} of ${totalItems} auctions`}
                     </span>
                   </div>
                   <div className="bid-pagination">
@@ -362,7 +426,7 @@ export default function BidHistory() {
                   </div>
                   <div className="bid-summary-grid">
                     <div>
-                      <span>{isVi ? 'Tổng lượt ra giá' : 'Total Bids'}</span>
+                      <span>{isVi ? 'Tổng phiên đã tham gia' : 'Joined Auctions'}</span>
                       <strong>{summaries.totalCount}</strong>
                     </div>
                     <div>
@@ -392,6 +456,47 @@ export default function BidHistory() {
           </div>
         </main>
       </div>
+
+      {selectedBidGroup && (
+        <div className="bid-history-modal-overlay" role="dialog" aria-modal="true">
+          <div className="bid-history-modal">
+            <header>
+              <div>
+                <span>{isVi ? 'Lịch sử ra giá' : 'Bid Rounds'}</span>
+                <h2>{selectedBidGroup.productName}</h2>
+              </div>
+              <button type="button" onClick={() => setSelectedBidGroup(null)} aria-label="Close">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </header>
+
+            <div className="bid-history-modal-list">
+              {selectedBidGroup.bidHistory.map((historyBid) => {
+                const historyOutcome = resolveBidOutcome(historyBid.bidStatus, historyBid.auctionStatus, language);
+                return (
+                  <article key={historyBid.bidId} className="bid-history-modal-row">
+                    <div>
+                      <strong>{formatVnd(historyBid.bidAmount)}</strong>
+                      <span>{isVi ? 'Mã lượt bid:' : 'Bid ID:'} {historyBid.bidId}</span>
+                      <span>{formatDate(historyBid.createdAt)}</span>
+                    </div>
+                    <em className={`bid-status ${historyOutcome.className}`}>{historyOutcome.label}</em>
+                  </article>
+                );
+              })}
+            </div>
+
+            <footer>
+              <span className="bid-history-modal-current">
+                {isVi ? 'Giá hiện tại:' : 'Current price:'} {formatVnd(selectedBidGroup.currentPrice)}
+              </span>
+              <Link to={`/auction/${selectedBidGroup.auctionId}`} className="bid-primary-btn">
+                {isVi ? 'Xem chi tiết đấu giá' : 'View Auction Detail'}
+              </Link>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

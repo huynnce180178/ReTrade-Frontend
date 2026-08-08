@@ -2,12 +2,22 @@
   width: 100%;
   margin: 20px 0 32px;
   padding: 22px 24px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: radial-gradient(120% 120% at 50% 0%, rgba(20, 24, 33, 0.7) 0%, rgba(9, 11, 15, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   position: relative;
   overflow: hidden;
+}
+
+.sponsored-spotlight-waves {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .sponsored-spotlight-header {
@@ -29,7 +39,7 @@
   font-family: var(--font-title, 'Playfair Display', serif);
   font-size: 1.3rem;
   font-weight: 700;
-  color: #111827;
+  color: #ffffff;
   margin: 0;
   letter-spacing: 0.2px;
 }
@@ -62,9 +72,9 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #374151;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 24, 39, 0.75);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -73,9 +83,9 @@
 }
 
 .sponsored-nav-arrows button:hover {
-  background: #0f7b5f;
+  background: #38bdf8;
   color: #ffffff;
-  border-color: #0f7b5f;
+  border-color: #38bdf8;
   transform: scale(1.05);
 }
 
@@ -101,8 +111,10 @@
 }
 
 .sponsored-product-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: rgba(17, 24, 39, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-radius: 12px;
   overflow: hidden;
   position: relative;
@@ -115,8 +127,8 @@
 
 .sponsored-product-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 10px 24px rgba(15, 123, 95, 0.12);
-  border-color: #0f7b5f;
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
 }
 
 .sponsored-card-badge {
@@ -147,22 +159,22 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px solid #f3f4f6;
-  background: rgba(255, 255, 255, 0.95);
-  color: #6b7280;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(17, 24, 39, 0.75);
+  color: #9ca3af;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 2;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .sponsored-wishlist-btn:hover,
 .sponsored-wishlist-btn.liked {
   color: #ef4444;
-  background: #ffffff;
+  background: rgba(17, 24, 39, 0.9);
   transform: scale(1.08);
 }
 
@@ -170,7 +182,7 @@
   display: block;
   width: 100%;
   aspect-ratio: 1 / 1;
-  background: #f9fafb;
+  background: #111827;
   overflow: hidden;
 }
 
@@ -194,7 +206,7 @@
 
 .sponsored-seller-tag {
   font-size: 0.72rem;
-  color: #0f7b5f;
+  color: #38bdf8;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -209,7 +221,7 @@
 .sponsored-card-name {
   font-size: 0.88rem;
   font-weight: 600;
-  color: #1f2937;
+  color: #f3f4f6;
   text-decoration: none;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -220,7 +232,7 @@
 }
 
 .sponsored-card-name:hover {
-  color: #0f7b5f;
+  color: #38bdf8;
 }
 
 .sponsored-card-footer {
@@ -234,23 +246,24 @@
 .sponsored-card-price {
   font-size: 1rem;
   font-weight: 700;
-  color: #d97706;
+  color: #fbbf24;
 }
 
 .sponsored-buy-btn {
   padding: 6px 14px;
   border-radius: 6px;
-  background: #0f7b5f;
-  color: #ffffff;
-  border: none;
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .sponsored-buy-btn:hover {
-  background: #0b5e48;
+  background: rgba(56, 189, 248, 0.3);
+  color: #ffffff;
 }
 
 /* Sidebar Mode */
