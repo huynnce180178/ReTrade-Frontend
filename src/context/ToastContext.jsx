@@ -32,17 +32,35 @@ function sanitizeErrorMessage(msg) {
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const lastToastRef = React.useRef({ message: '', time: 0 });
 
   const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const showToast = useCallback((message, type = 'error', duration = 4000) => {
-    const id = Date.now() + Math.random();
     const formattedMsg = sanitizeErrorMessage(message);
+    if (!formattedMsg) return null;
 
-    setToasts((prev) => [...prev, { id, message: formattedMsg, type }]);
-    
+    const now = Date.now();
+    if (
+      lastToastRef.current.message === formattedMsg &&
+      now - lastToastRef.current.time < 2000
+    ) {
+      return null;
+    }
+    lastToastRef.current = { message: formattedMsg, time: now };
+
+    const id = now + Math.random();
+
+    setToasts((prev) => {
+      if (prev.some((t) => t.message === formattedMsg && t.type === type)) {
+        return prev;
+      }
+      const next = [...prev, { id, message: formattedMsg, type }];
+      return next.slice(-3);
+    });
+
     setTimeout(() => {
       removeToast(id);
     }, duration);

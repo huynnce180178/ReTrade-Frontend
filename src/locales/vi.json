@@ -223,6 +223,11 @@
     "agree_terms_link": "Điều khoản & Chính sách của ReTrade",
     "register_button": "Đăng ký",
     "registering": "Đang đăng ký...",
+    "already_account": "Đã có tài khoản?",
+    "unverified_notice": "Chưa hoàn tất xác minh OTP cho {email}?",
+    "reopen_otp": "Nhập mã OTP ngay",
+    "unverified_login_prompt": "Tài khoản của bạn chưa được kích hoạt. Mã OTP mới đã được gửi đến {email}.",
+    "otp_resend_limit": "Bạn đã đạt giới hạn gửi lại mã OTP 3 lần trong 15 phút. Vui lòng thử lại sau.",
     "have_account": "Đã có tài khoản?",
     "forgot_title": "Khôi phục mật khẩu",
     "forgot_desc": "Nhập email của bạn để nhận liên kết đặt lại mật khẩu.",
@@ -904,6 +909,9 @@
       "grant_seller_success": "Đã cấp gói Seller (Không giới hạn) thành công.",
       "revoke_seller_success": "Đã gỡ gói Seller thành công.",
       "manage_roles_title": "Quản Lý Vai Trò",
+      "confirm_role_title": "Xác Nhận Thay Đổi Vai Trò",
+      "confirm_assign_role_msg": "Bạn có chắc chắn muốn GÁN vai trò \"{role}\" cho người dùng \"{user}\" không?",
+      "confirm_remove_role_msg": "Bạn có chắc chắn muốn GỠ vai trò \"{role}\" khỏi người dùng \"{user}\" không?",
       "assign": "Gán",
       "remove": "Gỡ",
       "user_detail_title": "Chi Tiết Người Dùng",
@@ -1108,7 +1116,20 @@
     "password_uppercase": "Mật khẩu phải có ít nhất 1 chữ cái viết hoa.",
     "password_lowercase": "Mật khẩu phải có ít nhất 1 chữ cái viết thường.",
     "password_number": "Mật khẩu phải có ít nhất 1 chữ số.",
-    "password_special": "Mật khẩu phải có ít nhất 1 ký tự đặc biệt."
+    "password_special": "Mật khẩu phải có ít nhất 1 ký tự đặc biệt.",
+    "checking_username": "Đang kiểm tra username...",
+    "username_available": "✓ Username khả dụng",
+    "username_taken": "✕ Username đã được sử dụng",
+    "checking_email": "Đang kiểm tra email...",
+    "email_available": "✓ Email khả dụng",
+    "email_taken": "✕ Email đã được sử dụng",
+    "password_req_length": "8–50 ký tự",
+    "password_req_uppercase": "1 chữ hoa (A-Z)",
+    "password_req_lowercase": "1 chữ thường (a-z)",
+    "password_req_number": "1 chữ số (0-9)",
+    "password_req_special": "1 ký tự đặc biệt (!@#$%...)",
+    "password_match": "✓ Mật khẩu trùng khớp",
+    "password_mismatch_hint": "✕ Mật khẩu không trùng khớp"
   },
   "toast": {
     "login_success": "Đăng nhập thành công!",
@@ -1496,7 +1517,7 @@
     "recovery_step2_title": "Đăng nhập",
     "recovery_step2_desc": "Sử dụng mật khẩu mới để đăng nhập",
     "recovery_step3_title": "Bảo mật tài khoản",
-    "recovery_step3_desc": "Đổi lại mật khẩu trong phần cài đặt tài khoản"
+    "recovery_step3_desc": "Form đổi mật khẩu mới sẽ tự động hiển thị ngay sau khi đăng nhập (hoặc đổi trong Profile)"
   },
   "support": {
     "title": "Trung Tâm Hỗ Trợ RETRADE",
@@ -1766,8 +1787,14 @@
     "cancel_btn": "Hủy bỏ",
     "fill_all_fields_err": "Vui lòng nhập đầy đủ các trường.",
     "satisfy_req_err": "Vui lòng đáp ứng đầy đủ các yêu cầu mật khẩu an toàn.",
-    "success_msg": "Cập nhật mật khẩu mới thành công!",
+    "same_password_err": "Mật khẩu mới phải khác mật khẩu hiện tại.",
+    "success_msg": "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.",
     "failed_msg": "Không thể đổi mật khẩu."
+  },
+  "role_modal": {
+    "role_updated_modal_title": "Cập Nhật Quyền Hạn Tài Khoản",
+    "role_updated_modal_desc": "Quản trị viên vừa cập nhật vai trò/quyền hạn tài khoản của bạn. Hệ thống sẽ tự động đăng xuất sau {seconds} giây để cập nhật quyền mới.",
+    "login_again_now_btn": "Đăng Nhập Lại Ngay ({seconds}s)"
   },
   "payment_result": {
     "title_success": "Thanh toán thành công",

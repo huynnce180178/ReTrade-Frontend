@@ -99,6 +99,20 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    const handleLogoutEvent = () => {
+      if (accountHubRef.current) {
+        accountHubRef.current.stop().catch(() => {});
+        accountHubRef.current = null;
+      }
+      setUser(null);
+      setToken(null);
+    };
+
+    window.addEventListener('retrade:logout', handleLogoutEvent);
+    return () => window.removeEventListener('retrade:logout', handleLogoutEvent);
+  }, []);
+
+  useEffect(() => {
     if (!token || !user?.accountId) {
       return undefined;
     }
@@ -108,13 +122,16 @@ export const AuthProvider = ({ children }) => {
     let disposed = false;
 
     const handleForceLogout = (reasonMessage) => {
-      const msg = typeof reasonMessage === 'string' && reasonMessage.trim()
-        ? reasonMessage
-        : t('auth.force_logout_default');
-      window.dispatchEvent(new CustomEvent('retrade:toast', {
-        detail: { message: msg, type: 'warning', duration: 5000 }
+      if (!localStorage.getItem('token')) return;
+      if (window.__isSelfChangingPassword || sessionStorage.getItem('retrade_self_changing_pwd') === 'true') {
+        sessionStorage.removeItem('retrade_self_changing_pwd');
+        window.__isSelfChangingPassword = false;
+        handleLogout();
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('retrade:role_updated_logout', {
+        detail: { message: reasonMessage }
       }));
-      handleLogout();
     };
 
     connection.on('ForceLogout', handleForceLogout);
@@ -129,6 +146,12 @@ export const AuthProvider = ({ children }) => {
         console.error('Failed to connect account hub:', error);
       }
     };
+
+    connection.onreconnected(() => {
+      if (user?.accountId) {
+        connection.invoke('JoinAccountGroup', user.accountId).catch(() => {});
+      }
+    });
 
     startConnection();
 
@@ -196,6 +219,11 @@ export const AuthProvider = ({ children }) => {
         'Login failed. Please check your username and password.'
       );
       
+      if (errMsg && errMsg.includes('ACCOUNT_UNVERIFIED')) {
+        const email = errMsg.split('ACCOUNT_UNVERIFIED:')[1]?.trim() || '';
+        return { success: false, isUnverified: true, email };
+      }
+
       setError(errMsg);
       return { success: false, error: errMsg, code };
     }

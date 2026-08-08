@@ -297,7 +297,6 @@ export default function Header() {
 
   const handleLogoutClick = () => {
     logout();
-    showToast(t('toast.logout_success'), 'info');
     navigate('/login');
   };
 

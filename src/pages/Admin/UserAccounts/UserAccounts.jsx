@@ -1086,8 +1086,8 @@ export default function UserAccounts() {
             <div className="admin-confirm-modal-body">
               <p>
                 {pendingRoleConfirm.role.isAssigned
-                  ? t('admin.users.confirm_toggle_role_revoke', { role: formatRole(pendingRoleConfirm.role.name) || pendingRoleConfirm.role.name })
-                  : t('admin.users.confirm_toggle_role_grant', { role: formatRole(pendingRoleConfirm.role.name) || pendingRoleConfirm.role.name })}
+                  ? t('admin.users.confirm_remove_role_msg', { role: formatRole(pendingRoleConfirm.role.name) || pendingRoleConfirm.role.name, user: selectedUserDetail?.username || selectedUserDetail?.accountId || '' })
+                  : t('admin.users.confirm_assign_role_msg', { role: formatRole(pendingRoleConfirm.role.name) || pendingRoleConfirm.role.name, user: selectedUserDetail?.username || selectedUserDetail?.accountId || '' })}
               </p>
             </div>
             <div className="admin-confirm-modal-footer">

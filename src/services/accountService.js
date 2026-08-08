@@ -5,6 +5,8 @@ const get = (url) => api.get(url).then(r => r.data);
 
 const accountService = {
   register: (data) => post('/Account/register', data),
+  checkUsername: (username) => get(`/Account/check-username?username=${encodeURIComponent(username)}`),
+  checkEmail: (email) => get(`/Account/check-email?email=${encodeURIComponent(email)}`),
   loginWithGoogle: (googleTokenData) => {
     const token = typeof googleTokenData === 'string'
       ? googleTokenData
@@ -20,6 +22,7 @@ const accountService = {
     });
   },
   verify: (data) => post('/Account/verify', data),
+  verifyForgotOtp: (data) => post('/Account/verify-forgot-otp', data),
   resendOtp: (email) => post('/Account/resend-otp', { email }),
   login: (data) => post('/Account/login', data),
   getAdminUserList: (query = '') => get(`/Admin/user-list${query}`),

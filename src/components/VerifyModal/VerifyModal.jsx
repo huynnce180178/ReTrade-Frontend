@@ -13,6 +13,7 @@ export default function VerifyModal({ isOpen, onClose, email }) {
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [resendCount, setResendCount] = useState(0);
+  const [otpStatus, setOtpStatus] = useState({ checking: false, valid: null, message: '' });
   
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -29,11 +30,47 @@ export default function VerifyModal({ isOpen, onClose, email }) {
   useEffect(() => {
     if (isOpen) {
       setOtp(['', '', '', '', '', '']);
+      setOtpStatus({ checking: false, valid: null, message: '' });
       setResendCount(0);
-      setCountdown(0);
+      setCountdown(60);
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const code = otp.join('');
+    if (code.length !== 6) {
+      setOtpStatus({ checking: false, valid: null, message: '' });
+      return;
+    }
+
+    setOtpStatus({ checking: true, valid: null, message: '' });
+    const timer = setTimeout(async () => {
+      try {
+        const verifyResult = await accountService.verify({ email, otp: code });
+        const verified = verifyResult === true || verifyResult?.verified === true;
+        if (verified) {
+          setOtpStatus({ checking: false, valid: true, message: '' });
+          onClose();
+          navigate('/login', { replace: true });
+        } else {
+          setOtpStatus({
+            checking: false,
+            valid: false,
+            message: t('validation.otp_invalid') || '✕ Mã OTP không hợp lệ hoặc đã hết hạn.'
+          });
+        }
+      } catch (err) {
+        setOtpStatus({
+          checking: false,
+          valid: false,
+          message: err.response?.data?.message || t('validation.otp_invalid') || '✕ Mã OTP không hợp lệ hoặc đã hết hạn.'
+        });
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [otp, email, navigate, onClose, t]);
 
   const handleChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
@@ -70,7 +107,7 @@ export default function VerifyModal({ isOpen, onClose, email }) {
 
   const handleResend = async () => {
     if (resendCount >= 3) {
-      showToast('Bạn đã đạt giới hạn gửi lại mã OTP 3 lần trong 15 phút. Vui lòng thử lại sau.', 'error');
+      showToast(t('auth.otp_resend_limit'), 'error');
       return;
     }
     setResending(true);
@@ -78,7 +115,7 @@ export default function VerifyModal({ isOpen, onClose, email }) {
       await accountService.resendOtp(email);
       const nextCount = resendCount + 1;
       setResendCount(nextCount);
-      showToast(t('toast.saved_success'), 'success');
+      showToast(t('auth.unverified_login_prompt', { email }), 'info');
       setCountdown(60);
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || t('common.error_occurred');
@@ -104,7 +141,6 @@ export default function VerifyModal({ isOpen, onClose, email }) {
         throw new Error(verifyResult?.message || 'Invalid or expired OTP.');
       }
 
-      showToast(verifyResult?.message || t('toast.register_success'), 'success');
       onClose();
       navigate('/login', { replace: true });
     } catch (err) {
@@ -141,7 +177,7 @@ export default function VerifyModal({ isOpen, onClose, email }) {
                 key={index}
                 ref={(el) => (inputRefs.current[index] = el)}
                 type="text"
-                className="otp-input"
+                className={`otp-input ${otpStatus.valid === true ? 'otp-input-valid' : otpStatus.valid === false ? 'otp-input-error' : ''}`}
                 maxLength="1"
                 value={digit}
                 onChange={(e) => handleChange(index, e.target.value)}
@@ -152,6 +188,12 @@ export default function VerifyModal({ isOpen, onClose, email }) {
               />
             ))}
           </div>
+
+          {otpStatus.message && (
+            <div className={`mt-2 mb-2 text-xs font-medium text-center ${otpStatus.valid ? 'text-emerald-600' : 'text-red-500'}`}>
+              {otpStatus.message}
+            </div>
+          )}
 
           <button type="submit" className="verify-submit-btn" disabled={loading}>
             {loading ? (

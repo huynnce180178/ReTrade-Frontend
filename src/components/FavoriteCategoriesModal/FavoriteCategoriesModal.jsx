@@ -160,8 +160,11 @@ export default function FavoriteCategoriesModal({ isOpen, onClose, currentFavori
                     />
                   )}
                   <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary, #000805)', lineHeight: '1.3' }}>
+                      {cat.name}
+                    </div>
                     {cat.description && (
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted, #717975)', marginTop: '2px', lineHeight: '1.3' }}>
                         {cat.description.length > 80 ? cat.description.slice(0, 80) + '...' : cat.description}
                       </div>
                     )}

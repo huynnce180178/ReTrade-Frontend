@@ -4,6 +4,7 @@ import accountService from '../../../services/accountService';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { forceLogout } from '../../../utils/authUtils';
 import '../../../styles/MyAccount.css';
 
 export default function ChangePassword() {
@@ -56,6 +57,8 @@ export default function ChangePassword() {
     }
 
     setLoading(true);
+    window.__isSelfChangingPassword = true;
+    sessionStorage.setItem('retrade_self_changing_pwd', 'true');
     try {
       if (isPasswordSet) {
         await accountService.changePassword(cleanOldPassword, cleanNewPassword);
@@ -68,15 +71,13 @@ export default function ChangePassword() {
           : (language === 'vi' ? 'Đặt mật khẩu thành công. Vui lòng đăng nhập lại.' : 'Password set successfully. Please log in again.'),
         'success'
       );
-      clearMustChangePassword?.();
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
       setLoading(false);
       setTimeout(() => {
-        logout();
-      }, 1500);
+        forceLogout();
+      }, 500);
     } catch (err) {
+      window.__isSelfChangingPassword = false;
+      sessionStorage.removeItem('retrade_self_changing_pwd');
       const serverMsg = err?.response?.data?.message || err?.response?.data;
       showToast(
         typeof serverMsg === 'string'

@@ -6,6 +6,8 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import bgLogin from '../../../assets/background-login.png';
 import ChangePasswordAfterRecoveryModal from '../../../components/ChangePasswordAfterRecoveryModal/ChangePasswordAfterRecoveryModal';
+import VerifyModal from '../../../components/VerifyModal/VerifyModal';
+import accountService from '../../../services/accountService';
 
 import '../../../styles/Login.css';
 
@@ -27,6 +29,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showFirstChangeModal, setShowFirstChangeModal] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,8 +51,15 @@ export default function Login() {
           showToast(t('auth.change_pw_title'), 'info');
           setShowFirstChangeModal(true);
         } else {
-          showToast(t('toast.login_success'), 'success');
           navigate('/');
+        }
+      } else if (result.isUnverified) {
+        const targetEmail = result.email || cleanUsername;
+        setUnverifiedEmail(targetEmail);
+        setShowVerifyModal(true);
+        showToast(t('auth.unverified_login_prompt', { email: targetEmail }), 'info');
+        if (targetEmail) {
+          accountService.resendOtp(targetEmail).catch(() => {});
         }
       } else {
         const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title);
@@ -76,7 +87,6 @@ export default function Login() {
             showToast(t('auth.change_pw_title'), 'info');
             setShowFirstChangeModal(true);
           } else {
-            showToast(t('toast.login_success'), 'success');
             navigate('/');
           }
         } else {
@@ -255,6 +265,14 @@ export default function Login() {
             setShowFirstChangeModal(false);
             navigate('/');
           }}
+        />
+      )}
+
+      {showVerifyModal && (
+        <VerifyModal
+          isOpen={showVerifyModal}
+          onClose={() => setShowVerifyModal(false)}
+          email={unverifiedEmail}
         />
       )}
     </div>

@@ -224,6 +224,10 @@
     "register_button": "Establish Account",
     "registering": "Registering...",
     "have_account": "Already have an account?",
+    "unverified_notice": "Didn't complete OTP verification for {email}?",
+    "reopen_otp": "Verify OTP now",
+    "unverified_login_prompt": "Your account is pending verification. A new OTP code has been sent to {email}.",
+    "otp_resend_limit": "You have reached the maximum limit of 3 OTP resends in 15 minutes. Please try again later.",
     "forgot_title": "Recover Password",
     "forgot_desc": "Enter your email to receive password reset instructions.",
     "send_reset_link": "Send Reset Link",
@@ -901,6 +905,9 @@
       "ban_error": "Failed to ban account.",
       "unban_error": "Failed to reactivate account.",
       "manage_roles_title": "Manage Roles",
+      "confirm_role_title": "Confirm Role Change",
+      "confirm_assign_role_msg": "Are you sure you want to ASSIGN the \"{role}\" role to user \"{user}\"?",
+      "confirm_remove_role_msg": "Are you sure you want to REMOVE the \"{role}\" role from user \"{user}\"?",
       "assign": "Assign",
       "remove": "Remove",
       "user_detail_title": "User Detail",
@@ -1105,7 +1112,20 @@
     "password_uppercase": "Password must contain at least 1 uppercase letter.",
     "password_lowercase": "Password must contain at least 1 lowercase letter.",
     "password_number": "Password must contain at least 1 number.",
-    "password_special": "Password must contain at least 1 special character."
+    "password_special": "Password must contain at least 1 special character.",
+    "checking_username": "Checking username...",
+    "username_available": "✓ Username is available",
+    "username_taken": "✕ Username is already taken",
+    "checking_email": "Checking email...",
+    "email_available": "✓ Email is available",
+    "email_taken": "✕ Email is already registered",
+    "password_req_length": "8–50 characters",
+    "password_req_uppercase": "1 uppercase letter (A-Z)",
+    "password_req_lowercase": "1 lowercase letter (a-z)",
+    "password_req_number": "1 number (0-9)",
+    "password_req_special": "1 special character (!@#$%...)",
+    "password_match": "✓ Password matches",
+    "password_mismatch_hint": "✕ Confirm password does not match"
   },
   "toast": {
     "login_success": "Signed in successfully!",
@@ -1493,7 +1513,7 @@
     "recovery_step2_title": "Sign in",
     "recovery_step2_desc": "Use the new password to log in",
     "recovery_step3_title": "Secure your account",
-    "recovery_step3_desc": "Change the password in your settings"
+    "recovery_step3_desc": "A password update prompt will appear right after logging in (or change in Profile)"
   },
   "support": {
     "title": "RETRADE Support Center",
@@ -1763,8 +1783,14 @@
     "cancel_btn": "Cancel",
     "fill_all_fields_err": "Please fill in all fields.",
     "satisfy_req_err": "Please satisfy all password security requirements.",
-    "success_msg": "Password updated successfully!",
+    "same_password_err": "New password must be different from current password.",
+    "success_msg": "Password changed successfully. Please log in again.",
     "failed_msg": "Failed to change password."
+  },
+  "role_modal": {
+    "role_updated_modal_title": "Account Roles Updated",
+    "role_updated_modal_desc": "An administrator has updated your account roles. You will be automatically logged out in {seconds} seconds to apply changes.",
+    "login_again_now_btn": "Log In Now ({seconds}s)"
   },
   "payment_result": {
     "title_success": "Payment Successful",

@@ -137,6 +137,16 @@
   border-bottom-color: var(--color-secondary, #1b6b51);
 }
 
+.otp-input-error {
+  border-bottom: 2px solid #ef4444 !important;
+  color: #ef4444 !important;
+}
+
+.otp-input-valid {
+  border-bottom: 2px solid #10b981 !important;
+  color: #10b981 !important;
+}
+
 .verify-submit-btn {
   width: 100%;
   padding: 16px;
