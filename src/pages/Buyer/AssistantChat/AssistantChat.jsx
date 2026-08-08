@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { useAuth } from '../../../context/AuthContext';
+import wishlistService from '../../../services/wishlistService';
 import assistantChatService from '../../../services/assistantChatService';
 import './AssistantChat.css';
 
@@ -25,19 +26,184 @@ function formatTime(value) {
   });
 }
 
+function formatTextNode(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return lines.map((line, lineIdx) => {
+    let cleanLine = line.trim();
+    if (cleanLine.startsWith('### ') || cleanLine.startsWith('## ') || cleanLine.startsWith('# ')) {
+      const headingText = cleanLine.replace(/^#+\s*/, '');
+      return (
+        <div key={lineIdx} className="assistant-product-title-header">
+          {headingText}
+        </div>
+      );
+    }
+
+    const boldRegex = /\*\*([^*]+)\*\*/g;
+    const parts = [];
+    let lastIdx = 0;
+    let bMatch;
+
+    while ((bMatch = boldRegex.exec(cleanLine)) !== null) {
+      if (bMatch.index > lastIdx) {
+        parts.push(cleanLine.substring(lastIdx, bMatch.index));
+      }
+      parts.push(<strong key={`b-${lineIdx}-${bMatch.index}`}>{bMatch[1]}</strong>);
+      lastIdx = bMatch.index + bMatch[0].length;
+    }
+
+    if (lastIdx < cleanLine.length) {
+      parts.push(cleanLine.substring(lastIdx));
+    }
+
+    return (
+      <React.Fragment key={`line-${lineIdx}`}>
+        {parts}
+        {lineIdx < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
+}
+
+function renderFormattedContent(content, currentLanguage = 'vi', handlers = {}) {
+  if (!content) return null;
+
+  const linkRegex = /(!?)\[([^\]]+)\]\(([^)]+)\)/g;
+  const elements = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = linkRegex.exec(content)) !== null) {
+    const isImage = match[1] === '!';
+    const textStart = match.index;
+    if (textStart > lastIndex) {
+      elements.push(formatTextNode(content.substring(lastIndex, textStart)));
+    }
+
+    const title = match[2];
+    const url = match[3];
+
+    if (isImage) {
+      elements.push(
+        <div key={`img-${url}-${match.index}`} className="assistant-inline-img-wrapper">
+          <img src={url} alt={title} className="assistant-inline-img" onError={(e) => { e.target.style.display = 'none'; }} />
+        </div>
+      );
+    } else if (url.startsWith('/')) {
+      const lowerTitle = title.toLowerCase();
+      let icon = 'arrow_forward';
+      let buttonTypeClass = '';
+      let displayTitle = title;
+
+      const productIdMatch = url.match(/\/product\/([^\/?#]+)/);
+      const productId = productIdMatch ? productIdMatch[1] : null;
+
+      if (lowerTitle.includes('yêu thích') || lowerTitle.includes('wishlist') || url.includes('wishlist')) {
+        icon = 'favorite';
+        buttonTypeClass = ' wishlist';
+        displayTitle = currentLanguage === 'en' ? 'Add to Wishlist' : 'Thêm yêu thích';
+
+        elements.push(
+          <button
+            key={`${url}-${match.index}`}
+            type="button"
+            className={`assistant-nav-btn${buttonTypeClass}`}
+            onClick={(e) => handlers.onWishlist ? handlers.onWishlist(productId, e) : null}
+          >
+            <span className="material-symbols-outlined">{icon}</span>
+            <span>{displayTitle}</span>
+          </button>
+        );
+      } else if (lowerTitle.includes('mua ngay') || lowerTitle.includes('buy') || url.includes('buy')) {
+        icon = 'bolt';
+        buttonTypeClass = ' buy';
+        displayTitle = currentLanguage === 'en' ? 'Buy Now' : 'Mua ngay';
+
+        elements.push(
+          <button
+            key={`${url}-${match.index}`}
+            type="button"
+            className={`assistant-nav-btn${buttonTypeClass}`}
+            onClick={(e) => handlers.onBuyNow ? handlers.onBuyNow(productId, e) : null}
+          >
+            <span className="material-symbols-outlined">{icon}</span>
+            <span>{displayTitle}</span>
+          </button>
+        );
+      } else {
+        if (lowerTitle.includes('xem chi tiết') || lowerTitle.includes('view detail') || lowerTitle.includes('view details')) {
+          icon = 'arrow_forward';
+          displayTitle = currentLanguage === 'en' ? 'View Details' : 'Xem chi tiết';
+        }
+
+        const restOfContent = content.substring(match.index, match.index + 250);
+        const hasWishlist = restOfContent.includes('action=wishlist') || restOfContent.includes('yêu thích') || restOfContent.includes('wishlist');
+        const hasBuyNow = restOfContent.includes('action=buy') || restOfContent.includes('mua ngay') || restOfContent.includes('buy now');
+
+        elements.push(
+          <React.Fragment key={`prod-btns-${url}-${match.index}`}>
+            <Link to={url} className={`assistant-nav-btn${buttonTypeClass}`}>
+              <span className="material-symbols-outlined">{icon}</span>
+              <span>{displayTitle}</span>
+            </Link>
+            {productId && !hasWishlist && (
+              <button
+                type="button"
+                className="assistant-nav-btn wishlist"
+                onClick={(e) => handlers.onWishlist ? handlers.onWishlist(productId, e) : null}
+              >
+                <span className="material-symbols-outlined">favorite</span>
+                <span>{currentLanguage === 'en' ? 'Add to Wishlist' : 'Thêm yêu thích'}</span>
+              </button>
+            )}
+            {productId && !hasBuyNow && (
+              <button
+                type="button"
+                className="assistant-nav-btn buy"
+                onClick={(e) => handlers.onBuyNow ? handlers.onBuyNow(productId, e) : null}
+              >
+                <span className="material-symbols-outlined">bolt</span>
+                <span>{currentLanguage === 'en' ? 'Buy Now' : 'Mua ngay'}</span>
+              </button>
+            )}
+          </React.Fragment>
+        );
+      }
+    } else {
+      elements.push(
+        <a key={`${url}-${match.index}`} href={url} target="_blank" rel="noopener noreferrer" className="assistant-nav-btn">
+          <span>{title}</span>
+          <span className="material-symbols-outlined">open_in_new</span>
+        </a>
+      );
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    elements.push(formatTextNode(content.substring(lastIndex)));
+  }
+
+  return elements.length > 0 ? elements : formatTextNode(content);
+}
+
 function mapHistoryMessage(message) {
   return {
     id: message.messageId,
     role: message.role === 'model' || message.role === 'assistant' ? 'assistant' : 'user',
     content: message.content || '',
     createdAt: message.createdAt,
-    products: [],
+    products: Array.isArray(message.products) ? message.products : [],
   };
 }
 
 export default function AssistantChat() {
   const { showToast } = useToast();
   const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY));
   const [messages, setMessages] = useState([
     {
@@ -157,6 +323,40 @@ export default function AssistantChat() {
     return t(content.slice(I18N_CONTENT_PREFIX.length));
   };
 
+  const handleDirectWishlist = async (productId, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!user) {
+      showToast(t('auth.login_title') || (language === 'en' ? 'Please log in to continue' : 'Vui lòng đăng nhập để tiếp tục'), 'warning');
+      navigate('/login');
+      return;
+    }
+    if (!productId) return;
+    try {
+      await wishlistService.addToWishlist(productId);
+      showToast(t('product.add_to_wishlist') || (language === 'en' ? 'Added to wishlist!' : 'Đã thêm vào danh sách yêu thích!'), 'success');
+    } catch (err) {
+      const msg = err?.response?.data || err?.message;
+      showToast(typeof msg === 'string' ? msg : (language === 'en' ? 'Added to wishlist!' : 'Đã thêm vào danh sách yêu thích!'), 'success');
+    }
+  };
+
+  const handleDirectBuyNow = (productId, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!user) {
+      showToast(t('auth.login_title') || (language === 'en' ? 'Please log in to continue' : 'Vui lòng đăng nhập để tiếp tục'), 'warning');
+      navigate('/login');
+      return;
+    }
+    if (!productId) return;
+    navigate(`/product/${productId}?action=buy`);
+  };
+
   return (
     <div className="assistant-chat-page">
       <section className="assistant-chat-panel">
@@ -187,36 +387,13 @@ export default function AssistantChat() {
                   </span>
                 )}
                 <div className="assistant-message-bubble">
-                  <p>{translateAssistantContent(message.content)}</p>
-                  {message.products?.length > 0 && (
-                    <div className="assistant-products">
-                      {message.products.map((product) => (
-                        <Link
-                          key={product.productId}
-                          to={`/product/${product.productId}`}
-                          className="assistant-product-card"
-                        >
-                          <div className="assistant-product-image">
-                            {product.mainImageUrl ? (
-                              <img src={product.mainImageUrl} alt={product.name || t('common.product_image')} />
-                            ) : (
-                              <span className="material-symbols-outlined">inventory_2</span>
-                            )}
-                          </div>
-                          <div className="assistant-product-info">
-                            <strong>{product.name || t('common.unnamed_product')}</strong>
-                            <span>{product.categoryName || t('common.not_available')}</span>
-                            <b>{formatCurrency(product.price)}</b>
-                            <small>{product.condition || t('common.unknown')} • {t('common.quantity')}: {product.stockQuantity ?? 0}</small>
-                          </div>
-                          <div className="assistant-product-action">
-                            <span>{t('common.view_detail')}</span>
-                            <span className="material-symbols-outlined">chevron_right</span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+                  <div className="assistant-formatted-content">
+                    {renderFormattedContent(
+                      translateAssistantContent(message.content),
+                      language,
+                      { onWishlist: handleDirectWishlist, onBuyNow: handleDirectBuyNow }
+                    )}
+                  </div>
                   <time>{formatTime(message.createdAt)}</time>
                 </div>
               </div>

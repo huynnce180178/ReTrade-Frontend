@@ -4,6 +4,7 @@ import assistantChatService from '../../services/assistantChatService';
 import wishlistService from '../../services/wishlistService';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 import './AssistantChatWidget.css';
 
 const SESSION_KEY = 'retrade_assistant_session_id';
@@ -22,6 +23,15 @@ function formatTextNode(text) {
   const lines = text.split('\n');
   return lines.map((line, lineIdx) => {
     let cleanLine = line.trim();
+    if (cleanLine.startsWith('### ') || cleanLine.startsWith('## ') || cleanLine.startsWith('# ')) {
+      const headingText = cleanLine.replace(/^#+\s*/, '');
+      return (
+        <div key={lineIdx} className="assistant-widget-product-title">
+          {headingText}
+        </div>
+      );
+    }
+
     if (cleanLine.startsWith('* ') || cleanLine.startsWith('- ')) {
       cleanLine = `- ${cleanLine.substring(2)}`;
     }
@@ -44,7 +54,7 @@ function formatTextNode(text) {
   });
 }
 
-function renderFormattedContent(content) {
+function renderFormattedContent(content, currentLanguage = 'vi', handlers = {}) {
   if (!content) return null;
 
   const linkRegex = /(!?)\[([^\]]+)\]\(([^)]+)\)/g;
@@ -69,12 +79,85 @@ function renderFormattedContent(content) {
         </div>
       );
     } else if (url.startsWith('/')) {
-      elements.push(
-        <Link key={`${url}-${match.index}`} to={url} className="assistant-widget-nav-btn">
-          <span>{title}</span>
-          <span className="material-symbols-outlined">arrow_forward</span>
-        </Link>
-      );
+      const lowerTitle = title.toLowerCase();
+      let icon = 'arrow_forward';
+      let buttonTypeClass = '';
+      let displayTitle = title;
+
+      const productIdMatch = url.match(/\/product\/([^\/?#]+)/);
+      const productId = productIdMatch ? productIdMatch[1] : null;
+
+      if (lowerTitle.includes('yêu thích') || lowerTitle.includes('wishlist') || url.includes('wishlist')) {
+        icon = 'favorite';
+        buttonTypeClass = ' wishlist';
+        displayTitle = currentLanguage === 'en' ? 'Add to Wishlist' : 'Thêm yêu thích';
+
+        elements.push(
+          <button
+            key={`${url}-${match.index}`}
+            type="button"
+            className={`assistant-widget-nav-btn${buttonTypeClass}`}
+            onClick={(e) => handlers.onWishlist ? handlers.onWishlist(productId, e) : null}
+          >
+            <span className="material-symbols-outlined">{icon}</span>
+            <span>{displayTitle}</span>
+          </button>
+        );
+      } else if (lowerTitle.includes('mua ngay') || lowerTitle.includes('buy') || url.includes('buy')) {
+        icon = 'bolt';
+        buttonTypeClass = ' buy';
+        displayTitle = currentLanguage === 'en' ? 'Buy Now' : 'Mua ngay';
+
+        elements.push(
+          <button
+            key={`${url}-${match.index}`}
+            type="button"
+            className={`assistant-widget-nav-btn${buttonTypeClass}`}
+            onClick={(e) => handlers.onBuyNow ? handlers.onBuyNow(productId, e) : null}
+          >
+            <span className="material-symbols-outlined">{icon}</span>
+            <span>{displayTitle}</span>
+          </button>
+        );
+      } else {
+        if (lowerTitle.includes('xem chi tiết') || lowerTitle.includes('view detail') || lowerTitle.includes('view details')) {
+          icon = 'arrow_forward';
+          displayTitle = currentLanguage === 'en' ? 'View Details' : 'Xem chi tiết';
+        }
+
+        const restOfContent = content.substring(match.index, match.index + 250);
+        const hasWishlist = restOfContent.includes('action=wishlist') || restOfContent.includes('yêu thích') || restOfContent.includes('wishlist');
+        const hasBuyNow = restOfContent.includes('action=buy') || restOfContent.includes('mua ngay') || restOfContent.includes('buy now');
+
+        elements.push(
+          <React.Fragment key={`prod-btns-${url}-${match.index}`}>
+            <Link to={url} className={`assistant-widget-nav-btn${buttonTypeClass}`}>
+              <span className="material-symbols-outlined">{icon}</span>
+              <span>{displayTitle}</span>
+            </Link>
+            {productId && !hasWishlist && (
+              <button
+                type="button"
+                className="assistant-widget-nav-btn wishlist"
+                onClick={(e) => handlers.onWishlist ? handlers.onWishlist(productId, e) : null}
+              >
+                <span className="material-symbols-outlined">favorite</span>
+                <span>{currentLanguage === 'en' ? 'Add to Wishlist' : 'Thêm yêu thích'}</span>
+              </button>
+            )}
+            {productId && !hasBuyNow && (
+              <button
+                type="button"
+                className="assistant-widget-nav-btn buy"
+                onClick={(e) => handlers.onBuyNow ? handlers.onBuyNow(productId, e) : null}
+              >
+                <span className="material-symbols-outlined">bolt</span>
+                <span>{currentLanguage === 'en' ? 'Buy Now' : 'Mua ngay'}</span>
+              </button>
+            )}
+          </React.Fragment>
+        );
+      }
     } else {
       elements.push(
         <a key={`${url}-${match.index}`} href={url} target="_blank" rel="noopener noreferrer" className="assistant-widget-nav-btn">
@@ -121,6 +204,7 @@ export default function AssistantChatWidget() {
   const imageInputRef = useRef(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const QUICK_SUGGESTIONS = [
     { label: t('history.purchase_title'), query: t('chat.assistant_query_purchase_history') },
@@ -307,6 +391,41 @@ export default function AssistantChatWidget() {
     ]);
   };
 
+  const handleDirectWishlist = async (productId, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!user) {
+      showToast(t('auth.login_title') || (language === 'en' ? 'Please log in to continue' : 'Vui lòng đăng nhập để tiếp tục'), 'warning');
+      navigate('/login');
+      return;
+    }
+    if (!productId) return;
+    try {
+      await wishlistService.addToWishlist(productId);
+      setWishlistSet((prev) => new Set(prev).add(productId));
+      showToast(t('product.add_to_wishlist') || (language === 'en' ? 'Added to wishlist!' : 'Đã thêm vào danh sách yêu thích!'), 'success');
+    } catch (err) {
+      const msg = err?.response?.data || err?.message;
+      showToast(typeof msg === 'string' ? msg : (language === 'en' ? 'Added to wishlist!' : 'Đã thêm vào danh sách yêu thích!'), 'success');
+    }
+  };
+
+  const handleDirectBuyNow = (productId, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!user) {
+      showToast(t('auth.login_title') || (language === 'en' ? 'Please log in to continue' : 'Vui lòng đăng nhập để tiếp tục'), 'warning');
+      navigate('/login');
+      return;
+    }
+    if (!productId) return;
+    navigate(`/product/${productId}?action=buy`);
+  };
+
   return (
     <div className={`assistant-widget ${open ? 'open' : ''}`}>
       {open && (
@@ -350,64 +469,12 @@ export default function AssistantChatWidget() {
 
                 <div className="assistant-widget-bubble">
                   <div className="assistant-widget-text">
-                    {renderFormattedContent(translateAssistantContent(message.content))}
+                    {renderFormattedContent(
+                      translateAssistantContent(message.content),
+                      language,
+                      { onWishlist: handleDirectWishlist, onBuyNow: handleDirectBuyNow }
+                    )}
                   </div>
-
-                  {message.products?.length > 0 && (
-                    <div className="assistant-widget-product-list">
-                      <div className="assistant-widget-product-header">
-                        <span className="material-symbols-outlined">shopping_bag</span>
-                        {t('product.related_products')}
-                      </div>
-                      {message.products.slice(0, 5).map((product) => {
-                        const outOfStock = isProductUnavailable(product);
-                        return (
-                        <div key={product.productId} className={`assistant-widget-product-card-container ${outOfStock ? 'out-of-stock' : ''}`}>
-                          <Link to={`/product/${product.productId}`} className="assistant-widget-product-card">
-                            <div className="assistant-widget-product-img">
-                              {product.mainImageUrl ? (
-                                <img src={product.mainImageUrl} alt={product.name || t('common.product_image')} />
-                              ) : (
-                                <div className="assistant-widget-img-placeholder">
-                                  <span className="material-symbols-outlined">inventory_2</span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="assistant-widget-product-meta">
-                              <span className="product-title">{product.name || t('common.unnamed_product')}</span>
-                              <span className="product-price">{formatCurrency(product.price)}</span>
-                              <small style={{ color: '#059669', fontWeight: 600, fontSize: '11px', marginTop: '2px' }}>
-                                {outOfStock ? t('product.out_of_stock') : t('common.view_detail')}
-                              </small>
-                            </div>
-                          </Link>
-                          <div className="assistant-widget-product-card-actions">
-                            <button
-                              type="button"
-                              className={`assistant-widget-action-icon wishlist-btn ${wishlistSet.has(product.productId) ? 'active' : ''}`}
-                              title={outOfStock && !wishlistSet.has(product.productId) ? t('product.out_of_stock') : wishlistSet.has(product.productId) ? t('product.remove_from_wishlist') : t('product.add_to_wishlist')}
-                              onClick={(e) => handleToggleWishlist(e, product)}
-                              disabled={outOfStock && !wishlistSet.has(product.productId)}
-                            >
-                              <span className="material-symbols-outlined">
-                                {wishlistSet.has(product.productId) ? 'favorite' : 'favorite_border'}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className="assistant-widget-action-icon buy-btn"
-                              title={outOfStock ? t('product.out_of_stock') : t('product.buy_now')}
-                              onClick={(e) => handleBuyNow(e, product)}
-                              disabled={outOfStock}
-                            >
-                              <span className="material-symbols-outlined">bolt</span>
-                            </button>
-                          </div>
-                        </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
 
                 {message.role === 'user' && (

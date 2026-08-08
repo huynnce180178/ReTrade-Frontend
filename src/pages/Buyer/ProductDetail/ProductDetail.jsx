@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -255,6 +255,7 @@ function MakeOfferModal({ product, onClose, onSuccess }) {
 export default function ProductDetail() {
   const { productId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const { user } = useAuth();
   const { t, language, formatCurrency } = useLanguage();
@@ -342,6 +343,16 @@ export default function ProductDetail() {
       }
     });
   }, [user, productId]);
+
+  // Auto open checkout modal if action=buy in search params
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('action') === 'buy' || searchParams.get('buy') === 'true') {
+      if (product && !isProductUnavailable(product)) {
+        setShowCheckoutConfirmModal(true);
+      }
+    }
+  }, [location.search, product]);
 
   // Listen to SignalR notifications in real-time
   useEffect(() => {
