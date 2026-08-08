@@ -132,6 +132,35 @@ function AuctionCountdown({ auction, now: externalNow }) {
     );
   }
 
+}
+
+function SmallCountdown({ startTime, endTime, status }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const start = parseAuctionDateTime(startTime)?.getTime() || 0;
+  const end = parseAuctionDateTime(endTime)?.getTime() || 0;
+
+  if (status === 'Upcoming' && start > now) {
+    const diff = start - now;
+    const parts = splitDuration(diff);
+    const pad = (num) => String(num).padStart(2, '0');
+    const daysStr = parts.days > 0 ? `${parts.days}d ` : '';
+    return `${daysStr}${pad(parts.hours)}:${pad(parts.minutes)}:${pad(parts.seconds)}`;
+  }
+
+  if (status === 'Ongoing' && end > now) {
+    const diff = Math.max(0, end - now);
+    const parts = splitDuration(diff);
+    const pad = (num) => String(num).padStart(2, '0');
+    const daysStr = parts.days > 0 ? `${parts.days}d ` : '';
+    return `${daysStr}${pad(parts.hours)}:${pad(parts.minutes)}:${pad(parts.seconds)}`;
+  }
+
   return null;
 }
 
@@ -383,35 +412,32 @@ export default function Auction() {
                     <span className="material-symbols-outlined">inventory_2</span>
                   )}
                   <em className={`auction-card-status ${String(effectiveStatus || '').toLowerCase()}`}>{translatedStatusLabel}</em>
-                  {effectiveStatus === 'Upcoming' && (
-                    <div className="auction-card-watch-badge">
-                      <span className="material-symbols-outlined">notifications_active</span>
-                      {t('auction.status_upcoming')}
+                  {(effectiveStatus === 'Upcoming' || effectiveStatus === 'Ongoing') && (
+                    <div className={`auction-card-countdown-badge ${String(effectiveStatus || '').toLowerCase()}`}>
+                      <span className="material-symbols-outlined">
+                        {effectiveStatus === 'Upcoming' ? 'schedule' : 'bolt'}
+                      </span>
+                      <SmallCountdown startTime={auction.startTime} endTime={auction.endTime} status={effectiveStatus} />
                     </div>
                   )}
                 </div>
                 <div className="auction-card-body">
-                  <span className="auction-card-category">{auction.categoryName || t('common.none')}</span>
+                  <div className="auction-card-meta-row">
+                    <span className="auction-card-category">{auction.categoryName || t('common.none')}</span>
+                    <span className="auction-card-bids-count">
+                      {auction.bidCount || 0} {t('auction.bid_count')}
+                    </span>
+                  </div>
                   <h2>{auction.productName || 'Auction'}</h2>
                   <p>{auction.sellerName || auction.sellerId || 'Seller'}</p>
-                  <AuctionCountdown auction={auction} now={currentTime} />
-                  <div className="auction-bid-panel">
-                    <div>
-                      <small>{t('auction.current_bid')}</small>
-                      <strong>{formatCurrency(auction.currentPrice)}</strong>
-                    </div>
-                    <div>
-                      <small>{t('auction.min_step')}</small>
-                      <strong>{formatCurrency(auction.minIncrement)}</strong>
-                    </div>
-                  </div>
-                  <div className="auction-card-footer">
-                    <span>{getTimeLabel(auction, currentTime, t, language)}</span>
-                    <span>{auction.bidCount || 0} {t('auction.bid_count')}</span>
-                  </div>
-                  <div className="auction-card-dates">
-                    <span>{formatDate(auction.startTime)}</span>
-                    <span>{formatDate(auction.endTime)}</span>
+                  
+                  <div className="auction-card-price-row">
+                    <span>
+                      {t('auction.current_bid')}: <strong>{formatCurrency(auction.currentPrice)}</strong>
+                    </span>
+                    <span>
+                      {t('auction.min_step')}: <strong>{formatCurrency(auction.minIncrement)}</strong>
+                    </span>
                   </div>
                 </div>
               </article>
