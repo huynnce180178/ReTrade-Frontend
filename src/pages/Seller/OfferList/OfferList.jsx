@@ -34,7 +34,7 @@ export default function OfferList() {
   const { user } = useOutletContext();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, isVi } = useLanguage();
 
   // Offers states
   const [offers, setOffers] = useState([]);
@@ -56,6 +56,9 @@ export default function OfferList() {
   // Action Confirm modal state (accept / reject)
   const [actionConfirm, setActionConfirm] = useState(null); // { type: 'accept' | 'reject', offer: object }
   const [submittingAction, setSubmittingAction] = useState(false);
+
+  // Detail offer state
+  const [detailOffer, setDetailOffer] = useState(null);
 
   // Fetch offers from backend
   const fetchOffers = useCallback(async () => {
@@ -305,11 +308,15 @@ export default function OfferList() {
                           : 0;
 
                         return (
-                          <tr key={offer.offerId} className="hover:bg-gray-50/80 transition-colors">
+                          <tr
+                            key={offer.offerId}
+                            onClick={() => setDetailOffer(offer)}
+                            className="hover:bg-gray-50/80 transition-colors cursor-pointer"
+                          >
                             <td className="py-4 px-6">
                               <div className="flex items-center gap-3">
                                 <img
-                                  src={offer.productImage || 'https://placehold.co/80'}
+                                  src={offer.productImageUrl || 'https://placehold.co/80'}
                                   alt={offer.productName}
                                   className="w-12 h-12 object-cover rounded-lg border border-gray-100 shadow-sm"
                                 />
@@ -351,30 +358,51 @@ export default function OfferList() {
                             </td>
 
                             <td className="py-4 px-6 text-right">
-                              {isPending ? (
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    onClick={() => handleOpenAcceptModal(offer)}
-                                    className="px-3 py-1.5 bg-[#1b6b51] text-white rounded-md hover:bg-[#15533f] text-xs font-semibold transition-all shadow-sm"
-                                  >
-                                    {t('offer_list.accept')}
-                                  </button>
-                                  <button
-                                    onClick={() => openCounterModal(offer)}
-                                    className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 text-xs font-semibold transition-all"
-                                  >
-                                    {t('seller_dashboard.contact')}
-                                  </button>
-                                  <button
-                                    onClick={() => handleOpenRejectModal(offer)}
-                                    className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 text-xs font-semibold transition-all"
-                                  >
-                                    {t('offer_list.reject')}
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400 italic">{badge.label}</span>
-                              )}
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDetailOffer(offer);
+                                  }}
+                                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-all flex items-center justify-center"
+                                  title={isVi ? 'Xem chi tiết' : 'View Details'}
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">visibility</span>
+                                </button>
+                                {isPending ? (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenAcceptModal(offer);
+                                      }}
+                                      className="px-3 py-1.5 bg-[#1b6b51] text-white rounded-md hover:bg-[#15533f] text-xs font-semibold transition-all shadow-sm"
+                                    >
+                                      {t('offer_list.accept')}
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openCounterModal(offer);
+                                      }}
+                                      className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 text-xs font-semibold transition-all"
+                                    >
+                                      {t('seller_dashboard.contact')}
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenRejectModal(offer);
+                                      }}
+                                      className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 text-xs font-semibold transition-all"
+                                    >
+                                      {t('offer_list.reject')}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">{badge.label}</span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -515,6 +543,172 @@ export default function OfferList() {
               >
                 {submittingAction ? t('common.submitting') : t('common.confirm')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offer Detail Modal */}
+      {detailOffer && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 font-serif">
+                  {isVi ? 'Chi Tiết Đề Nghị' : 'Offer Details'}
+                </h3>
+                <p className="text-xs text-gray-400 mt-1 font-mono">ID: {detailOffer.offerId}</p>
+              </div>
+              <button
+                onClick={() => setDetailOffer(null)}
+                className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-600 rounded-full transition-all"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
+              {/* Product Info Card */}
+              <div className="flex gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <img
+                  src={detailOffer.productImageUrl || 'https://placehold.co/100'}
+                  alt={detailOffer.productName}
+                  className="w-20 h-20 object-cover rounded-lg border border-gray-200 bg-white shadow-sm"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold text-[#1b6b51] uppercase tracking-wider">
+                    {isVi ? 'Sản phẩm' : 'Product'}
+                  </span>
+                  <h4 className="font-bold text-gray-900 text-base line-clamp-1 mt-0.5">
+                    {detailOffer.productName || t('common.unnamed_product')}
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-x-4 mt-2 text-xs">
+                    <div>
+                      <span className="text-gray-400">{t('offer_list.th_original_price')}:</span>{' '}
+                      <span className="font-semibold text-gray-700">{formatVnd(detailOffer.originalPrice)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Offer Pricing Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-[#1b6b51]/5 border border-[#1b6b51]/10 rounded-xl">
+                  <span className="text-[11px] text-[#1b6b51] font-bold block uppercase tracking-wider">
+                    {isVi ? 'Giá người mua đề nghị' : 'Buyer\'s Proposed Price'}
+                  </span>
+                  <strong className="text-lg font-extrabold text-[#1b6b51] mt-1 block">
+                    {formatVnd(detailOffer.offerPrice)}
+                  </strong>
+                </div>
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                  <span className="text-[11px] text-amber-800 font-bold block uppercase tracking-wider">
+                    {isVi ? 'Giảm giá so với giá gốc' : 'Discount Percentage'}
+                  </span>
+                  <strong className="text-lg font-extrabold text-amber-700 mt-1 block">
+                    {detailOffer.originalPrice
+                      ? `-${Math.round(((detailOffer.originalPrice - detailOffer.offerPrice) / detailOffer.originalPrice) * 100)}%`
+                      : '—'}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Buyer Info */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  {isVi ? 'Thông tin người mua' : 'Buyer Information'}
+                </h5>
+                <div className="p-3 bg-gray-50/50 rounded-xl border border-gray-100 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">{isVi ? 'Họ tên' : 'Full Name'}:</span>
+                    <span className="font-semibold text-gray-800">{detailOffer.buyerName || t('common.unknown_buyer')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email:</span>
+                    <span className="font-semibold text-gray-800 font-mono">{detailOffer.buyerEmail || '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Buyer Message */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  {isVi ? 'Lời nhắn từ người mua' : 'Buyer\'s Message'}
+                </h5>
+                <div className="p-4 bg-gray-50 border border-gray-200/60 rounded-xl text-sm text-gray-700 italic leading-relaxed whitespace-pre-wrap">
+                  {detailOffer.message && detailOffer.message.trim() ? (
+                    detailOffer.message
+                  ) : (
+                    <span className="text-gray-400 not-italic">
+                      {isVi ? '(Người mua không để lại lời nhắn)' : '(No message provided by buyer)'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Timeline & Status */}
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="space-y-2">
+                  <span className="text-[11px] text-gray-400 font-bold block uppercase tracking-wider">
+                    {isVi ? 'Trạng thái' : 'Status'}
+                  </span>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${getStatusBadge(detailOffer.status).bg}`}>
+                    {getStatusBadge(detailOffer.status).label}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-gray-400 font-bold block uppercase tracking-wider">
+                    {isVi ? 'Thời gian còn lại' : 'Time Remaining'}
+                  </span>
+                  <span className="font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded inline-block mt-1 font-semibold">
+                    {calculateTimeRemaining(detailOffer.expiresAt, t)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setDetailOffer(null)}
+                className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all"
+              >
+                {isVi ? 'Đóng' : 'Close'}
+              </button>
+
+              {detailOffer.status === 'Pending' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setDetailOffer(null);
+                      handleOpenAcceptModal(detailOffer);
+                    }}
+                    className="px-4 py-2 bg-[#1b6b51] text-white hover:bg-[#15533f] rounded-xl text-xs font-bold transition-all shadow-sm"
+                  >
+                    {t('offer_list.accept')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDetailOffer(null);
+                      openCounterModal(detailOffer);
+                    }}
+                    className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-xl text-xs font-bold transition-all"
+                  >
+                    {t('seller_dashboard.contact')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDetailOffer(null);
+                      handleOpenRejectModal(detailOffer);
+                    }}
+                    className="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all"
+                  >
+                    {t('offer_list.reject')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

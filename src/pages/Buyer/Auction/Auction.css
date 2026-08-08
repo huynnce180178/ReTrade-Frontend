@@ -995,6 +995,25 @@
   border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-rules-first-time {
+  min-height: 44px;
+  padding: 0 24px;
+  border: 1.5px solid var(--primary);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-rules-first-time:hover {
+  background: rgba(27, 107, 81, 0.06);
+  transform: translateY(-1px);
 }
 
 .btn-rules-agree {
