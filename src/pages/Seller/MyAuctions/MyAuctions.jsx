@@ -74,7 +74,8 @@ function getProgress(auction) {
 function getAuctionEditBlockReason(auction, t) {
   if (!auction) return t('common.no_data');
   if (auction.winnerId) return t('auction.cannot_edit_has_winner');
-  if (!isEndedStatus(auction.status) && Number(auction.bidCount || 0) > 0) return t('auction.cannot_edit_has_bids');
+  if (auction.status !== 'Upcoming') return t('admin.auctions.err_edit_upcoming_only');
+  if (Number(auction.bidCount || 0) > 0) return t('auction.cannot_edit_has_bids');
 
   return '';
 }
@@ -590,7 +591,7 @@ export default function MyAuctions() {
                       <Link to={`/auction/${auction.auctionId}`} className="btn-secondary">
                         {t('auction.title')}
                       </Link>
-                      {(!auction.winnerId && auction.status !== 'Cancelled') && (
+                      {(!auction.winnerId && auction.status === 'Upcoming') && (
                         <button
                           type="button"
                           className="btn-primary"
