@@ -172,26 +172,35 @@
 }
 
 .my-sub-remaining {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(6, 95, 70, 0.06);
+  border: 1px solid rgba(6, 95, 70, 0.15);
+  min-width: 96px;
+  text-align: center;
 }
 
 .rem-num {
-  font-family: var(--font-title, 'Playfair Display', sans-serif);
-  font-size: 32px;
+  font-family: var(--font-main, 'Inter', 'Manrope', sans-serif) !important;
+  font-size: 24px;
   font-weight: 800;
-  color: var(--primary, #065f46);
-  line-height: 1;
+  color: #065f46;
+  line-height: 1.1;
 }
 
 .rem-lbl {
-  font-size: 11px;
-  color: var(--text-muted, #6b7280);
-  font-weight: 700;
+  font-family: var(--font-main, 'Inter', 'Manrope', sans-serif) !important;
+  font-size: 10px;
+  color: #047857;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
   margin-top: 2px;
+  white-space: nowrap;
 }
 
 .my-sub-details-grid {

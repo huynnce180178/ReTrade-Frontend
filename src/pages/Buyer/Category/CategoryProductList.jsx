@@ -5,6 +5,7 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { formatFormattedNumber, parseRawNumber } from '../../../utils/numberUtils';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
+import SponsoredSpotlight from '../../../components/SponsoredSpotlight/SponsoredSpotlight';
 import '../../../styles/Product.css';
 
 function timeAgo(dateStr, language = 'en') {
@@ -276,6 +277,8 @@ export default function CategoryProductList() {
           {t('product_list.filters')}
         </button>
       </div>
+
+      <SponsoredSpotlight mode="carousel" limit={8} />
 
       <div className="product-layout">
         {/* Filter Sidebar */}

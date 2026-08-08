@@ -233,11 +233,6 @@ export default function MyAccount() {
       return;
     }
 
-    if (!trimmedLastName) {
-      showToast(language === 'vi' ? 'Họ không được để trống hoặc chỉ nhập khoảng trắng.' : 'Last name cannot be empty or whitespace.', 'error');
-      return;
-    }
-
     try {
       const updatedProfile = await profileService.updateMyProfile({
         username: username.trim(),
@@ -338,7 +333,7 @@ export default function MyAccount() {
                     </div>
                     <div className="ma-form-group">
                       <label className="ma-label">{language === 'vi' ? 'Tên' : 'Last Name'}</label>
-                      <input type="text" className="ma-input" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                      <input type="text" className="ma-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                     </div>
                     <div className="ma-form-group">
                       <label className="ma-label">{language === 'vi' ? 'Số điện thoại' : 'Phone Number'}</label>
@@ -411,10 +406,10 @@ export default function MyAccount() {
             <div className="ma-col-right">
               
               {/* Profile Photo Card */}
-              <div className="ma-card">
-                <h4 className="ma-card-title" style={{ marginBottom: '24px' }}>{language === 'vi' ? 'Ảnh Đại Diện' : 'Profile Photo'}</h4>
-                <div className="ma-profile-photo-section" style={{ flexDirection: 'column', gap: '24px', alignItems: 'flex-start', marginBottom: 0 }}>
-                  <div className="ma-photo-wrapper">
+              <div className="ma-card ma-photo-card">
+                <h4 className="ma-card-title" style={{ marginBottom: '20px' }}>{language === 'vi' ? 'Ảnh Đại Diện' : 'Profile Photo'}</h4>
+                <div className="ma-profile-photo-wrap">
+                  <div className="ma-photo-circle">
                     {isValidAvatarUrl(user?.avatarUrl) && !avatarError ? (
                       <img
                         src={user.avatarUrl}
@@ -426,9 +421,12 @@ export default function MyAccount() {
                       <div className="ma-photo-placeholder">{getInitials()}</div>
                     )}
                   </div>
-                    <div className="ma-photo-text">
-                    <p className="ma-subtitle-small">{language === 'vi' ? 'Định dạng hỗ trợ: JPG, PNG (Tối đa 5MB)' : 'Accepted formats: JPG, PNG (Max 5MB)'}</p>
-                    <button type="button" className="ma-link-btn" onClick={handleChooseImage}>{language === 'vi' ? 'Cập Nhật Ảnh' : 'Update Image'}</button>
+                  <div className="ma-photo-info">
+                    <p className="ma-photo-note">{language === 'vi' ? 'Định dạng hỗ trợ: JPG, PNG (Tối đa 5MB)' : 'Accepted formats: JPG, PNG (Max 5MB)'}</p>
+                    <button type="button" className="ma-upload-btn" onClick={handleChooseImage}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>upload</span>
+                      {language === 'vi' ? 'Tải Ảnh Mới' : 'Upload Image'}
+                    </button>
                     <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
                   </div>
                 </div>
@@ -445,59 +443,10 @@ export default function MyAccount() {
                 </p>
               </div>
 
-              {!(user?.roles?.some((r) => String(r).toLowerCase() === 'admin') || user?.primaryRole?.toLowerCase() === 'admin') && (
-                <div className="ma-danger-card" style={{ flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span className="material-symbols-outlined ma-danger-icon">cancel</span>
-                    <h4 className="ma-danger-title" style={{ margin: 0 }}>{language === 'vi' ? 'Vô Hiệu Hóa Tài Khoản' : 'Deactivate Account'}</h4>
-                  </div>
-                  <p className="ma-danger-text" style={{ fontSize: '14px' }}>
-                    {language === 'vi' ? 'Nếu không còn nhu cầu sử dụng ReTrade, bạn có thể vô hiệu hóa tài khoản. Bạn sẽ bị đăng xuất ngay lập tức.' : 'If you no longer want to use ReTrade, you can deactivate your account. You will be logged out immediately and receive a confirmation email.'}
-                  </p>
-                  <button type="button" className="ma-danger-btn" onClick={() => setShowDeactivateModal(true)}>
-                    {language === 'vi' ? 'Vô Hiệu Hóa Tài Khoản' : 'Deactivate Account'}
-                  </button>
-                </div>
-              )}
-
             </div>
           </div>
         </main>
       </div>
-
-      {showDeactivateModal && (
-        <div className="ma-deactivate-overlay" onClick={() => !deactivateLoading && setShowDeactivateModal(false)}>
-          <div className="ma-deactivate-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ma-deactivate-header">
-              <div>
-                <p className="ma-deactivate-kicker">{language === 'vi' ? 'Tài Khoản Không Hoạt Động' : 'Inactive User'}</p>
-                <h3>{language === 'vi' ? 'Vô hiệu hóa tài khoản của bạn?' : 'Deactivate your account?'}</h3>
-              </div>
-              <button type="button" className="ma-deactivate-close" onClick={() => setShowDeactivateModal(false)} disabled={deactivateLoading}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <div className="ma-deactivate-body">
-              <p>
-                {language === 'vi' ? 'Tài khoản của bạn sẽ bị chuyển sang trạng thái Không hoạt động và đăng xuất ngay lập tức.' : 'Your account will be set to Inactive, you will be logged out immediately, and you will receive a confirmation email.'}
-              </p>
-              <div className="ma-deactivate-note">
-                {language === 'vi' ? 'Liên hệ hỗ trợ nếu bạn cần sự trợ giúp.' : 'You can ask support by replying to the email if you have any questions.'}
-              </div>
-            </div>
-
-            <div className="ma-deactivate-footer">
-              <button type="button" className="ma-btn-secondary" onClick={() => setShowDeactivateModal(false)} disabled={deactivateLoading}>
-                {language === 'vi' ? 'Hủy' : 'Cancel'}
-              </button>
-              <button type="button" className="ma-danger-btn" onClick={handleDeactivateAccount} disabled={deactivateLoading}>
-                {deactivateLoading ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...') : (language === 'vi' ? 'Xác Nhận Vô Hiệu Hóa' : 'Deactivate')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -168,6 +168,23 @@ export default function UserAccounts() {
     });
   }, [users, searchTerm, roleFilter, statusFilter]);
 
+  // Pagination State (9 users per page)
+  const pageSize = 9;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, statusFilter]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredUsers.length / pageSize) || 1;
+  }, [filteredUsers, pageSize]);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, currentPage, pageSize]);
+
   const selectedUser = filteredUsers.find((user) => user.accountId === selectedUserId) || filteredUsers[0] || null;
 
   const summary = useMemo(() => {
@@ -623,7 +640,7 @@ export default function UserAccounts() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map((user) => {
+                    {paginatedUsers.map((user) => {
                       const isSelected = selectedUser?.accountId === user.accountId;
                       const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || t('admin.users.unknown_user');
                       const statusClass = statusTone(user.status);
@@ -703,12 +720,43 @@ export default function UserAccounts() {
 
           <footer className="admin-table-footer">
             <span>
-              {t('admin.users.displaying_count', { current: filteredUsers.length, total: formatNumber(users.length) })}
+              {t('admin.users.displaying_count', { current: paginatedUsers.length, total: formatNumber(filteredUsers.length) })}
+              {filteredUsers.length > 0 && (
+                <span style={{ marginLeft: '8px', opacity: 0.8, fontSize: '13px' }}>
+                  ({(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredUsers.length)})
+                </span>
+              )}
             </span>
-            <div className="admin-pagination">
-              <button type="button" disabled>{t('admin.users.prev')}</button>
-              <button type="button" className="active">{t('admin.users.next')}</button>
-            </div>
+            {totalPages > 1 && (
+              <div className="admin-pagination">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  title={t('admin.users.prev')}
+                >
+                  ‹
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={p === currentPage ? 'active' : ''}
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  title={t('admin.users.next')}
+                >
+                  ›
+                </button>
+              </div>
+            )}
           </footer>
         </div>
       </section>

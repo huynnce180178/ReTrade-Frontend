@@ -143,6 +143,10 @@ export default function Login() {
           {/* Right Side: Login Form */}
           <div className="login-right-side">
             <div className="login-form-container">
+              <Link to="/" className="login-back-home-btn" title={language === 'vi' ? 'Trở về trang chủ' : 'Back to Home'}>
+                <span className="material-symbols-outlined">home</span>
+                <span>{language === 'vi' ? 'Trang chủ' : 'Home'}</span>
+              </Link>
 
               <div className="login-header-text">
                 <h1>{t('auth.login_title')}</h1>

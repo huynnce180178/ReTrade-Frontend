@@ -29,8 +29,9 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
       const normalizedUrl = url.toLowerCase();
       const isAuthAttempt = normalizedUrl.includes('/login');
+      const hasToken = !!localStorage.getItem('token');
 
-      if (!isAuthAttempt) {
+      if (!isAuthAttempt && hasToken) {
         forceLogout();
       }
     }

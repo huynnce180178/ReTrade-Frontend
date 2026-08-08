@@ -276,8 +276,21 @@
 
 /* Unavailable Item overlay */
 .item-unavailable {
-  opacity: 0.6;
-  filter: grayscale(0.5);
+  opacity: 0.65;
+  filter: grayscale(0.85);
+  background-color: #f3f4f6 !important;
+  border: 1px dashed #d1d5db !important;
+}
+
+.item-unavailable .wl-item-img {
+  filter: grayscale(1);
+}
+
+.wl-status-pill.sold-out {
+  color: #991b1b;
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  font-weight: 700;
 }
 
 /* ── Sidebar Summary ── */

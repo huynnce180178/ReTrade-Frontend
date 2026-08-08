@@ -163,6 +163,27 @@
   width: 100%;
 }
 
+.login-back-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5c706b;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  margin-bottom: 16px;
+  transition: all 0.2s ease;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(2, 36, 27, 0.05);
+}
+
+.login-back-home-btn:hover {
+  color: #02241b;
+  background: rgba(2, 36, 27, 0.1);
+  transform: translateX(-3px);
+}
+
 .login-header-text {
   margin-bottom: 24px;
   text-align: center;

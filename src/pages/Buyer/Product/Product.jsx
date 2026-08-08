@@ -201,12 +201,12 @@ export default function Product() {
       showToast(t('product.cannot_wishlist_own_product'), 'error');
       return;
     }
-    if (isProductUnavailable(product)) {
-      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng.' : 'This product is out of stock.', 'warning');
+    const isAdded = wishlistIds.has(product.productId);
+    if (!isAdded && isProductUnavailable(product)) {
+      showToast(t('product.sold_out_cannot_add_wishlist'), 'warning');
       return;
     }
     setTogglingId(product.productId);
-    const isAdded = wishlistIds.has(product.productId);
     try {
       if (isAdded) {
         const data = await wishlistService.getWishlist();
@@ -305,7 +305,7 @@ export default function Product() {
         </button>
       </div>
 
-      <SponsoredSpotlight mode="grid" limit={4} />
+      <SponsoredSpotlight mode="carousel" limit={8} />
 
       <div className="product-layout">
           {showMobileFilter && (

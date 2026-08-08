@@ -697,12 +697,10 @@
 }
 
 .product-card-price {
-  font-family: var(--font-title);
-  font-size: 20px;
+  font-family: var(--font-main, 'Inter', 'Manrope', sans-serif);
+  font-size: 19px;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #02241b;
 }
 
 .product-card-price-no {

@@ -9,7 +9,7 @@ import chatService from '../../services/chatService';
 import { createChatHubConnection } from '../../services/chatRealtimeService';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../LanguageSwitcher/LanguageSwitcher';
-import { formatNotificationContent } from '../../utils/notificationUtils';
+import { formatNotificationContent, formatNotificationTime } from '../../utils/notificationUtils';
 
 import './Header.css';
 
@@ -418,7 +418,11 @@ export default function Header() {
           <div className="header-left">
             <button
               className="mobile-menu-toggle"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => {
+                setMobileMenuOpen(!mobileMenuOpen);
+                setDropdownOpen(false);
+                setNotifOpen(false);
+              }}
               aria-label="Toggle Navigation Menu"
             >
               <span className="material-symbols-outlined">
@@ -426,7 +430,7 @@ export default function Header() {
               </span>
             </button>
 
-            <Link to="/" className="header-logo">
+            <Link to="/" className="header-logo" onClick={() => setMobileMenuOpen(false)}>
               <span>RETRADE</span>
             </Link>
           </div>
@@ -455,7 +459,20 @@ export default function Header() {
 
             {/* Mobile Drawer Actions */}
             <div className="mobile-drawer-footer">
-              <LanguageSwitcher className="mobile-lang-switcher" />
+              <div className="mobile-drawer-top-row">
+                <button
+                  className="btn-subscription mobile-sub-btn"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setSubscriptionModalOpen(true);
+                  }}
+                >
+                  <span className="sub-glow"></span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '6px' }}>workspace_premium</span>
+                  {t('nav.my_subscriptions')}
+                </button>
+                <LanguageSwitcher className="mobile-lang-switcher" />
+              </div>
               {user ? (
                 <div className="mobile-user-info">
                   <div className="avatar-circle">
@@ -550,7 +567,11 @@ export default function Header() {
             <div className="notification-wrapper" ref={notifRef}>
               <button
                 className="icon-btn"
-                onClick={() => setNotifOpen(!notifOpen)}
+                onClick={() => {
+                  setNotifOpen(!notifOpen);
+                  setDropdownOpen(false);
+                  setMobileMenuOpen(false);
+                }}
                 aria-label="Notifications"
               >
                 <span className="material-symbols-outlined">notifications</span>
@@ -581,7 +602,7 @@ export default function Header() {
                               <div className="notif-title">{translatedTitle}</div>
                               <div className="notif-text">{translatedMessage}</div>
                               <div className="notif-time">
-                                {item.createdAt ? new Date(item.createdAt).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : (language === 'vi' ? 'Vừa xong' : 'Just now')}
+                                {formatNotificationTime(item.createdAt, language)}
                               </div>
                             </div>
                             <button
@@ -610,7 +631,11 @@ export default function Header() {
               <div className="user-dropdown-wrapper" ref={dropdownRef}>
                 <button
                   className="user-profile-trigger"
-                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  onClick={() => {
+                    setDropdownOpen(!dropdownOpen);
+                    setNotifOpen(false);
+                    setMobileMenuOpen(false);
+                  }}
                   aria-expanded={dropdownOpen}
                 >
                   <div className="avatar-circle">

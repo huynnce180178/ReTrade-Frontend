@@ -355,6 +355,11 @@
     "make_offer": "Make an Offer",
     "buy_now": "Buy Now",
     "out_of_stock": "Out of stock",
+    "sold_out": "SOLD OUT / OUT OF STOCK",
+    "in_stock": "IN STOCK",
+    "select_single_item_notice": "Please select 1 available item to proceed to checkout",
+    "sold_out_cannot_add_wishlist": "This product is sold out or unavailable and cannot be added to your wishlist.",
+    "sold_out_cannot_buy": "This product is sold out and cannot be purchased.",
     "add_to_wishlist": "Added to wishlist!",
     "remove_from_wishlist": "Removed from wishlist.",
     "cannot_wishlist_own_product": "You cannot add your own product to your wishlist.",
@@ -498,7 +503,8 @@
     "counter_offer_badge": "Counter Offer",
     "confirm_offer_accepted_msg": "The seller agreed to the price of {{price}}. Would you like to proceed to checkout now?",
     "confirm_buy_now_msg": "Are you sure you want to proceed to checkout for this item?",
-    "checkout_now": "Checkout Now"
+    "checkout_now": "Checkout Now",
+    "product_unavailable_toast": "This product is sold out or no longer available for checkout."
   },
   "account": {
     "profile_title": "Personal Information",
@@ -1790,7 +1796,11 @@
   "role_modal": {
     "role_updated_modal_title": "Account Roles Updated",
     "role_updated_modal_desc": "An administrator has updated your account roles. You will be automatically logged out in {seconds} seconds to apply changes.",
-    "login_again_now_btn": "Log In Now ({seconds}s)"
+    "ban_modal_title": "Account Suspended",
+    "ban_modal_desc": "Your account has been banned by an administrator. You will be automatically logged out in {seconds} seconds.",
+    "ban_reason_label": "Reason:",
+    "login_again_now_btn": "Log In Now ({seconds}s)",
+    "understand_btn": "I Understand ({seconds}s)"
   },
   "payment_result": {
     "title_success": "Payment Successful",

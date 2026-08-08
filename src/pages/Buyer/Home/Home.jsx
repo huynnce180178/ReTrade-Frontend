@@ -181,6 +181,11 @@ export default function Home() {
   }, []);
 
   const fetchFavorites = useCallback(async () => {
+    if (!user) {
+      setFavorites([]);
+      setLoadingFavorites(false);
+      return;
+    }
     setLoadingFavorites(true);
     try {
       const data = await userFavoriteService.getFavorites();
@@ -278,12 +283,13 @@ export default function Home() {
       showToast(t('product.cannot_wishlist_own_product'), 'error');
       return;
     }
-    if (product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || Number(product.stockQuantity ?? 0) <= 0) {
-      showToast(t('product.out_of_stock'), 'warning');
+    const isAdded = wishlistIds.has(product.productId);
+    const isSold = product.status === 'SoldOut' || product.status === 'Sold' || product.status === 'Inactive' || Number(product.stockQuantity ?? 0) <= 0;
+    if (!isAdded && isSold) {
+      showToast(t('product.sold_out_cannot_add_wishlist'), 'warning');
       return;
     }
     setTogglingId(product.productId);
-    const isAdded = wishlistIds.has(product.productId);
     try {
       if (isAdded) {
         const data = await wishlistService.getWishlist();

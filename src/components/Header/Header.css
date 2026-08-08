@@ -38,6 +38,8 @@
   display: flex;
   align-items: center;
   gap: 24px;
+  position: relative;
+  z-index: 10;
 }
 
 .header-logo {
@@ -48,10 +50,18 @@
   font-weight: 800;
   font-size: 26px;
   letter-spacing: -0.6px;
-  color: var(--text-primary);
+  color: #ffffff !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  position: relative;
+  z-index: 10;
   margin-right: 16px;
   /* Cách xa Menu một chút */
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.header-logo span {
+  color: #ffffff !important;
 }
 
 .header-logo:hover {
@@ -198,6 +208,16 @@
 .btn-subscription:hover {
   transform: translateY(-3px) scale(1.03);
   box-shadow: 0 12px 30px rgba(16, 185, 129, 0.45);
+}
+
+.mobile-sub-btn {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 13.5px;
+  margin-bottom: 14px;
+  justify-content: center;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
 }
 
 .sub-glow {
@@ -556,7 +576,7 @@
     width: calc(100vw - 24px) !important;
     max-width: 320px !important;
     margin-left: auto !important;
-    z-index: 9999 !important;
+    z-index: 1005 !important;
   }
 }
 
@@ -1230,19 +1250,32 @@
     top: 100%;
     left: 0;
     width: 100%;
-    background: rgba(255, 255, 255, 0.98);
+    background: #02241b !important;
     backdrop-filter: blur(28px);
     -webkit-backdrop-filter: blur(28px);
-    border-bottom: 1px solid rgba(2, 36, 27, 0.1);
-    box-shadow: 0 10px 30px rgba(2, 36, 27, 0.08);
-    padding: 20px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    padding: 20px 24px;
     gap: 16px;
-    z-index: 1000;
+    z-index: 1050;
     align-items: flex-start;
   }
 
   .header-nav.mobile-open {
     display: flex;
+  }
+
+  .header-nav.mobile-open .nav-link {
+    color: rgba(255, 255, 255, 0.88) !important;
+    font-size: 15px;
+    font-weight: 600;
+    width: 100%;
+    padding: 6px 0;
+  }
+
+  .header-nav.mobile-open .nav-link.active,
+  .header-nav.mobile-open .nav-link:hover {
+    color: #10b981 !important;
   }
 
   .header-actions {
@@ -1292,21 +1325,22 @@
     width: 100%;
     margin-top: 16px;
     padding-top: 16px;
-    border-top: 1px solid rgba(2, 36, 27, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
   }
 
-  .mobile-only-menu-items {
-    display: flex !important;
-    flex-direction: column;
-    gap: 16px;
+  .mobile-drawer-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     width: 100%;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(2, 36, 27, 0.1);
+    flex-wrap: wrap;
   }
 
   .mobile-sub-btn {
-    align-self: flex-start;
+    align-self: center;
+    flex: 1;
+    min-width: 180px;
   }
 
   .mobile-auth-links {

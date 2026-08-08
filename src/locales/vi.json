@@ -356,6 +356,11 @@
     "make_offer": "Đề xuất trả giá",
     "buy_now": "Mua ngay",
     "out_of_stock": "Hết hàng",
+    "sold_out": "ĐÃ BÁN / HẾT HÀNG",
+    "in_stock": "CÒN HÀNG",
+    "select_single_item_notice": "Vui lòng chọn 1 sản phẩm còn hàng để thanh toán",
+    "sold_out_cannot_add_wishlist": "Sản phẩm đã hết hàng hoặc ngưng bán, không thể thêm vào danh sách yêu thích.",
+    "sold_out_cannot_buy": "Sản phẩm đã hết hàng hoặc ngưng bán, không thể mua ngay.",
     "add_to_wishlist": "Đã thêm vào danh sách yêu thích!",
     "remove_from_wishlist": "Đã xóa khỏi danh sách yêu thích.",
     "cannot_wishlist_own_product": "Bạn không thể thêm sản phẩm của chính mình vào danh sách yêu thích.",
@@ -496,7 +501,8 @@
     "counter_offer_badge": "Giá thương lượng",
     "confirm_offer_accepted_msg": "Người bán đã đồng ý mức giá {{price}}. Bạn có muốn tiến hành thanh toán ngay không?",
     "confirm_buy_now_msg": "Bạn có chắc chắn muốn tiến hành thanh toán cho sản phẩm này?",
-    "checkout_now": "Thanh toán ngay"
+    "checkout_now": "Thanh toán ngay",
+    "product_unavailable_toast": "Sản phẩm đã hết hàng hoặc không còn khả dụng để thanh toán."
   },
   "account": {
     "profile_title": "Thông tin cá nhân",
@@ -1794,7 +1800,11 @@
   "role_modal": {
     "role_updated_modal_title": "Cập Nhật Quyền Hạn Tài Khoản",
     "role_updated_modal_desc": "Quản trị viên vừa cập nhật vai trò/quyền hạn tài khoản của bạn. Hệ thống sẽ tự động đăng xuất sau {seconds} giây để cập nhật quyền mới.",
-    "login_again_now_btn": "Đăng Nhập Lại Ngay ({seconds}s)"
+    "ban_modal_title": "Tài Khoản Đã Bị Khóa",
+    "ban_modal_desc": "Tài khoản của bạn đã bị Quản trị viên tạm khóa. Hệ thống sẽ tự động đăng xuất sau {seconds} giây.",
+    "ban_reason_label": "Lý do khóa:",
+    "login_again_now_btn": "Đăng Nhập Lại Ngay ({seconds}s)",
+    "understand_btn": "Đã Hiểu ({seconds}s)"
   },
   "payment_result": {
     "title_success": "Thanh toán thành công",

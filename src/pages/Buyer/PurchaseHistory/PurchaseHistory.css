@@ -530,6 +530,30 @@
   box-shadow: 0 4px 12px rgba(27,107,81,0.12);
 }
 
+.purchase-detail-title {
+  font-family: var(--font-main, 'Inter', 'Manrope', sans-serif) !important;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-primary, #02241b);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.order-code-tag {
+  font-family: var(--font-main, 'Inter', 'Manrope', system-ui, sans-serif) !important;
+  font-size: 18px;
+  font-weight: 700;
+  color: #065f46;
+  background: rgba(6, 95, 70, 0.08);
+  border: 1px solid rgba(6, 95, 70, 0.2);
+  padding: 3px 12px;
+  border-radius: 8px;
+  letter-spacing: 0.5px;
+}
+
 .purchase-breadcrumb .material-symbols-outlined {
   font-size: 14px;
   color: #6f8378;
