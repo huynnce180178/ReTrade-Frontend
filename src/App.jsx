@@ -11,6 +11,7 @@ import { NotificationProvider } from './context/NotificationContext';
 
 const GOOGLE_CLIENT_ID = '743075993817-g2um0aknujbhp10vtfjmtg12gq6iaoid.apps.googleusercontent.com';
 import MainLayout from './layouts/MainLayout/MainLayout';
+import RoleUpdateModal from './components/RoleUpdateModal/RoleUpdateModal';
 
 import Home from './pages/Buyer/Home/Home';
 import Login from './pages/Buyer/Login/Login';
@@ -89,6 +90,7 @@ function App() {
         <AuthProvider>
         <NotificationProvider>
           <ToastProvider>
+            <RoleUpdateModal />
             <BrowserRouter>
               <ScrollToTop />
               <Routes>

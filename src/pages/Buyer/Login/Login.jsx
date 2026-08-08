@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../../context/AuthContext';
@@ -6,6 +6,8 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import bgLogin from '../../../assets/background-login.png';
 import ChangePasswordAfterRecoveryModal from '../../../components/ChangePasswordAfterRecoveryModal/ChangePasswordAfterRecoveryModal';
+import VerifyModal from '../../../components/VerifyModal/VerifyModal';
+import accountService from '../../../services/accountService';
 
 import '../../../styles/Login.css';
 
@@ -27,6 +29,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showFirstChangeModal, setShowFirstChangeModal] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,8 +51,15 @@ export default function Login() {
           showToast(t('auth.change_pw_title'), 'info');
           setShowFirstChangeModal(true);
         } else {
-          showToast(t('toast.login_success'), 'success');
           navigate('/');
+        }
+      } else if (result.isUnverified) {
+        const targetEmail = result.email || cleanUsername;
+        setUnverifiedEmail(targetEmail);
+        setShowVerifyModal(true);
+        showToast(t('auth.unverified_login_prompt', { email: targetEmail }), 'info');
+        if (targetEmail) {
+          accountService.resendOtp(targetEmail).catch(() => {});
         }
       } else {
         const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title);
@@ -76,7 +87,6 @@ export default function Login() {
             showToast(t('auth.change_pw_title'), 'info');
             setShowFirstChangeModal(true);
           } else {
-            showToast(t('toast.login_success'), 'success');
             navigate('/');
           }
         } else {
@@ -133,6 +143,10 @@ export default function Login() {
           {/* Right Side: Login Form */}
           <div className="login-right-side">
             <div className="login-form-container">
+              <Link to="/" className="login-back-home-btn" title={language === 'vi' ? 'Trở về trang chủ' : 'Back to Home'}>
+                <span className="material-symbols-outlined">home</span>
+                <span>{language === 'vi' ? 'Trang chủ' : 'Home'}</span>
+              </Link>
 
               <div className="login-header-text">
                 <h1>{t('auth.login_title')}</h1>
@@ -178,7 +192,6 @@ export default function Login() {
                         required
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        placeholder="user@example.com"
                         className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm"
                       />
                     </div>
@@ -193,7 +206,6 @@ export default function Login() {
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
                           className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm pr-10"
                         />
                         <button
@@ -257,6 +269,14 @@ export default function Login() {
             setShowFirstChangeModal(false);
             navigate('/');
           }}
+        />
+      )}
+
+      {showVerifyModal && (
+        <VerifyModal
+          isOpen={showVerifyModal}
+          onClose={() => setShowVerifyModal(false)}
+          email={unverifiedEmail}
         />
       )}
     </div>

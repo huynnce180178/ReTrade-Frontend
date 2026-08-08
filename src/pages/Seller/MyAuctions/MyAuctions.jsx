@@ -6,7 +6,9 @@ import { createAuctionHubConnection } from '../../../services/auctionRealtimeSer
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { formatFormattedNumber, parseRawNumber } from '../../../utils/numberUtils';
 import { auctionDateTimeLocalToApiValue, formatAuctionDateTime, getFutureAuctionDateTimeLocal, parseAuctionDateTime, toAuctionDateTimeLocal } from '../../../utils/auctionTime';
+import { AUCTION_DURATION_PRESETS, calculateEndTimeFromDuration, formatDateTimePreview } from '../../../utils/auctionDurationUtils';
 import SellerPagination from '../../../components/SellerPagination/SellerPagination';
 import './MyAuctions.css';
 
@@ -32,23 +34,30 @@ function formatDateTime(value) {
 }
 
 function getDefaultCreateForm() {
+  const startTime = getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS);
+  const durationMinutes = 60;
   return {
     productId: '',
     startingPrice: '',
     minIncrement: '',
     buyNowPrice: '',
-    startTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS),
-    endTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS + 24 * 60 * 60 * 1000),
+    startTime: startTime,
+    durationMinutes: durationMinutes,
+    endTime: calculateEndTimeFromDuration(startTime, durationMinutes),
   };
 }
 
 function toAuctionPayload(form) {
+  const calculatedEndTime = form.durationMinutes
+    ? calculateEndTimeFromDuration(form.startTime, form.durationMinutes)
+    : form.endTime;
   return {
     startingPrice: Number(form.startingPrice),
     minIncrement: Number(form.minIncrement),
     buyNowPrice: form.buyNowPrice ? Number(form.buyNowPrice) : null,
     startTime: auctionDateTimeLocalToApiValue(form.startTime),
-    endTime: auctionDateTimeLocalToApiValue(form.endTime),
+    endTime: auctionDateTimeLocalToApiValue(calculatedEndTime || form.endTime),
+    durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : undefined,
   };
 }
 
@@ -64,11 +73,8 @@ function getProgress(auction) {
 
 function getAuctionEditBlockReason(auction, t) {
   if (!auction) return t('common.no_data');
-  if (auction.status !== 'Upcoming') return t('my_auctions.cancel_error');
-  if (Number(auction.bidCount || 0) > 0) return t('auction.err_limit_exceeded');
-
-  const startTime = parseAuctionDateTime(auction.startTime)?.getTime() || 0;
-  if (!startTime || startTime <= Date.now()) return t('auction.auction_ended');
+  if (auction.winnerId) return t('auction.cannot_edit_has_winner');
+  if (!isEndedStatus(auction.status) && Number(auction.bidCount || 0) > 0) return t('auction.cannot_edit_has_bids');
 
   return '';
 }
@@ -98,7 +104,7 @@ function validateAuctionForm(form, { requireProduct = false, requireFutureStart 
 export default function MyAuctions() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const { t } = useLanguage();
+  const { t, isVi } = useLanguage();
 
   const [auctions, setAuctions] = useState([]);
   const [eligibleProducts, setEligibleProducts] = useState([]);
@@ -242,8 +248,18 @@ export default function MyAuctions() {
   }, [authLoading, user]);
 
   const handleCreateChange = (event) => {
-    const { name, value } = event.target;
-    setCreateForm((current) => ({ ...current, [name]: value }));
+    let { name, value } = event.target;
+    if (name === 'startingPrice' || name === 'minIncrement' || name === 'buyNowPrice') {
+      value = parseRawNumber(value);
+    }
+    setCreateForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === 'startTime' || name === 'durationMinutes') {
+        const duration = next.durationMinutes || 60;
+        next.endTime = calculateEndTimeFromDuration(next.startTime, duration);
+      }
+      return next;
+    });
   };
 
   const openCreateModal = () => {
@@ -251,8 +267,18 @@ export default function MyAuctions() {
   };
 
   const handleEditChange = (event) => {
-    const { name, value } = event.target;
-    setEditForm((current) => ({ ...current, [name]: value }));
+    let { name, value } = event.target;
+    if (name === 'startingPrice' || name === 'minIncrement' || name === 'buyNowPrice') {
+      value = parseRawNumber(value);
+    }
+    setEditForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === 'startTime' || name === 'durationMinutes') {
+        const duration = next.durationMinutes || 60;
+        next.endTime = calculateEndTimeFromDuration(next.startTime, duration);
+      }
+      return next;
+    });
   };
 
   const handleCreate = async (event) => {
@@ -287,13 +313,24 @@ export default function MyAuctions() {
       showToast(blockReason, 'warning');
       return;
     }
+    const currentStart = parseAuctionDateTime(auction.startTime);
+    const isPastStart = !currentStart || currentStart.getTime() <= Date.now();
+    const startStr = isPastStart ? getFutureAuctionDateTimeLocal(0) : toAuctionDateTimeLocal(auction.startTime);
+    let duration = 60;
+    if (auction.startTime && auction.endTime) {
+      const diffMs = new Date(auction.endTime).getTime() - new Date(auction.startTime).getTime();
+      if (diffMs > 0) duration = Math.round(diffMs / 60000);
+    }
+    const endStr = calculateEndTimeFromDuration(startStr, duration);
+
     setEditingAuction(auction);
     setEditForm({
       startingPrice: auction.startingPrice ?? '',
       minIncrement: auction.minIncrement ?? '',
       buyNowPrice: auction.buyNowPrice ?? '',
-      startTime: toAuctionDateTimeLocal(auction.startTime),
-      endTime: toAuctionDateTimeLocal(auction.endTime),
+      startTime: startStr,
+      durationMinutes: duration,
+      endTime: endStr,
     });
   };
 
@@ -350,13 +387,16 @@ export default function MyAuctions() {
   };
 
   const openRelistModal = (auction) => {
+    const startTime = getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS);
+    const durationMinutes = 60;
     setRelistingAuction(auction);
     setRelistForm({
       startingPrice: auction.startingPrice ?? '',
       minIncrement: auction.minIncrement ?? '',
       buyNowPrice: auction.buyNowPrice ?? '',
-      startTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS),
-      endTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS + 24 * 60 * 60 * 1000),
+      startTime: startTime,
+      durationMinutes: durationMinutes,
+      endTime: calculateEndTimeFromDuration(startTime, durationMinutes),
     });
   };
 
@@ -368,7 +408,14 @@ export default function MyAuctions() {
 
   const handleRelistChange = (event) => {
     const { name, value } = event.target;
-    setRelistForm((current) => ({ ...current, [name]: value }));
+    setRelistForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === 'startTime' || name === 'durationMinutes') {
+        const duration = next.durationMinutes || 60;
+        next.endTime = calculateEndTimeFromDuration(next.startTime, duration);
+      }
+      return next;
+    });
   };
 
   const handleRelist = async (event) => {
@@ -543,13 +590,25 @@ export default function MyAuctions() {
                       <Link to={`/auction/${auction.auctionId}`} className="btn-secondary">
                         {t('auction.title')}
                       </Link>
-                      {auction.status === 'Upcoming' && Number(auction.bidCount || 0) === 0 && (
+                      {(!auction.winnerId && auction.status !== 'Cancelled') && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => openEditModal(auction)}
+                          disabled={saving}
+                        >
+                          {t('common.update')}
+                        </button>
+                      )}
+                      {(isEndedStatus(auction.status) && !auction.winnerId && auction.status !== 'Cancelled') && (
                         <button
                           type="button"
                           className="btn-outline"
-                          onClick={() => openEditModal(auction)}
+                          style={{ color: '#059669', borderColor: '#6ee7b7' }}
+                          onClick={() => openRelistModal(auction)}
+                          disabled={saving}
                         >
-                          {t('common.edit')}
+                          {t('my_auctions.relist_auction')}
                         </button>
                       )}
                       {auction.status === 'Ongoing' && (
@@ -561,16 +620,6 @@ export default function MyAuctions() {
                           disabled={saving}
                         >
                           {t('my_auctions.end_auction')}
-                        </button>
-                      )}
-                      {(auction.status === 'EndedNoBid' || (isEndedStatus(auction.status) && Number(auction.bidCount || 0) === 0)) && (
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          onClick={() => openRelistModal(auction)}
-                          disabled={saving}
-                        >
-                          {t('my_auctions.relist_auction')}
                         </button>
                       )}
                     </div>
@@ -621,23 +670,23 @@ export default function MyAuctions() {
               <div className="form-group">
                 <label>{t('auction.starting_price')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="startingPrice"
-                  value={createForm.startingPrice}
+                  value={formatFormattedNumber(createForm.startingPrice)}
                   onChange={handleCreateChange}
                   required
-                  min="1"
                 />
               </div>
               <div className="form-group">
                 <label>{t('auction.min_step')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="minIncrement"
-                  value={createForm.minIncrement}
+                  value={formatFormattedNumber(createForm.minIncrement)}
                   onChange={handleCreateChange}
                   required
-                  min="1"
                 />
               </div>
             </div>
@@ -645,12 +694,12 @@ export default function MyAuctions() {
             <div className="form-group">
               <label>{t('auction.buy_now_price')} (VND) *</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="buyNowPrice"
-                value={createForm.buyNowPrice}
+                value={formatFormattedNumber(createForm.buyNowPrice)}
                 onChange={handleCreateChange}
                 required
-                min="1"
               />
             </div>
 
@@ -666,16 +715,26 @@ export default function MyAuctions() {
                 />
               </div>
               <div className="form-group">
-                <label>{t('auction.end_time')} *</label>
-                <input
-                  type="datetime-local"
-                  name="endTime"
-                  value={createForm.endTime}
+                <label>{t('auction_durations.select_duration')} *</label>
+                <select
+                  name="durationMinutes"
+                  value={createForm.durationMinutes || 60}
                   onChange={handleCreateChange}
-                  min={createForm.startTime || undefined}
                   required
-                />
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+                >
+                  {AUCTION_DURATION_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>
+                      {t(`auction_durations.${preset.key}`)}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontSize: '13px', fontWeight: 500 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>schedule</span>
+              <span>{t('auction_durations.expected_end_time', { time: formatDateTimePreview(calculateEndTimeFromDuration(createForm.startTime, createForm.durationMinutes || 60), isVi) })}</span>
             </div>
 
             <div className="modal-footer">
@@ -699,23 +758,23 @@ export default function MyAuctions() {
               <div className="form-group">
                 <label>{t('auction.starting_price')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="startingPrice"
-                  value={editForm.startingPrice}
+                  value={formatFormattedNumber(editForm.startingPrice)}
                   onChange={handleEditChange}
                   required
-                  min="1"
                 />
               </div>
               <div className="form-group">
                 <label>{t('auction.min_step')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="minIncrement"
-                  value={editForm.minIncrement}
+                  value={formatFormattedNumber(editForm.minIncrement)}
                   onChange={handleEditChange}
                   required
-                  min="1"
                 />
               </div>
             </div>
@@ -723,12 +782,12 @@ export default function MyAuctions() {
             <div className="form-group">
               <label>{t('auction.buy_now_price')} (VND) *</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="buyNowPrice"
-                value={editForm.buyNowPrice}
+                value={formatFormattedNumber(editForm.buyNowPrice)}
                 onChange={handleEditChange}
                 required
-                min="1"
               />
             </div>
 
@@ -744,16 +803,26 @@ export default function MyAuctions() {
                 />
               </div>
               <div className="form-group">
-                <label>{t('auction.end_time')} *</label>
-                <input
-                  type="datetime-local"
-                  name="endTime"
-                  value={editForm.endTime}
+                <label>{t('auction_durations.select_duration')} *</label>
+                <select
+                  name="durationMinutes"
+                  value={editForm.durationMinutes || 60}
                   onChange={handleEditChange}
-                  min={editForm.startTime || undefined}
                   required
-                />
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+                >
+                  {AUCTION_DURATION_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>
+                      {t(`auction_durations.${preset.key}`)}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontSize: '13px', fontWeight: 500 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>schedule</span>
+              <span>{t('auction_durations.expected_end_time', { time: formatDateTimePreview(calculateEndTimeFromDuration(editForm.startTime, editForm.durationMinutes || 60), isVi) })}</span>
             </div>
 
             <div className="modal-footer">
@@ -779,23 +848,23 @@ export default function MyAuctions() {
               <div className="form-group">
                 <label>{t('auction.starting_price')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="startingPrice"
-                  value={relistForm.startingPrice}
+                  value={formatFormattedNumber(relistForm.startingPrice)}
                   onChange={handleRelistChange}
                   required
-                  min="1"
                 />
               </div>
               <div className="form-group">
                 <label>{t('auction.min_step')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="minIncrement"
-                  value={relistForm.minIncrement}
+                  value={formatFormattedNumber(relistForm.minIncrement)}
                   onChange={handleRelistChange}
                   required
-                  min="1"
                 />
               </div>
             </div>
@@ -803,12 +872,12 @@ export default function MyAuctions() {
             <div className="form-group">
               <label>{t('auction.buy_now_price')} (VND) *</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="buyNowPrice"
-                value={relistForm.buyNowPrice}
+                value={formatFormattedNumber(relistForm.buyNowPrice)}
                 onChange={handleRelistChange}
                 required
-                min="1"
               />
             </div>
 
@@ -824,16 +893,26 @@ export default function MyAuctions() {
                 />
               </div>
               <div className="form-group">
-                <label>{t('auction.end_time')} *</label>
-                <input
-                  type="datetime-local"
-                  name="endTime"
-                  value={relistForm.endTime}
+                <label>{t('auction_durations.select_duration')} *</label>
+                <select
+                  name="durationMinutes"
+                  value={relistForm.durationMinutes || 60}
                   onChange={handleRelistChange}
-                  min={relistForm.startTime || undefined}
                   required
-                />
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }}
+                >
+                  {AUCTION_DURATION_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>
+                      {t(`auction_durations.${preset.key}`)}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontSize: '13px', fontWeight: 500 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>schedule</span>
+              <span>{t('auction_durations.expected_end_time', { time: formatDateTimePreview(calculateEndTimeFromDuration(relistForm.startTime, relistForm.durationMinutes || 60), isVi) })}</span>
             </div>
 
             <div className="modal-footer">

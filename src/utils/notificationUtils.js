@@ -90,3 +90,56 @@ export function formatNotificationContent(rawTitle, rawMessage, language) {
 
   return { translatedTitle: title, translatedMessage: message };
 }
+
+/**
+ * Formats notification creation timestamp into localized relative or clean date-time format.
+ * Examples: "Vừa xong", "5 phút trước", "2 giờ trước", "Hôm qua 14:30", "08/08 14:30"
+ */
+export function formatNotificationTime(dateStr, language) {
+  if (!dateStr) return language === 'vi' ? 'Vừa xong' : 'Just now';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return language === 'vi' ? 'Vừa xong' : 'Just now';
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 60) {
+    return language === 'vi' ? 'Vừa xong' : 'Just now';
+  }
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return language === 'vi' ? `${diffMin} phút trước` : `${diffMin}m ago`;
+  }
+
+  const diffHour = Math.floor(diffMin / 60);
+  const isToday = now.getDate() === date.getDate() &&
+                  now.getMonth() === date.getMonth() &&
+                  now.getFullYear() === date.getFullYear();
+
+  if (isToday) {
+    return language === 'vi' ? `${diffHour} giờ trước` : `${diffHour}h ago`;
+  }
+
+  const isYesterday = (new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString() === date.toDateString());
+  const timeStr = date.toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  if (isYesterday) {
+    return language === 'vi' ? `Hôm qua ${timeStr}` : `Yesterday ${timeStr}`;
+  }
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+
+  if (year === now.getFullYear()) {
+    return `${day}/${month} ${timeStr}`;
+  }
+
+  return `${day}/${month}/${year} ${timeStr}`;
+}

@@ -5,6 +5,7 @@ import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 
 import { useLanguage } from '../../../context/LanguageContext';
+import { formatFormattedNumber, parseRawNumber } from '../../../utils/numberUtils';
 
 export default function ProductForm() {
   const navigate = useNavigate();
@@ -271,7 +272,11 @@ export default function ProductForm() {
       return;
     }
 
-    const finalValue = type === 'checkbox' ? checked : value;
+    let finalValue = type === 'checkbox' ? checked : value;
+    if (name === 'price' || name === 'weightGram' || name === 'lengthCm' || name === 'widthCm' || name === 'heightCm') {
+      finalValue = parseRawNumber(value);
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: finalValue,
@@ -502,7 +507,6 @@ export default function ProductForm() {
                   value={formData.name}
                   onChange={handleInputChange}
                   required
-                  placeholder={isVi ? 'Ví dụ: iPhone 15 Pro Max 256GB Vàng' : 'e.g. iPhone 15 Pro Max 256GB Gold'}
                   className={validationErrors.name ? 'has-error' : ''}
                 />
                 {validationErrors.name && <span className="input-error-msg">{validationErrors.name}</span>}
@@ -540,7 +544,7 @@ export default function ProductForm() {
 
               <div className="form-group">
                 <label>{isVi ? 'Mô Tả Chi Tiết' : 'Detailed Description'}</label>
-                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={6} placeholder={isVi ? 'Mô tả chi tiết sản phẩm, các vết xước nhỏ nếu có, phụ kiện đi kèm...' : 'Detailed description of the product, minor defects if any, included accessories...'} />
+                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={6} />
               </div>
             </div>
 
@@ -569,13 +573,13 @@ export default function ProductForm() {
                 <div className="form-group">
                   <label>{isVi ? 'Giá (VND)' : 'Price (VND)'} {!formData.isForAuction && '*'}</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="price"
-                    value={formData.price}
+                    value={formatFormattedNumber(formData.price)}
                     onChange={handleInputChange}
                     disabled={formData.isForAuction}
                     required={!formData.isForAuction}
-                    placeholder={formData.isForAuction ? (isVi ? 'Thiết lập khi Đấu Giá' : 'Set in Auction') : (isVi ? 'Ví dụ: 15000000' : 'e.g. 15000000')}
                     className={validationErrors.price ? 'has-error' : ''}
                   />
                   {validationErrors.price && <span className="input-error-msg">{validationErrors.price}</span>}
@@ -584,13 +588,13 @@ export default function ProductForm() {
                 <div className="form-group">
                   <label>{isVi ? 'Số Lượng Tồn Kho *' : 'Stock Quantity *'}</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="stockQuantity"
-                    value={formData.stockQuantity}
+                    value={formatFormattedNumber(formData.stockQuantity)}
                     onChange={handleInputChange}
                     disabled={formData.isForAuction}
                     required
-                    min="1"
                     className={validationErrors.stockQuantity ? 'has-error' : ''}
                   />
                   {validationErrors.stockQuantity && <span className="input-error-msg">{validationErrors.stockQuantity}</span>}
@@ -605,11 +609,11 @@ export default function ProductForm() {
               <div className="form-group">
                 <label>{isVi ? 'Trọng Lượng (Gram)' : 'Weight (Grams)'}</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="weightGram"
-                  value={formData.weightGram}
+                  value={formatFormattedNumber(formData.weightGram)}
                   onChange={handleInputChange}
-                  placeholder={isVi ? 'Ví dụ: 200' : 'e.g. 200'}
                   className={validationErrors.weightGram ? 'has-error' : ''}
                 />
                 {validationErrors.weightGram && <span className="input-error-msg">{validationErrors.weightGram}</span>}
@@ -619,11 +623,11 @@ export default function ProductForm() {
                 <div className="form-group">
                   <label>{isVi ? 'Chiều Dài (Cm)' : 'Length (Cm)'}</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="lengthCm"
-                    value={formData.lengthCm}
+                    value={formatFormattedNumber(formData.lengthCm)}
                     onChange={handleInputChange}
-                    placeholder={isVi ? 'Dài' : 'Length'}
                     className={validationErrors.lengthCm ? 'has-error' : ''}
                   />
                   {validationErrors.lengthCm && <span className="input-error-msg">{validationErrors.lengthCm}</span>}
@@ -631,11 +635,11 @@ export default function ProductForm() {
                 <div className="form-group">
                   <label>{isVi ? 'Chiều Rộng (Cm)' : 'Width (Cm)'}</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="widthCm"
-                    value={formData.widthCm}
+                    value={formatFormattedNumber(formData.widthCm)}
                     onChange={handleInputChange}
-                    placeholder={isVi ? 'Rộng' : 'Width'}
                     className={validationErrors.widthCm ? 'has-error' : ''}
                   />
                   {validationErrors.widthCm && <span className="input-error-msg">{validationErrors.widthCm}</span>}
@@ -643,11 +647,11 @@ export default function ProductForm() {
                 <div className="form-group">
                   <label>{isVi ? 'Chiều Cao (Cm)' : 'Height (Cm)'}</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="heightCm"
-                    value={formData.heightCm}
+                    value={formatFormattedNumber(formData.heightCm)}
                     onChange={handleInputChange}
-                    placeholder={isVi ? 'Cao' : 'Height'}
                     className={validationErrors.heightCm ? 'has-error' : ''}
                   />
                   {validationErrors.heightCm && <span className="input-error-msg">{validationErrors.heightCm}</span>}
@@ -661,15 +665,27 @@ export default function ProductForm() {
                 <div className="dynamic-attributes-grid">
                   {currentCategoryAttributes.map((attr) => (
                     <div className="form-group" key={attr.attributeId}>
-                      <label>
-                        {attr.name} {attr.isRequired && '*'} {attr.unit && `(${attr.unit})`}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                        <span>{attr.name} {attr.unit && `(${attr.unit})`}</span>
+                        {attr.isRequired ? (
+                          <span style={{ color: '#dc2626', fontWeight: 700, fontSize: '12px', backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '4px' }}>
+                            * ({t('common.required')})
+                          </span>
+                        ) : (
+                          <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '12px', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '4px' }}>
+                            ({t('common.optional')})
+                          </span>
+                        )}
                       </label>
                       <input
-                        type={attr.dataType === 'Number' ? 'number' : 'text'}
-                        value={dynamicAttributes[attr.attributeId] || ''}
-                        onChange={(e) => handleAttrChange(attr.attributeId, e.target.value)}
+                        type="text"
+                        inputMode={attr.dataType === 'Number' ? 'numeric' : 'text'}
+                        value={attr.dataType === 'Number' ? formatFormattedNumber(dynamicAttributes[attr.attributeId] || '') : (dynamicAttributes[attr.attributeId] || '')}
+                        onChange={(e) => {
+                          const val = attr.dataType === 'Number' ? parseRawNumber(e.target.value) : e.target.value;
+                          handleAttrChange(attr.attributeId, val);
+                        }}
                         required={attr.isRequired}
-                        placeholder={attr.dataType === 'Number' ? (isVi ? 'Chỉ nhập số' : 'Numbers only') : (isVi ? `Nhập ${attr.name.toLowerCase()}` : `Enter ${attr.name.toLowerCase()}`)}
                         className={validationErrors[attr.attributeId] ? 'has-error' : ''}
                       />
                       {validationErrors[attr.attributeId] && <span className="input-error-msg">{validationErrors[attr.attributeId]}</span>}
@@ -761,7 +777,6 @@ export default function ProductForm() {
                     value={reqName} 
                     onChange={(e) => setReqName(e.target.value)} 
                     required 
-                    placeholder="e.g. Vintage Books"
                   />
                 </div>
 
@@ -789,7 +804,6 @@ export default function ProductForm() {
                     rows="3" 
                     value={reqDescription} 
                     onChange={(e) => setReqDescription(e.target.value)}
-                    placeholder="Provide details about the category..."
                   />
                 </div>
 
@@ -814,7 +828,6 @@ export default function ProductForm() {
                             <input 
                               type="text" 
                               className="form-input attr-name-input" 
-                              placeholder="Attribute Name (e.g. Page Count)" 
                               value={attr.name}
                               onChange={(e) => handleReqAttributeChange(idx, 'name', e.target.value)}
                               required
@@ -840,7 +853,6 @@ export default function ProductForm() {
                               <input 
                                 type="text" 
                                 className="form-input input-sm" 
-                                placeholder="e.g. pages, cm" 
                                 value={attr.unit || ''}
                                 onChange={(e) => handleReqAttributeChange(idx, 'unit', e.target.value)}
                               />
@@ -854,7 +866,6 @@ export default function ProductForm() {
                                     type="number" 
                                     step="any"
                                     className="form-input input-sm" 
-                                    placeholder="Min" 
                                     value={attr.minValue !== null && attr.minValue !== undefined ? attr.minValue : ''}
                                     onChange={(e) => handleReqAttributeChange(idx, 'minValue', e.target.value === '' ? null : e.target.value)}
                                   />
@@ -865,7 +876,6 @@ export default function ProductForm() {
                                     type="number" 
                                     step="any"
                                     className="form-input input-sm" 
-                                    placeholder="Max" 
                                     value={attr.maxValue !== null && attr.maxValue !== undefined ? attr.maxValue : ''}
                                     onChange={(e) => handleReqAttributeChange(idx, 'maxValue', e.target.value === '' ? null : e.target.value)}
                                   />

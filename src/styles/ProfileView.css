@@ -1008,14 +1008,15 @@
 }
 
 .seller-products-pagination button {
-  min-width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid rgba(2, 36, 27, 0.1);
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 6px;
+  border: 1px solid #eaeaea;
   background: #ffffff;
-  color: #02241b;
+  color: #333333;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1023,24 +1024,26 @@
   transition: all 0.2s ease;
 }
 
-.seller-products-pagination button:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #0b9485;
+.seller-products-pagination button:hover:not(:disabled):not(.active) {
+  border-color: #0a2a1f;
+  color: #0a2a1f;
+  background: #f8faf9;
 }
 
 .seller-products-pagination button.active {
-  background: #02241b;
+  background: #0a2a1f;
   color: #ffffff;
-  border-color: #02241b;
+  border: none;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(10, 42, 31, 0.15);
 }
 
 .seller-products-pagination button:disabled {
-  opacity: 0.35;
+  opacity: 0.5;
   cursor: not-allowed;
-}
-
-.seller-products-pagination button .material-symbols-outlined {
-  font-size: 20px;
+  background: #fafafa;
+  border-color: #eee;
+  color: #ccc;
 }
 
 .seller-profile-product-card {

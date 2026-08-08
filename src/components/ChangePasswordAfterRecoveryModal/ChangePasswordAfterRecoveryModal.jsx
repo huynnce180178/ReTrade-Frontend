@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import accountService from '../../services/accountService';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { forceLogout } from '../../utils/authUtils';
 import './ChangePasswordAfterRecoveryModal.css';
 
 export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSuccess }) {
@@ -45,31 +46,32 @@ export default function ChangePasswordAfterRecoveryModal({ isOpen, onClose, onSu
       showToast(t('change_password_recovery.fill_all_fields_err'), 'error');
       return;
     }
+    if (cleanOld === cleanNew) {
+      showToast(t('change_password_recovery.same_password_err'), 'error');
+      return;
+    }
     if (!isPasswordValid) {
       showToast(t('change_password_recovery.satisfy_req_err'), 'error');
       return;
     }
 
     setLoading(true);
-    let success = false;
+    window.__isSelfChangingPassword = true;
+    sessionStorage.setItem('retrade_self_changing_pwd', 'true');
     try {
       await accountService.changePassword(cleanOld, cleanNew);
       showToast(t('change_password_recovery.success_msg'), 'success');
-      success = true;
+      setClosed(true);
+      setTimeout(() => {
+        forceLogout();
+      }, 500);
     } catch (err) {
+      window.__isSelfChangingPassword = false;
+      sessionStorage.removeItem('retrade_self_changing_pwd');
       const serverMsg = err?.response?.data?.message || err?.response?.data;
       showToast(serverMsg || t('change_password_recovery.failed_msg'), 'error');
     } finally {
       setLoading(false);
-    }
-
-    if (success) {
-      setClosed(true);
-      try {
-        onSuccess?.();
-      } catch (err) {
-        console.error('Modal onSuccess error:', err);
-      }
     }
   };
 

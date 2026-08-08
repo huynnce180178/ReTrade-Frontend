@@ -353,7 +353,10 @@ export default function PurchaseDetail() {
               <>
                 <header className="purchase-detail-header">
                   <div>
-                    <h1>{language === 'vi' ? 'Đơn hàng #' : 'Order #'}{purchase.orderCode || purchase.orderId}</h1>
+                    <h1 className="purchase-detail-title">
+                      <span>{language === 'vi' ? 'Đơn hàng' : 'Order'}</span>
+                      <span className="order-code-tag">#{purchase.orderCode || purchase.orderId}</span>
+                    </h1>
                     <p>{language === 'vi' ? 'Đặt hàng lúc' : 'Placed on'} {formatDateTime(purchase.createdAt)}</p>
                   </div>
                   <div>

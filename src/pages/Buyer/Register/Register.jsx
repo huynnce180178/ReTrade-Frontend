@@ -4,7 +4,9 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import '../../../styles/Login.css';
 import '../../../styles/Register.css';
+import accountService from '../../../services/accountService';
 import VerifyModal from '../../../components/VerifyModal/VerifyModal';
 import TermsModal from '../../../components/TermsModal/TermsModal';
 import bgRegister from '../../../assets/background-register.png';
@@ -37,6 +39,57 @@ export default function Register() {
     agreed: false
   });
 
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, available: null });
+  const [emailStatus, setEmailStatus] = useState({ checking: false, available: null });
+
+  React.useEffect(() => {
+    const trimmed = formData.username.trim();
+    if (!trimmed) {
+      setUsernameStatus({ checking: false, available: null });
+      return;
+    }
+
+    setUsernameStatus({ checking: true, available: null });
+    const timer = setTimeout(async () => {
+      try {
+        const res = await accountService.checkUsername(trimmed);
+        if (res.isAvailable) {
+          setUsernameStatus({ checking: false, available: true });
+        } else {
+          setUsernameStatus({ checking: false, available: false });
+        }
+      } catch (err) {
+        setUsernameStatus({ checking: false, available: null });
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [formData.username]);
+
+  React.useEffect(() => {
+    const trimmed = formData.email.trim();
+    if (!trimmed || !/\S+@\S+\.\S+/.test(trimmed)) {
+      setEmailStatus({ checking: false, available: null });
+      return;
+    }
+
+    setEmailStatus({ checking: true, available: null });
+    const timer = setTimeout(async () => {
+      try {
+        const res = await accountService.checkEmail(trimmed);
+        if (res.isAvailable) {
+          setEmailStatus({ checking: false, available: true });
+        } else {
+          setEmailStatus({ checking: false, available: false });
+        }
+      } catch (err) {
+        setEmailStatus({ checking: false, available: null });
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [formData.email]);
+
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
 
@@ -63,7 +116,6 @@ export default function Register() {
         const doGoogleLogin = googleLogin || loginWithGoogle;
         const result = await doGoogleLogin(tokenResponse);
         if (result.success) {
-          showToast(t('toast.register_success'), 'success');
           navigate('/');
         } else {
           const rawErr = typeof result.error === 'string' ? result.error : (result.error?.message || result.error?.title || JSON.stringify(result.error));
@@ -129,6 +181,15 @@ export default function Register() {
       return;
     }
 
+    if (usernameStatus.available === false) {
+      showToast(t('validation.username_taken'), 'error');
+      return;
+    }
+    if (emailStatus.available === false) {
+      showToast(t('validation.email_taken'), 'error');
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await register({
@@ -141,7 +202,6 @@ export default function Register() {
       });
 
       if (result.success) {
-        showToast(t('toast.register_success'), 'success');
         setRegisteredEmail(trimmedEmail);
         setShowVerifyModal(true);
       } else {
@@ -155,155 +215,283 @@ export default function Register() {
   };
 
   return (
-    <div className="register-page-premium">
-      <div className="register-container">
-        <div className="register-grid">
-          
-          {/* Left Content: Brand Narrative */}
-          <div className="register-left-col">
-            <span className="brand-subtitle">{t('auth.brand_subtitle')}</span>
-            <h1 className="brand-title">{t('auth.brand_title')}</h1>
-            <p className="brand-desc">{t('auth.brand_desc')}</p>
-            
-            <div className="brand-image-wrapper">
-              <img src={bgRegister} alt="ReTrade Platform" />
-              <div className="brand-image-overlay">
-                <div className="brand-quote-box">
-                  <p className="brand-quote">&quot;{t('auth.brand_desc')}&quot;</p>
-                  <p className="brand-est">EST. 2024 — TRUSTED MARKETPLACE</p>
-                </div>
-              </div>
+    <div className="login-page-premium">
+      <section className="login-section">
+        <div className="login-split-card">
+
+          {/* Left Side: Visual Storytelling */}
+          <div className="login-left-side">
+            <img src={bgRegister} alt="ReTrade Platform" />
+            <div className="hero-gradient">
+              <h2>
+                {t('home.hero_title_1')}<br />
+                {t('home.hero_title_2')}
+              </h2>
+              <p>{t('auth.brand_desc')}</p>
             </div>
           </div>
 
-          {/* Right Content: Registration Form */}
-          <div className="register-right-col">
-            <div className="register-form-header">
-              <h2>{t('auth.register_title')}</h2>
-              <p>{t('auth.register_subtitle')}</p>
-            </div>
+          {/* Right Side: Registration Form */}
+          <div className="login-right-side">
+            <div className="login-form-container">
 
-            <button 
-              type="button" 
-              className="google-btn-register"
-              onClick={() => handleGoogleLogin()}
-              disabled={loading || googleLoading}
-            >
-              {googleLoading ? (
-                <span className="btn-spinner btn-spinner-dark" style={{ width: '20px', height: '20px' }}></span>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" width="20" height="20">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
-                    <path d="M5.84 14.11c-.22-.66-.35-1.36-.35-2.11s.13-1.45.35-2.11V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.83z" fill="#FBBC05"></path>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.83c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
-                  </svg>
-                  {t('auth.google_login')}
-                </>
+              {registeredEmail && !showVerifyModal && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-800">
+                  <span>{t('auth.unverified_notice', { email: registeredEmail })}</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowVerifyModal(true)}
+                    className="font-bold text-[#1b6b51] underline hover:text-[#15533f] ml-2 whitespace-nowrap"
+                  >
+                    {t('auth.reopen_otp')}
+                  </button>
+                </div>
               )}
-            </button>
 
-            <div className="register-divider">
-              <div className="register-divider-line"></div>
-              <span>{t('auth.or_continue_with')}</span>
-              <div className="register-divider-line"></div>
-            </div>
-
-            <form onSubmit={handleSubmit}>
-              
-              <div className="form-grid">
-                <div className="input-wrapper-register">
-                  <label htmlFor="firstName">{t('auth.first_name')}</label>
-                  <input type="text" id="firstName" className="input-register" value={formData.firstName} onChange={handleChange} disabled={loading} />
-                </div>
-                <div className="input-wrapper-register">
-                  <label htmlFor="lastName">{t('auth.last_name')}</label>
-                  <input type="text" id="lastName" className="input-register" value={formData.lastName} onChange={handleChange} disabled={loading} />
-                </div>
-                <div className="input-wrapper-register form-group-full">
-                  <label htmlFor="email">{t('auth.email')} *</label>
-                  <input type="email" id="email" className="input-register" value={formData.email} onChange={handleChange} required disabled={loading} />
-                </div>
-
-                <div className="input-wrapper-register form-group-full">
-                  <label htmlFor="username">{t('auth.username_or_email')} *</label>
-                  <input type="text" id="username" className="input-register" value={formData.username} onChange={handleChange} required disabled={loading} />
-                </div>
-
-                <div className="input-wrapper-register">
-                  <label htmlFor="password">{t('auth.password')} *</label>
-                  <div className="password-input-container">
-                    <input type={showPassword ? 'text' : 'password'} id="password" className="input-register" value={formData.password} onChange={handleChange} required disabled={loading} />
-                    <button type="button" className="password-toggle-register" onClick={() => setShowPassword(!showPassword)} disabled={loading}>
-                      {showPassword ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="input-wrapper-register">
-                  <label htmlFor="confirmPassword">{t('auth.confirm_password')} *</label>
-                  <div className="password-input-container">
-                    <input type={showConfirmPassword ? 'text' : 'password'} id="confirmPassword" className="input-register" value={formData.confirmPassword} onChange={handleChange} required disabled={loading} />
-                    <button type="button" className="password-toggle-register" onClick={() => setShowConfirmPassword(!showConfirmPassword)} disabled={loading}>
-                      {showConfirmPassword ? (
-                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
+              <div className="login-header-text">
+                <h1>{t('auth.register_title')}</h1>
+                <p>{t('auth.register_subtitle')}</p>
               </div>
 
-              <div className="terms-container">
-                <input type="checkbox" id="agreed" checked={formData.agreed} onChange={handleChange} disabled={loading} />
-                <label htmlFor="agreed">
-                  {t('auth.agree_terms_prefix')}
-                  <span onClick={() => setShowTerms(true)} style={{cursor: 'pointer', color: '#02241b', textDecoration: 'underline', fontWeight: '700'}}>
-                    {t('auth.agree_terms_link')}
-                  </span>.
-                </label>
-              </div>
-
-              <button type="submit" className="submit-btn-register" disabled={loading || googleLoading}>
-                {loading ? (
-                  <span className="btn-spinner" style={{ width: '20px', height: '20px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></span>
+              {/* Google Sign In */}
+              <button 
+                type="button" 
+                className="google-btn-premium"
+                onClick={() => handleGoogleLogin()}
+                disabled={loading || googleLoading}
+              >
+                {googleLoading ? (
+                  <span className="btn-spinner btn-spinner-dark" style={{ width: '20px', height: '20px' }}></span>
                 ) : (
                   <>
-                    <span>{t('auth.register_button')}</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" width="20" height="20">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+                      <path d="M5.84 14.11c-.22-.66-.35-1.36-.35-2.11s.13-1.45.35-2.11V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.83z" fill="#FBBC05"></path>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.83c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+                    </svg>
+                    <span>{t('auth.google_login')}</span>
                   </>
                 )}
               </button>
 
-            </form>
+              <div className="login-divider">
+                <div className="login-divider-line"></div>
+                <span>{t('auth.or_continue_with')}</span>
+              </div>
 
-            <div className="login-prompt">
-              <p>
-                {t('auth.have_account')} 
-                <Link to="/login" className="login-link-register"> {t('auth.login_button')}</Link>
-              </p>
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                      {t('auth.first_name')}
+                    </label>
+                    <input
+                      type="text"
+                      id="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      disabled={loading}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                      {t('auth.last_name')}
+                    </label>
+                    <input
+                      type="text"
+                      id="lastName"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      disabled={loading}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    {t('auth.email')} *
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
+                    disabled={loading}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm"
+                  />
+                  {emailStatus.checking && <span className="field-status-hint checking">{t('validation.checking_email')}</span>}
+                  {!emailStatus.checking && emailStatus.available === true && (
+                    <span className="field-status-hint available">{t('validation.email_available')}</span>
+                  )}
+                  {!emailStatus.checking && emailStatus.available === false && (
+                    <span className="field-status-hint taken">{t('validation.email_taken')}</span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    {t('auth.username_or_email')} *
+                  </label>
+                  <input
+                    type="text"
+                    id="username"
+                    required
+                    value={formData.username}
+                    onChange={handleChange}
+                    disabled={loading}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm"
+                  />
+                  {usernameStatus.checking && <span className="field-status-hint checking">{t('validation.checking_username')}</span>}
+                  {!usernameStatus.checking && usernameStatus.available === true && (
+                    <span className="field-status-hint available">{t('validation.username_available')}</span>
+                  )}
+                  {!usernameStatus.checking && usernameStatus.available === false && (
+                    <span className="field-status-hint taken">{t('validation.username_taken')}</span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    {t('auth.password')} *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="password"
+                      required
+                      value={formData.password}
+                      onChange={handleChange}
+                      disabled={loading}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        {showPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                  {formData.password.length > 0 && (
+                    <div className="password-req-box">
+                      <div className={`req-chip ${formData.password.length >= 8 && formData.password.length <= 50 ? 'valid' : ''}`}>
+                        {formData.password.length >= 8 && formData.password.length <= 50 ? '✓' : '•'} {t('validation.password_req_length')}
+                      </div>
+                      <div className={`req-chip ${/[A-Z]/.test(formData.password) ? 'valid' : ''}`}>
+                        {/[A-Z]/.test(formData.password) ? '✓' : '•'} {t('validation.password_req_uppercase')}
+                      </div>
+                      <div className={`req-chip ${/[a-z]/.test(formData.password) ? 'valid' : ''}`}>
+                        {/[a-z]/.test(formData.password) ? '✓' : '•'} {t('validation.password_req_lowercase')}
+                      </div>
+                      <div className={`req-chip ${/[0-9]/.test(formData.password) ? 'valid' : ''}`}>
+                        {/[0-9]/.test(formData.password) ? '✓' : '•'} {t('validation.password_req_number')}
+                      </div>
+                      <div className={`req-chip ${SPECIAL_CHAR_REGEX.test(formData.password) ? 'valid' : ''}`}>
+                        {SPECIAL_CHAR_REGEX.test(formData.password) ? '✓' : '•'} {t('validation.password_req_special')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    {t('auth.confirm_password')} *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      id="confirmPassword"
+                      required
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      disabled={loading}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-[#1b6b51] focus:ring-2 focus:ring-[#1b6b51]/20 transition-all outline-none text-sm pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={loading}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                  {formData.confirmPassword.length > 0 && (
+                    formData.confirmPassword === formData.password ? (
+                      <span className="field-status-hint available">{t('validation.password_match')}</span>
+                    ) : (
+                      <span className="field-status-hint taken">{t('validation.password_mismatch_hint')}</span>
+                    )
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="agreed"
+                    checked={formData.agreed}
+                    onChange={handleChange}
+                    disabled={loading}
+                    className="w-4 h-4 rounded text-[#1b6b51] focus:ring-[#1b6b51] accent-[#1b6b51] cursor-pointer"
+                  />
+                  <label htmlFor="agreed" className="text-xs text-gray-600 cursor-pointer leading-normal">
+                    {t('auth.agree_terms_prefix')}{' '}
+                    <span onClick={() => setShowTerms(true)} className="text-[#02241b] font-bold underline cursor-pointer">
+                      {t('auth.agree_terms_link')}
+                    </span>.
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || googleLoading}
+                  className="w-full py-3.5 px-4 bg-[#1b6b51] hover:bg-[#15533f] text-white font-bold rounded-xl transition-all shadow-lg shadow-[#1b6b51]/20 flex items-center justify-center gap-2 disabled:opacity-50 text-sm mt-4"
+                >
+                  {loading ? (
+                    <span className="btn-spinner" style={{ width: '20px', height: '20px' }}></span>
+                  ) : (
+                    t('auth.register_button')
+                  )}
+                </button>
+
+              </form>
+
+              <div className="text-center mt-5 pt-4 border-t border-gray-100 text-xs text-gray-500">
+                {t('auth.have_account')}{' '}
+                <Link to="/login" className="text-[#1b6b51] font-bold hover:underline">
+                  {t('auth.login_button')}
+                </Link>
+              </div>
+
             </div>
-
           </div>
 
         </div>
-      </div>
+      </section>
 
-      <VerifyModal 
-        isOpen={showVerifyModal} 
-        onClose={handleVerifyClose} 
-        email={registeredEmail}
-      />
-      <TermsModal 
-        isOpen={showTerms} 
-        onClose={() => setShowTerms(false)} 
-      />
+      {showVerifyModal && (
+        <VerifyModal
+          isOpen={showVerifyModal}
+          onClose={handleVerifyClose}
+          email={registeredEmail}
+        />
+      )}
+      {showTerms && (
+        <TermsModal
+          isOpen={showTerms}
+          onClose={() => setShowTerms(false)}
+        />
+      )}
     </div>
   );
 }

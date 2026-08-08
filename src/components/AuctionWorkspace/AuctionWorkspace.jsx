@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { auctionDateTimeLocalToApiValue, getFutureAuctionDateTimeLocal, parseAuctionDateTime, toAuctionDateTimeLocal } from '../../utils/auctionTime';
+import { AUCTION_DURATION_PRESETS, calculateEndTimeFromDuration, formatDateTimePreview } from '../../utils/auctionDurationUtils';
 import './AuctionWorkspace.css';
 
 const statusOptions = [
@@ -34,13 +35,16 @@ function isEndedStatus(status) {
 }
 
 function getDefaultForm() {
+  const startTime = getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS);
+  const durationMinutes = 60;
   return {
     productId: '',
     startingPrice: '',
     minIncrement: '',
     buyNowPrice: '',
-    startTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS),
-    endTime: getFutureAuctionDateTimeLocal(DEFAULT_AUCTION_START_OFFSET_MS + 24 * 60 * 60 * 1000),
+    startTime: startTime,
+    durationMinutes: durationMinutes,
+    endTime: calculateEndTimeFromDuration(startTime, durationMinutes),
   };
 }
 
@@ -87,12 +91,17 @@ function getAuctionEditBlockReasonKey(auction) {
 }
 
 function toAuctionPayload(form) {
+  const calculatedEndTime = form.durationMinutes
+    ? calculateEndTimeFromDuration(form.startTime, form.durationMinutes)
+    : form.endTime;
+
   return {
     startingPrice: Number(form.startingPrice),
     minIncrement: Number(form.minIncrement),
     buyNowPrice: form.buyNowPrice ? Number(form.buyNowPrice) : null,
     startTime: auctionDateTimeLocalToApiValue(form.startTime),
-    endTime: auctionDateTimeLocalToApiValue(form.endTime),
+    endTime: auctionDateTimeLocalToApiValue(calculatedEndTime || form.endTime),
+    durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : undefined,
   };
 }
 
@@ -278,7 +287,14 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === 'startTime' || name === 'durationMinutes') {
+        const duration = next.durationMinutes || 60;
+        next.endTime = calculateEndTimeFromDuration(next.startTime, duration);
+      }
+      return next;
+    });
   };
 
   const handleCreateAuction = async (event) => {
@@ -316,13 +332,21 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
       showToast(t(blockReasonKey), 'warning');
       return;
     }
+    const startStr = toAuctionDateTimeLocal(auction.startTime);
+    const endStr = toAuctionDateTimeLocal(auction.endTime);
+    let duration = 60;
+    if (auction.startTime && auction.endTime) {
+      const diffMs = new Date(auction.endTime).getTime() - new Date(auction.startTime).getTime();
+      if (diffMs > 0) duration = Math.round(diffMs / 60000);
+    }
     setEditingAuction(auction);
     setEditForm({
       startingPrice: auction.startingPrice ?? '',
       minIncrement: auction.minIncrement ?? '',
       buyNowPrice: auction.buyNowPrice ?? '',
-      startTime: toAuctionDateTimeLocal(auction.startTime),
-      endTime: toAuctionDateTimeLocal(auction.endTime),
+      startTime: startStr,
+      durationMinutes: duration,
+      endTime: endStr,
     });
   };
 
@@ -334,7 +358,14 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
 
   const handleEditFormChange = (event) => {
     const { name, value } = event.target;
-    setEditForm((current) => ({ ...current, [name]: value }));
+    setEditForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === 'startTime' || name === 'durationMinutes') {
+        const duration = next.durationMinutes || 60;
+        next.endTime = calculateEndTimeFromDuration(next.startTime, duration);
+      }
+      return next;
+    });
   };
 
   const handleUpdateAuction = async (event) => {
@@ -446,9 +477,20 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
                   <input name="startTime" type="datetime-local" value={form.startTime} onChange={handleFormChange} required />
                 </label>
                 <label>
-                  <span>{t('admin.auctions.end_time')}</span>
-                  <input name="endTime" type="datetime-local" value={form.endTime} onChange={handleFormChange} required />
+                  <span>Thời lượng phiên (Duration)</span>
+                  <select name="durationMinutes" value={form.durationMinutes || 60} onChange={handleFormChange} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+                    {AUCTION_DURATION_PRESETS.map((preset) => (
+                      <option key={preset.value} value={preset.value}>
+                        {preset.labelVi}
+                      </option>
+                    ))}
+                  </select>
                 </label>
+              </div>
+
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontSize: '13px', fontWeight: 500 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>schedule</span>
+                <span>Thời gian kết thúc dự kiến: <strong>{formatDateTimePreview(calculateEndTimeFromDuration(form.startTime, form.durationMinutes || 60), true)}</strong></span>
               </div>
 
               <label>
@@ -613,9 +655,19 @@ export default function AuctionWorkspace({ mode = 'seller', title, subtitle }) {
                 <input name="startTime" type="datetime-local" value={editForm.startTime} onChange={handleEditFormChange} required />
               </label>
               <label>
-                <span>{t('admin.auctions.end_time')}</span>
-                <input name="endTime" type="datetime-local" value={editForm.endTime} onChange={handleEditFormChange} required />
+                <span>{t('auction_durations.select_duration')}</span>
+                <select name="durationMinutes" value={editForm.durationMinutes || 60} onChange={handleEditFormChange} required style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px' }}>
+                  {AUCTION_DURATION_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>
+                      {t(`auction_durations.${preset.key}`)}
+                    </option>
+                  ))}
+                </select>
               </label>
+              <div className="auction-modal-wide-field" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontSize: '13px', fontWeight: 500 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>schedule</span>
+                <span>{t('auction_durations.expected_end_time', { time: formatDateTimePreview(calculateEndTimeFromDuration(editForm.startTime, editForm.durationMinutes || 60), true) })}</span>
+              </div>
               <label className="auction-modal-wide-field">
                 <span>{t('admin.auctions.buy_now_price')}</span>
                 <input name="buyNowPrice" type="number" min="0" value={editForm.buyNowPrice} onChange={handleEditFormChange} />

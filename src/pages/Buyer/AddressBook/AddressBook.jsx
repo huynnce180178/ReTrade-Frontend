@@ -304,108 +304,58 @@ export default function AddressBook() {
 
           <main className="ma-main">
             <div className="address-dashboard-grid">
-              <div className="address-content-column">
-                <div className="ma-card address-hero-card">
-                  <div className="ma-header-info">
-                    <div className="address-hero-icon">
-                      <span className="material-symbols-outlined">location_on</span>
-                    </div>
-                    <div>
-                      <h1 className="ma-headline">{isVi ? 'Sổ Địa Chỉ' : 'Address Book'}</h1>
-                      <p className="ma-subtitle">{isVi ? 'Quản lý địa chỉ giao hàng và thanh toán để có trải nghiệm mua sắm mượt mà hơn.' : 'Manage your shipping and billing addresses to ensure a seamless checkout experience.'}</p>
-                    </div>
+              <div className="ma-card address-hero-card">
+                <div className="ma-header-info">
+                  <div className="address-hero-icon">
+                    <span className="material-symbols-outlined">location_on</span>
                   </div>
-                </div>
-
-                <div className="ma-card address-saved-card">
-                  <div className="address-section-header">
-                    <h2>{isVi ? 'Địa Chỉ Đã Lưu' : 'Saved Addresses'}</h2>
-                    <button className="ma-btn-primary address-add-btn" type="button" onClick={handleAddClick}>
-                      <span className="material-symbols-outlined">add</span>
-                      {isVi ? 'Thêm Địa Chỉ Mới' : 'Add New Address'}
-                    </button>
+                  <div>
+                    <h1 className="ma-headline">{isVi ? 'Sổ Địa Chỉ' : 'Address Book'}</h1>
+                    <p className="ma-subtitle">{isVi ? 'Quản lý địa chỉ giao hàng và thanh toán để có trải nghiệm mua sắm mượt mà hơn.' : 'Manage your shipping and billing addresses to ensure a seamless checkout experience.'}</p>
                   </div>
-                  {loading ? (
-                    <div className="address-empty-state">
-                      <span className="btn-spinner"></span>
-                      <p>{isVi ? 'Đang tải danh sách địa chỉ...' : 'Loading addresses...'}</p>
-                    </div>
-                  ) : addresses.length === 0 ? (
-                    <div className="address-empty-state">
-                      <span className="material-symbols-outlined">home_work</span>
-                      <p>{isVi ? 'Bạn chưa lưu địa chỉ nào.' : "You haven't added any addresses yet."}</p>
-                    </div>
-                  ) : (
-                    <div className="address-list">
-                      {addresses.map((address) => (
-                        <article key={address.addressId} className="address-card">
-                          <div className="address-card-main">
-                            <div className="address-card-title-row">
-                              <h3>{address.receiverName}</h3>
-                              {address.isDefault && <span className="address-default-badge">{isVi ? 'Địa chỉ mặc định' : 'Default Shipping'}</span>}
-                            </div>
-                            <p><span className="material-symbols-outlined">call</span>{address.receiverPhone}</p>
-                            <p><span className="material-symbols-outlined">home_pin</span>{formatAddressLine(address)}</p>
-                          </div>
-                          <div className="address-card-actions">
-                            {!address.isDefault && <button type="button" onClick={() => handleSetDefault(address.addressId)}>{isVi ? 'Đặt mặc định' : 'Set Default'}</button>}
-                            <button type="button" onClick={() => handleEditClick(address)}>{isVi ? 'Chỉnh sửa' : 'Edit'}</button>
-                            <button type="button" className="danger" onClick={() => setAddressToDelete(address.addressId)}>{isVi ? 'Xóa' : 'Delete'}</button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
 
-              <aside className="address-side-column">
-                <section className="ma-card address-preference-card">
-                  <div className="address-side-title">
-                    <span className="material-symbols-outlined">local_shipping</span>
-                    <h3>{isVi ? 'Hình Thức Giao Hàng' : 'Delivery Preferences'}</h3>
+              <div className="ma-card address-saved-card">
+                <div className="address-section-header">
+                  <h2>{isVi ? 'Địa Chỉ Đã Lưu' : 'Saved Addresses'}</h2>
+                  <button className="ma-btn-primary address-add-btn" type="button" onClick={handleAddClick}>
+                    <span className="material-symbols-outlined">add</span>
+                    {isVi ? 'Thêm Địa Chỉ Mới' : 'Add New Address'}
+                  </button>
+                </div>
+                {loading ? (
+                  <div className="address-empty-state">
+                    <span className="btn-spinner"></span>
+                    <p>{isVi ? 'Đang tải danh sách địa chỉ...' : 'Loading addresses...'}</p>
                   </div>
-                  <label className="address-delivery-option selected">
-                    <input type="radio" defaultChecked />
-                    <span>
-                      <strong>{isVi ? 'Giao hàng Tiêu Chuẩn' : 'Standard Shipping'}</strong>
-                      <small>{isVi ? '3-5 ngày làm việc' : '3-5 business days'}</small>
-                    </span>
-                  </label>
-                  <label className="address-delivery-option">
-                    <input type="radio" />
-                    <span>
-                      <strong>{isVi ? 'Giao hàng Hỏa Tốc' : 'Express Priority'}</strong>
-                      <small>{isVi ? 'Nhận trong ngày tiếp theo' : 'Next day delivery'}</small>
-                    </span>
-                  </label>
-                </section>
-
-                <section className="ma-card address-stats-card">
-                  <h3>{isVi ? 'Thống Kê Nhanh' : 'Quick Stats'}</h3>
-                  <div className="address-stat-grid">
-                    <div>
-                      <span>{isVi ? 'TỔNG SỐ' : 'TOTAL'}</span>
-                      <strong>{String(addresses.length).padStart(2, '0')}</strong>
-                    </div>
-                    <div>
-                      <span>{isVi ? 'ĐÃ XÁC MINH' : 'VERIFIED'}</span>
-                      <strong>{String(addresses.length).padStart(2, '0')}</strong>
-                    </div>
+                ) : addresses.length === 0 ? (
+                  <div className="address-empty-state">
+                    <span className="material-symbols-outlined">home_work</span>
+                    <p>{isVi ? 'Bạn chưa lưu địa chỉ nào.' : "You haven't added any addresses yet."}</p>
                   </div>
-                  <div className="address-default-status">
-                    <span>{isVi ? 'TRẠNG THÁI MẶC ĐỊNH' : 'DEFAULT SET'}</span>
-                    <strong>{defaultAddress ? (isVi ? 'Đã thiết lập' : 'Active') : (isVi ? 'Chưa thiết lập' : 'Missing')}</strong>
-                    <span className="material-symbols-outlined">{defaultAddress ? 'check_circle' : 'error'}</span>
+                ) : (
+                  <div className="address-list">
+                    {addresses.map((address) => (
+                      <article key={address.addressId} className="address-card">
+                        <div className="address-card-main">
+                          <div className="address-card-title-row">
+                            <h3>{address.receiverName}</h3>
+                            {address.isDefault && <span className="address-default-badge">{isVi ? 'Địa chỉ mặc định' : 'Default Shipping'}</span>}
+                          </div>
+                          <p><span className="material-symbols-outlined">call</span>{address.receiverPhone}</p>
+                          <p><span className="material-symbols-outlined">home_pin</span>{formatAddressLine(address)}</p>
+                        </div>
+                        <div className="address-card-actions">
+                          {!address.isDefault && <button type="button" onClick={() => handleSetDefault(address.addressId)}>{isVi ? 'Đặt mặc định' : 'Set Default'}</button>}
+                          <button type="button" onClick={() => handleEditClick(address)}>{isVi ? 'Chỉnh sửa' : 'Edit'}</button>
+                          <button type="button" className="danger" onClick={() => setAddressToDelete(address.addressId)}>{isVi ? 'Xóa' : 'Delete'}</button>
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                </section>
-
-                <section className="address-tip-card">
-                  <span className="material-symbols-outlined">emoji_objects</span>
-                  <h3>{isVi ? 'Mẹo Nhỏ' : 'Pro Tip'}</h3>
-                  <p>{isVi ? 'Cung cấp chính xác thông tin địa chỉ giúp tránh chậm trễ khi giao hàng cho các đơn giá trị cao.' : 'Keep your address information accurate to avoid delivery delays for high-value orders.'}</p>
-                </section>
-              </aside>
+                )}
+              </div>
             </div>
           </main>
         </div>

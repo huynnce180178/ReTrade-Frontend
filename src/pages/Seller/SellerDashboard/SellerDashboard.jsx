@@ -123,9 +123,6 @@ export default function SellerDashboard() {
             <p>{t('seller_dashboard.welcome_sub')}</p>
           </div>
           <div className="seller-overview-actions">
-            <button type="button" className="seller-list-btn" onClick={() => navigate('/seller-dashboard/products/new')}>
-              <span className="material-symbols-outlined">add</span>{t('seller_dashboard.add_new_product')}
-            </button>
             <Link to="/seller-dashboard/orders">
               <span className="material-symbols-outlined">orders</span>{t('seller_dashboard.manage_orders')}
             </Link>

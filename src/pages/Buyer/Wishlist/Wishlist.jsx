@@ -6,12 +6,25 @@ import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
 import '../../../styles/Wishlist.css';
 
-const isWishlistItemUnavailable = (item) => (
-  item?.status === 'SoldOut' ||
-  item?.status === 'Sold' ||
-  item?.status === 'Inactive' ||
-  (item?.stockQuantity != null && Number(item.stockQuantity) <= 0)
-);
+const isWishlistItemUnavailable = (item) => {
+  if (!item) return true;
+  const status = (item.status || item.productStatus || item.statusName || '').toString().toLowerCase();
+  const quantity = item.stockQuantity ?? item.quantity ?? item.stock ?? null;
+
+  if (status === 'sold' || status === 'soldout' || status === 'inactive' || status === 'completed' || status === 'expired' || status === 'rejected' || status === 'cancelled') {
+    return true;
+  }
+  if (status && status !== 'accepted' && status !== 'active') {
+    return true;
+  }
+  if (item.isSold === true) {
+    return true;
+  }
+  if (quantity != null && Number(quantity) <= 0) {
+    return true;
+  }
+  return false;
+};
 
 export default function Wishlist() {
   const { user } = useAuth();
@@ -244,11 +257,11 @@ export default function Wishlist() {
                             <div className="wl-item-actions-row">
                               <div className="wl-item-meta-info">
                                 {isSoldOut ? (
-                                  <span className="wl-status-pill sold-out">SOLD OUT</span>
+                                  <span className="wl-status-pill sold-out">{t('product.sold_out')}</span>
                                 ) : (
                                   <span className="wl-status-pill in-stock">
                                     <span className="material-symbols-outlined">check_circle</span>
-                                    IN STOCK
+                                    {t('product.in_stock')}
                                   </span>
                                 )}
                               </div>
@@ -311,7 +324,7 @@ export default function Wishlist() {
                   </button>
                   {selectedItems.size > 1 && (
                     <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '8px', textAlign: 'center', fontWeight: '500' }}>
-                      ⚠️ {t('common.warning')}
+                      ⚠️ {t('product.select_single_item_notice')}
                     </p>
                   )}
                 </div>

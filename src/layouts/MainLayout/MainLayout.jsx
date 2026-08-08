@@ -30,7 +30,6 @@ export default function MainLayout() {
           isOpen={true}
           onClose={() => setModalDismissed(true)}
           onSuccess={() => {
-            clearMustChangePassword();
             setModalDismissed(true);
           }}
         />

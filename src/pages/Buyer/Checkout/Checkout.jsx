@@ -10,12 +10,25 @@ import { useLanguage } from '../../../context/LanguageContext';
 import vietnamAddressService from '../../../services/vietnamAddressService';
 import { createVnPayPaymentUrl } from '../../../services/paymentService';
 
-const isProductUnavailable = (product) => (
-  product?.status === 'SoldOut' ||
-  product?.status === 'Sold' ||
-  product?.status === 'Inactive' ||
-  Number(product?.stockQuantity ?? 0) <= 0
-);
+const isProductUnavailable = (product) => {
+  if (!product) return true;
+  const status = (product.status || product.productStatus || product.statusName || '').toString().toLowerCase();
+  const quantity = product.stockQuantity ?? product.quantity ?? product.stock ?? null;
+
+  if (status === 'sold' || status === 'soldout' || status === 'inactive' || status === 'completed' || status === 'expired' || status === 'rejected' || status === 'cancelled') {
+    return true;
+  }
+  if (status && status !== 'accepted' && status !== 'active' && status !== 'ready') {
+    return true;
+  }
+  if (product.isSold === true) {
+    return true;
+  }
+  if (quantity != null && Number(quantity) <= 0) {
+    return true;
+  }
+  return false;
+};
 
 const Checkout = () => {
   const { productId } = useParams();
@@ -108,7 +121,7 @@ const Checkout = () => {
       const prodData = await productService.getById(productId);
       if (isProductUnavailable(prodData)) {
         setProduct(prodData);
-        showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng hoáº·c khÃ´ng cÃ²n Ä‘Æ°á»£c bÃ¡n.' : 'This product is out of stock or no longer available.', 'warning');
+        showToast(t('checkout.product_unavailable_toast'), 'warning');
         navigate('/product');
         return;
       }

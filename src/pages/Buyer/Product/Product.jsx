@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { formatFormattedNumber, parseRawNumber } from '../../../utils/numberUtils';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 import wishlistService from '../../../services/wishlistService';
 import { useAuth } from '../../../context/AuthContext';
+import SponsoredSpotlight from '../../../components/SponsoredSpotlight/SponsoredSpotlight';
 import '../../../styles/Product.css';
 
 function timeAgo(dateStr, language) {
@@ -94,7 +96,7 @@ export default function Product() {
   }, [minPriceParam, maxPriceParam]);
 
   useEffect(() => {
-    categoryService.getAllActive("?$filter=Status eq 'Active'")
+    categoryService.getAllActive("?$filter=Status eq 'Active'&$top=100")
       .then(res => {
         const arr = Array.isArray(res) ? res : (res?.value || []);
         setCategories(arr);
@@ -129,8 +131,9 @@ export default function Product() {
     setLoading(true);
     try {
       const params = {
+        Status: 'Accepted',
         Page: currentPage,
-        PageSize: 12,
+        PageSize: 6,
         SortBy: sortBy,
       };
       if (searchTerm) params.SearchTerm = searchTerm;
@@ -143,7 +146,7 @@ export default function Product() {
       const availableItems = itemsList.filter((item) => !isProductUnavailable(item));
       setProducts(availableItems);
       setTotalItems(data?.totalItems ?? availableItems.length);
-      setTotalPages(data?.totalPages || Math.ceil((data?.totalItems ?? availableItems.length) / 12) || 1);
+      setTotalPages(data?.totalPages || Math.ceil((data?.totalItems ?? availableItems.length) / 6) || 1);
     } catch (err) {
       showToast(t('common.error_occurred'), 'error');
     } finally {
@@ -198,12 +201,12 @@ export default function Product() {
       showToast(t('product.cannot_wishlist_own_product'), 'error');
       return;
     }
-    if (isProductUnavailable(product)) {
-      showToast(language === 'vi' ? 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng.' : 'This product is out of stock.', 'warning');
+    const isAdded = wishlistIds.has(product.productId);
+    if (!isAdded && isProductUnavailable(product)) {
+      showToast(t('product.sold_out_cannot_add_wishlist'), 'warning');
       return;
     }
     setTogglingId(product.productId);
-    const isAdded = wishlistIds.has(product.productId);
     try {
       if (isAdded) {
         const data = await wishlistService.getWishlist();
@@ -227,8 +230,7 @@ export default function Product() {
   };
 
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
-    const pages = [];
+    if (products.length === 0) return null;
     const maxVisible = 5;
     let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let end = Math.min(totalPages, start + maxVisible - 1);
@@ -236,37 +238,52 @@ export default function Product() {
       start = Math.max(1, end - maxVisible + 1);
     }
 
-    pages.push(
-      <button key="prev" className="pagination-btn" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage <= 1}>
-        ‹ {t('common.previous')}
-      </button>
-    );
-
-    if (start > 1) {
-      pages.push(<button key={1} className="pagination-btn" onClick={() => handlePageChange(1)}>1</button>);
-      if (start > 2) pages.push(<span key="e1" className="pagination-ellipsis">…</span>);
-    }
-
-    for (let i = start; i <= end; i++) {
-      pages.push(
-        <button key={i} className={`pagination-btn ${i === currentPage ? 'active' : ''}`} onClick={() => handlePageChange(i)}>
-          {i}
+    return (
+      <div className="pagination-container">
+        <button
+          type="button"
+          className="pagination-btn"
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+        >
+          ‹
         </button>
-      );
-    }
 
-    if (end < totalPages) {
-      if (end < totalPages - 1) pages.push(<span key="e2" className="pagination-ellipsis">…</span>);
-      pages.push(<button key={totalPages} className="pagination-btn" onClick={() => handlePageChange(totalPages)}>{totalPages}</button>);
-    }
+        {start > 1 && (
+          <>
+            <button type="button" className="pagination-btn" onClick={() => handlePageChange(1)}>1</button>
+            {start > 2 && <span className="pagination-ellipsis">…</span>}
+          </>
+        )}
 
-    pages.push(
-      <button key="next" className="pagination-btn" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage >= totalPages}>
-        {t('common.next')} ›
-      </button>
+        {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(num => (
+          <button
+            key={num}
+            type="button"
+            className={`pagination-btn ${num === currentPage ? 'active' : ''}`}
+            onClick={() => handlePageChange(num)}
+          >
+            {num}
+          </button>
+        ))}
+
+        {end < totalPages && (
+          <>
+            {end < totalPages - 1 && <span className="pagination-ellipsis">…</span>}
+            <button type="button" className="pagination-btn" onClick={() => handlePageChange(totalPages)}>{totalPages}</button>
+          </>
+        )}
+
+        <button
+          type="button"
+          className="pagination-btn"
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+        >
+          ›
+        </button>
+      </div>
     );
-
-    return <div className="pagination-container">{pages}</div>;
   };
 
   const hasActiveFilters = condition || minPriceParam || maxPriceParam;
@@ -287,6 +304,8 @@ export default function Product() {
           {t('common.filter')}
         </button>
       </div>
+
+      <SponsoredSpotlight mode="carousel" limit={8} />
 
       <div className="product-layout">
           {showMobileFilter && (
@@ -315,19 +334,19 @@ export default function Product() {
               <div className="filter-section-title">{t('product.price_range')}</div>
               <div className="price-range-inputs">
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder={t('product.min_price')}
-                  value={minPriceInput}
-                  onChange={(e) => setMinPriceInput(e.target.value)}
-                  min="0"
+                  value={formatFormattedNumber(minPriceInput)}
+                  onChange={(e) => setMinPriceInput(parseRawNumber(e.target.value))}
                 />
                 <span className="price-range-sep">—</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder={t('product.max_price')}
-                  value={maxPriceInput}
-                  onChange={(e) => setMaxPriceInput(e.target.value)}
-                  min="0"
+                  value={formatFormattedNumber(maxPriceInput)}
+                  onChange={(e) => setMaxPriceInput(parseRawNumber(e.target.value))}
                 />
               </div>
             </div>

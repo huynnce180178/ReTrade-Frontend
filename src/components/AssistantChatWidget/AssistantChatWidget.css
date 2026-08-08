@@ -527,6 +527,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .assistant-widget-footer input {
@@ -593,6 +594,84 @@
   40% { transform: translateY(-4px); }
 }
 
+/* Attachment Button & Image Preview Bar */
+.assistant-widget-attach-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--at-border);
+  background: var(--at-slate-bg);
+  color: var(--at-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.assistant-widget-attach-btn:hover {
+  background: var(--at-mint);
+  color: var(--at-primary);
+  border-color: var(--at-primary);
+}
+
+.assistant-widget-attach-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.assistant-widget-image-preview-bar {
+  padding: 6px 12px;
+  background: #f8fafc;
+  border-top: 1px solid var(--at-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-widget-preview-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--at-border);
+  border-radius: 8px;
+  padding: 2px;
+  background: #ffffff;
+}
+
+.assistant-widget-preview-img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.assistant-widget-preview-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.assistant-widget-preview-remove .material-symbols-outlined {
+  font-size: 12px;
+}
+
+.assistant-widget-preview-label {
+  font-size: 11px;
+  color: var(--at-text-muted);
+}
+
 @media (max-width: 480px) {
   .assistant-widget {
     right: 14px;
@@ -601,5 +680,13 @@
   .assistant-widget-panel {
     width: calc(100vw - 28px);
     bottom: 68px;
+  }
+}
+
+@media (max-height: 640px) {
+  .assistant-widget-panel {
+    height: calc(100vh - 84px) !important;
+    min-height: 320px !important;
+    bottom: 64px !important;
   }
 }

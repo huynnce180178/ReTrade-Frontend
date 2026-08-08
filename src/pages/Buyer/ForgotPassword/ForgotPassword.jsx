@@ -35,11 +35,49 @@ export default function ForgotPassword() {
   const [otp, setOtp] = useState(INITIAL_OTP);
   const [countdown, setCountdown] = useState(0);
   const [resending, setResending] = useState(false);
+  const [resendCount, setResendCount] = useState(0);
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [otpStatus, setOtpStatus] = useState({ checking: false, valid: null, message: '' });
+
+  useEffect(() => {
+    const code = otp.join('');
+    if (code.length !== 6) {
+      setOtpStatus({ checking: false, valid: null, message: '' });
+      return;
+    }
+
+    setOtpStatus({ checking: true, valid: null, message: '' });
+    const timer = setTimeout(async () => {
+      try {
+        const res = await accountService.verifyForgotOtp({ email: email.trim(), otp: code });
+        if (res === true || res?.verified === true) {
+          setOtpStatus({
+            checking: false,
+            valid: true,
+            message: language === 'vi' ? '✓ Mã OTP chính xác!' : '✓ OTP code is valid!'
+          });
+        } else {
+          setOtpStatus({
+            checking: false,
+            valid: false,
+            message: language === 'vi' ? '✕ Mã OTP không hợp lệ hoặc đã hết hạn.' : '✕ Invalid or expired OTP code.'
+          });
+        }
+      } catch (err) {
+        setOtpStatus({
+          checking: false,
+          valid: false,
+          message: language === 'vi' ? '✕ Mã OTP không hợp lệ hoặc đã hết hạn.' : '✕ Invalid or expired OTP code.'
+        });
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [otp, email, language]);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -59,13 +97,12 @@ export default function ForgotPassword() {
     setLoading(true);
     try {
       await accountService.forgotPassword(trimmed);
-      showToast(language === 'vi' ? 'Mã OTP đã được gửi đến email của bạn.' : 'OTP code sent to your email.', 'success');
-      setEmail(trimmed);
-      setStep('resetForm');
+      setResendCount(1);
       setCountdown(60);
-      setOtp([...INITIAL_OTP]);
+      setStep('resetForm');
     } catch (err) {
-      showToast(getErrorMsg(err, language === 'vi' ? 'Email không tồn tại trong hệ thống.' : 'Email address not found.'), 'error');
+      const msg = err.response?.data?.message || err.message || (language === 'vi' ? 'Email không tồn tại trong hệ thống.' : 'Email address not found.');
+      showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
     } finally {
       setLoading(false);
     }
@@ -94,15 +131,21 @@ export default function ForgotPassword() {
   };
 
   const handleResendOtp = async () => {
+    if (resendCount >= 3) {
+      showToast(t('auth.otp_resend_limit'), 'error');
+      return;
+    }
     setResending(true);
     try {
       await accountService.forgotPassword(email.trim());
-      showToast(language === 'vi' ? 'Mã OTP mới đã được gửi lại!' : 'New OTP code resent!', 'success');
+      setResendCount(prev => prev + 1);
       setCountdown(60);
       setOtp([...INITIAL_OTP]);
+      showToast(t('auth.unverified_login_prompt', { email: email.trim() }), 'info');
       inputRefs.current[0]?.focus();
-    } catch {
-      showToast(language === 'vi' ? 'Không thể gửi lại mã OTP. Vui lòng thử lại sau.' : 'Failed to resend OTP.', 'error');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || (language === 'vi' ? 'Không thể gửi lại mã OTP. Vui lòng thử lại sau.' : 'Failed to resend OTP.');
+      showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
     } finally {
       setResending(false);
     }
@@ -196,6 +239,16 @@ export default function ForgotPassword() {
           {/* STEP 1: EMAIL ENTRY */}
           {step === 'email' && (
             <div className="fp-glass-card fp-animate-in" key="email">
+              <button
+                type="button"
+                className="fp-top-back-btn"
+                onClick={() => navigate('/login')}
+                title={t('forgot_password_page.back_to_login')}
+                aria-label={t('forgot_password_page.back_to_login')}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+
               <div className="fp-icon-wrap">
                 <span className="material-symbols-outlined fp-icon">lock_reset</span>
               </div>
@@ -223,19 +276,22 @@ export default function ForgotPassword() {
                   {loading ? <span className="fp-spinner" /> : (language === 'vi' ? 'Gửi mã xác thực OTP' : 'Send OTP Code')}
                 </button>
               </form>
-
-              <div className="fp-footer-link">
-                <Link to="/login" className="fp-back-link">
-                  <span className="material-symbols-outlined fp-back-icon">arrow_back</span>
-                  {t('forgot_password_page.back_to_login')}
-                </Link>
-              </div>
             </div>
           )}
 
           {/* STEP 2: UNIFIED OTP & NEW PASSWORD FORM */}
           {step === 'resetForm' && (
             <div className="fp-glass-card fp-glass-card--wide fp-glass-card--reset fp-animate-in" key="resetForm">
+              <button
+                type="button"
+                className="fp-top-back-btn"
+                onClick={backToEmailStep}
+                title={language === 'vi' ? 'Quay lại' : 'Back'}
+                aria-label={language === 'vi' ? 'Quay lại' : 'Back'}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+
               <div className="fp-header-center">
                 <div className="fp-icon-wrap fp-icon-wrap--otp">
                   <span className="material-symbols-outlined fp-icon">mark_email_read</span>
@@ -264,7 +320,7 @@ export default function ForgotPassword() {
                         key={i}
                         ref={el => (inputRefs.current[i] = el)}
                         type="text"
-                        className="fp-otp-input"
+                        className={`fp-otp-input ${otpStatus.valid === true ? 'fp-otp-input--valid' : otpStatus.valid === false ? 'fp-otp-input--error' : ''}`}
                         maxLength="1"
                         value={digit}
                         onChange={e => handleOtpChange(i, e.target.value)}
@@ -275,16 +331,25 @@ export default function ForgotPassword() {
                       />
                     ))}
                   </div>
+
+                  {otpStatus.message && (
+                    <div className={`mt-1.5 text-xs font-medium text-center ${otpStatus.valid ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {otpStatus.message}
+                    </div>
+                  )}
+
                   <div className="fp-resend-area">
                     <span>{language === 'vi' ? 'Chưa nhận được mã?' : "Didn't receive code?"}</span>
                     <button
                       type="button"
                       className="fp-resend-btn"
                       onClick={handleResendOtp}
-                      disabled={countdown > 0 || resending || loading}
+                      disabled={countdown > 0 || resending || loading || resendCount >= 3}
                     >
                       {resending
                         ? (language === 'vi' ? 'Đang gửi...' : 'Resending...')
+                        : resendCount >= 3
+                        ? (language === 'vi' ? 'Đã đạt giới hạn gửi (3/3)' : 'Resend limit reached (3/3)')
                         : countdown > 0
                         ? (language === 'vi' ? `Gửi lại sau (${countdown}s)` : `Resend in (${countdown}s)`)
                         : (language === 'vi' ? 'Bấm để gửi lại' : 'Resend Code')}
@@ -331,22 +396,7 @@ export default function ForgotPassword() {
                     ? <span className="fp-spinner" />
                     : (language === 'vi' ? 'Xác nhận & Đổi mật khẩu' : 'Confirm & Reset Password')}
                 </button>
-                <button type="button" className="fp-back-link" onClick={resetOtpEntry} disabled={loading}>
-                  <span className="material-symbols-outlined fp-back-icon">restart_alt</span>
-                  {language === 'vi' ? 'Nhập lại mã OTP' : 'Re-enter OTP'}
-                </button>
-                <button type="button" className="fp-back-link" onClick={backToEmailStep} disabled={loading}>
-                  <span className="material-symbols-outlined fp-back-icon">arrow_back</span>
-                  {language === 'vi' ? 'Quay lại nhập email' : 'Back to email'}
-                </button>
               </form>
-
-              <div className="fp-footer-link">
-                <Link to="/login" className="fp-back-link">
-                  <span className="material-symbols-outlined fp-back-icon">arrow_back</span>
-                  {t('forgot_password_page.return_to_login')}
-                </Link>
-              </div>
             </div>
           )}
 

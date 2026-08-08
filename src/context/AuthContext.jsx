@@ -1,8 +1,10 @@
-﻿import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import accountService from '../services/accountService';
 import profileService from '../services/profileService';
 import { clearAuthStorage } from '../utils/authUtils';
 import { createAccountHubConnection } from '../services/accountRealtimeService';
+
+import { useLanguage } from './LanguageContext';
 
 const AuthContext = createContext(null);
 
@@ -52,6 +54,7 @@ const extractErrorDetails = (err, fallback) => {
 };
 
 export const AuthProvider = ({ children }) => {
+  const { t } = useLanguage();
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -76,18 +79,37 @@ export const AuthProvider = ({ children }) => {
             ...freshProfile,
             roles: freshProfile.roles || storedUser?.roles || [],
             isPasswordSet: freshProfile.isPasswordSet ?? storedUser?.isPasswordSet,
+            mustChangePassword: freshProfile.mustChangePassword ?? storedUser?.mustChangePassword,
           };
           setUser(mergedProfile);
           localStorage.setItem('user', JSON.stringify(mergedProfile));
         } catch (err) {
-          console.error('Failed to validate token on startup:', err);
-          handleLogout();
+          console.error('Failed to load profile on startup:', err);
+          if (err.response?.status === 401) {
+            clearAuthStorage();
+            setUser(null);
+            setToken(null);
+          }
         }
       }
       setLoading(false);
     };
 
     initializeAuth();
+  }, []);
+
+  useEffect(() => {
+    const handleLogoutEvent = () => {
+      if (accountHubRef.current) {
+        accountHubRef.current.stop().catch(() => {});
+        accountHubRef.current = null;
+      }
+      setUser(null);
+      setToken(null);
+    };
+
+    window.addEventListener('retrade:logout', handleLogoutEvent);
+    return () => window.removeEventListener('retrade:logout', handleLogoutEvent);
   }, []);
 
   useEffect(() => {
@@ -100,11 +122,16 @@ export const AuthProvider = ({ children }) => {
     let disposed = false;
 
     const handleForceLogout = (reasonMessage) => {
-      const msg = typeof reasonMessage === 'string' && reasonMessage.trim()
-        ? reasonMessage
-        : 'Quyền hạn tài khoản của bạn đã bị Quản trị viên thay đổi. Hệ thống tự động đăng xuất.';
-      alert(msg);
-      handleLogout();
+      if (!localStorage.getItem('token')) return;
+      if (window.__isSelfChangingPassword || sessionStorage.getItem('retrade_self_changing_pwd') === 'true') {
+        sessionStorage.removeItem('retrade_self_changing_pwd');
+        window.__isSelfChangingPassword = false;
+        handleLogout();
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('retrade:role_updated_logout', {
+        detail: { message: reasonMessage }
+      }));
     };
 
     connection.on('ForceLogout', handleForceLogout);
@@ -119,6 +146,12 @@ export const AuthProvider = ({ children }) => {
         console.error('Failed to connect account hub:', error);
       }
     };
+
+    connection.onreconnected(() => {
+      if (user?.accountId) {
+        connection.invoke('JoinAccountGroup', user.accountId).catch(() => {});
+      }
+    });
 
     startConnection();
 
@@ -186,6 +219,11 @@ export const AuthProvider = ({ children }) => {
         'Login failed. Please check your username and password.'
       );
       
+      if (errMsg && errMsg.includes('ACCOUNT_UNVERIFIED')) {
+        const email = errMsg.split('ACCOUNT_UNVERIFIED:')[1]?.trim() || '';
+        return { success: false, isUnverified: true, email };
+      }
+
       setError(errMsg);
       return { success: false, error: errMsg, code };
     }

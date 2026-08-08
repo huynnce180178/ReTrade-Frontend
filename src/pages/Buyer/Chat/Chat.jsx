@@ -319,6 +319,18 @@ export default function Chat({ basePath = '/chat' }) {
     });
   };
 
+  const handlePartnerGroupClick = (group) => {
+    setExpandedPartners((prev) => ({
+      ...prev,
+      [group.partnerId]: true,
+    }));
+
+    const targetRoom = group.productRooms[0] || group.businessRoom || group.rooms[0];
+    if (targetRoom && targetRoom.roomId !== roomId) {
+      navigate(`${basePath}/${targetRoom.roomId}`);
+    }
+  };
+
   const saveCustomTitle = (targetRoomId, newTitle) => {
     setCustomTitles((prev) => {
       const updated = { ...prev };
@@ -391,9 +403,6 @@ export default function Chat({ basePath = '/chat' }) {
       const data = await chatService.getRooms();
       const list = Array.isArray(data) ? data : [];
       setRooms(list);
-      if (!roomId && list.length > 0) {
-        navigate(`${basePath}/${list[0].roomId}`, { replace: true });
-      }
     } catch (error) {
       const msg = error.response?.data || error.message || t('chat.load_conversations_error');
       showToast(String(msg), 'error');
@@ -463,9 +472,13 @@ export default function Chat({ basePath = '/chat' }) {
     let disposed = false;
 
     const upsertMessage = (message) => {
+      if (!message || !message.chatId) return;
+
       setMessages((current) => {
         if (activeRoomRef.current !== message.roomId) return current;
-        if (current.some((item) => item.chatId === message.chatId)) return current;
+        if (current.some((item) => item.chatId === message.chatId)) {
+          return current.map((item) => (item.chatId === message.chatId ? { ...item, ...message } : item));
+        }
         return [...current, message];
       });
 
@@ -488,35 +501,90 @@ export default function Chat({ basePath = '/chat' }) {
 
     const handleNotification = (payload) => {
       const message = payload?.message || payload?.Message;
-      if (!message || activeRoomRef.current === message.roomId) return;
-      setRooms((current) => current.map((room) => (
-        room.roomId === message.roomId
-          ? {
-              ...room,
-              lastMessage: message,
-              unreadCount: (room.unreadCount || 0) + 1,
-              updatedAt: message.createdAt || new Date().toISOString(),
-            }
-          : room
-      )));
+      const notificationRoomId = payload?.roomId || payload?.RoomId || message?.roomId;
+      if (!message) return;
+
+      if (activeRoomRef.current === notificationRoomId) {
+        setMessages((current) => {
+          if (current.some((item) => item.chatId === message.chatId)) {
+            return current.map((item) => (item.chatId === message.chatId ? { ...item, ...message } : item));
+          }
+          return [...current, message];
+        });
+        if (message.senderId !== user.userId) {
+          chatService.markAsRead(notificationRoomId).catch(() => {});
+        }
+      }
+
+      setRooms((current) => {
+        const roomExists = current.some((r) => r.roomId === notificationRoomId);
+        if (!roomExists) {
+          chatService.getRooms().then((list) => {
+            if (Array.isArray(list)) setRooms(list);
+          }).catch(() => {});
+          return current;
+        }
+
+        return current.map((room) => (
+          room.roomId === notificationRoomId
+            ? {
+                ...room,
+                lastMessage: message,
+                unreadCount: activeRoomRef.current === notificationRoomId ? room.unreadCount : (room.unreadCount || 0) + 1,
+                updatedAt: message.createdAt || new Date().toISOString(),
+              }
+            : room
+        ));
+      });
     };
 
     const handleMessagesRead = (payload) => {
       const readerId = payload?.readerId || payload?.ReaderId;
+      const readRoomId = payload?.roomId || payload?.RoomId;
       if (!readerId || readerId === user.userId) return;
-      setMessages((current) => current.map((message) =>
-        message.senderId === user.userId ? { ...message, isRead: true, readAt: payload.readAt || payload.ReadAt } : message
+
+      if (readRoomId === activeRoomRef.current) {
+        setMessages((current) => current.map((message) =>
+          message.senderId === user.userId ? { ...message, isRead: true, readAt: payload.readAt || payload.ReadAt } : message
+        ));
+      }
+
+      setRooms((current) => current.map((room) =>
+        room.roomId === readRoomId ? { ...room, unreadCount: 0 } : room
       ));
     };
 
-    const handleMessageRecalled = (message) => {
-      if (!message?.chatId) return;
+    const handleMessageRecalled = (payload) => {
+      const message = payload?.chatId ? payload : (payload?.message || payload?.Message);
+      const chatId = message?.chatId || message?.ChatId || payload?.chatId || payload?.ChatId;
+      const rId = message?.roomId || message?.RoomId || payload?.roomId || payload?.RoomId;
+      if (!chatId) return;
+
       setMessages((current) => current.map((item) =>
-        item.chatId === message.chatId ? { ...item, ...message, isRecalled: true } : item
+        item.chatId === chatId
+          ? {
+              ...item,
+              ...message,
+              isRecalled: true,
+              message: 'Tin nhắn đã bị thu hồi',
+              messageType: 'Recall',
+              canRecall: false,
+            }
+          : item
       ));
+
       setRooms((current) => current.map((room) =>
-        room.roomId === message.roomId && room.lastMessage?.chatId === message.chatId
-          ? { ...room, lastMessage: { ...room.lastMessage, ...message, isRecalled: true } }
+        room.roomId === rId && room.lastMessage?.chatId === chatId
+          ? {
+              ...room,
+              lastMessage: {
+                ...room.lastMessage,
+                ...message,
+                isRecalled: true,
+                message: 'Tin nhắn đã bị thu hồi',
+                messageType: 'Recall',
+              },
+            }
           : room
       ));
     };
@@ -524,21 +592,59 @@ export default function Chat({ basePath = '/chat' }) {
     const handleMessageDeleted = (payload) => {
       const chatId = payload?.chatId || payload?.ChatId;
       const payloadRoomId = payload?.roomId || payload?.RoomId;
-      if (!chatId || payloadRoomId !== activeRoomRef.current) return;
-      setMessages((current) => current.filter((message) => message.chatId !== chatId));
+      if (!chatId) return;
+
+      if (payloadRoomId === activeRoomRef.current) {
+        setMessages((current) => current.filter((message) => message.chatId !== chatId));
+      }
+
+      setRooms((current) => current.map((room) => {
+        if (room.roomId !== payloadRoomId) return room;
+        if (room.lastMessage?.chatId === chatId) {
+          return {
+            ...room,
+            lastMessage: {
+              ...room.lastMessage,
+              message: 'Tin nhắn đã xóa',
+            },
+          };
+        }
+        return room;
+      }));
+    };
+
+    const handleRoomCreated = (newRoom) => {
+      if (!newRoom || !newRoom.roomId) return;
+      setRooms((current) => {
+        if (current.some((r) => r.roomId === newRoom.roomId)) {
+          return current.map((r) => (r.roomId === newRoom.roomId ? { ...r, ...newRoom } : r));
+        }
+        return [newRoom, ...current];
+      });
     };
 
     connection.on('ReceiveMessage', upsertMessage);
     connection.on('ChatNotification', handleNotification);
+    connection.on('RoomCreated', handleRoomCreated);
     connection.on('MessagesRead', handleMessagesRead);
     connection.on('MessageRecalled', handleMessageRecalled);
     connection.on('MessageDeleted', handleMessageDeleted);
+
+    connection.onreconnected(async () => {
+      await connection.invoke('JoinUserNotifications').catch(() => {});
+      if (activeRoomRef.current) {
+        await connection.invoke('JoinRoom', activeRoomRef.current).catch(() => {});
+      }
+    });
 
     const start = async () => {
       try {
         await connection.start();
         if (!disposed) {
           await connection.invoke('JoinUserNotifications');
+          if (activeRoomRef.current) {
+            await connection.invoke('JoinRoom', activeRoomRef.current).catch(() => {});
+          }
           setConnectionReady(true);
         }
       } catch (error) {
@@ -705,7 +811,7 @@ export default function Chat({ basePath = '/chat' }) {
   }
 
   return (
-    <div className={`chat-page ${showInfoSidebar && activeRoom ? 'has-right-sidebar' : ''}`}>
+    <div className={`chat-page ${roomId ? 'has-room' : ''} ${showInfoSidebar && activeRoom ? 'has-right-sidebar' : ''}`}>
 
       <aside className="chat-sidebar">
         <div className="chat-sidebar-header">
@@ -744,7 +850,7 @@ export default function Chat({ basePath = '/chat' }) {
                   <div key={group.partnerId} className={`chat-partner-group ${hasActiveChild ? 'has-active' : ''}`}>
                     <div
                       className={`chat-partner-header ${isExpanded ? 'expanded' : ''}`}
-                      onClick={() => togglePartnerExpand(group.partnerId)}
+                      onClick={() => handlePartnerGroupClick(group)}
                     >
                       <div className="chat-room-avatar">
                         {group.partner?.avatarUrl ? (
@@ -857,6 +963,14 @@ export default function Chat({ basePath = '/chat' }) {
         ) : (
           <>
             <header className="chat-panel-header">
+              <button
+                type="button"
+                className="chat-mobile-back-btn"
+                onClick={() => navigate(basePath)}
+                title={t('common.back')}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
               <div className="chat-peer-avatar">
                 {activeRoom?.productImageUrl ? (
                   <img src={activeRoom.productImageUrl} alt={activeRoom.productName || getRoomTitle(activeRoom, t, customTitles)} />

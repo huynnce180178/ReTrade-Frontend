@@ -28,6 +28,26 @@ const REPORT_ALLOWED_STATUSES = [
 const canReportOrder = (status) => REPORT_ALLOWED_STATUSES
   .some((allowed) => allowed.toLowerCase() === String(status || '').toLowerCase());
 
+const SELLER_ORDER_EVENTS = [
+  { name: 'SellerOrderCreated', resetToFirstPage: true },
+  { name: 'SellerOrderPlaced', resetToFirstPage: true },
+  { name: 'NewSellerOrder', resetToFirstPage: true },
+  { name: 'NewOrder', resetToFirstPage: true },
+  { name: 'OrderCreated', resetToFirstPage: true },
+  { name: 'ReceiveOrderNotification', resetToFirstPage: true },
+  { name: 'SellerOrderStatusChanged', resetToFirstPage: false },
+  { name: 'OrderStatusUpdated', resetToFirstPage: false },
+];
+
+const getPayloadSellerId = (payload) => (
+  payload?.sellerId ||
+  payload?.SellerId ||
+  payload?.order?.sellerId ||
+  payload?.Order?.SellerId ||
+  payload?.data?.sellerId ||
+  payload?.Data?.SellerId
+);
+
 export default function OrderManagement() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
@@ -52,10 +72,13 @@ export default function OrderManagement() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [returnModalTarget, setReturnModalTarget] = useState(null);
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const latestFetchOrdersRef = useRef(null);
+  const latestFetchAllOrdersRef = useRef(null);
+  const latestPageRef = useRef(1);
 
   const isSeller = (user?.roles || []).some((role) => String(role).toLowerCase() === 'seller');
   const isAdmin = (user?.roles || []).some((role) => String(role).toLowerCase() === 'admin');
-  const sellerId = user?.userId;
+  const sellerId = user?.userId || user?.id || user?.accountId;
 
   const statusMeta = useMemo(() => ({
     AwaitingPayment: { label: t('order_status.awaiting_payment'), className: 'awaiting' },
@@ -164,6 +187,18 @@ export default function OrderManagement() {
   }, [sellerId]);
 
   useEffect(() => {
+    latestFetchOrdersRef.current = fetchOrders;
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    latestFetchAllOrdersRef.current = fetchAllOrdersForStats;
+  }, [fetchAllOrdersForStats]);
+
+  useEffect(() => {
+    latestPageRef.current = page;
+  }, [page]);
+
+  useEffect(() => {
     if (user && (isSeller || isAdmin)) {
       fetchOrders();
       fetchAllOrdersForStats();
@@ -171,34 +206,52 @@ export default function OrderManagement() {
   }, [fetchAllOrdersForStats, fetchOrders, isAdmin, isSeller, user]);
 
   useEffect(() => {
-    if (authLoading || !user || (!isSeller && !isAdmin)) return undefined;
+    if (authLoading || !user || !sellerId || (!isSeller && !isAdmin)) return undefined;
 
     const connection = createOrderHubConnection();
     let disposed = false;
 
-    const handleOrderUpdate = () => {
-      if (!disposed) {
-        fetchOrders();
-        fetchAllOrdersForStats();
+    const handleSellerOrderEvent = (payload, resetToFirstPage = false) => {
+      if (disposed) return;
+
+      const payloadSellerId = getPayloadSellerId(payload);
+      if (payloadSellerId && sellerId && String(payloadSellerId) !== String(sellerId)) {
+        return;
       }
+
+      latestFetchAllOrdersRef.current?.();
+
+      if (resetToFirstPage && latestPageRef.current !== 1) {
+        setPage(1);
+        return;
+      }
+
+      latestFetchOrdersRef.current?.();
     };
 
-    connection.on('ReceiveOrderNotification', handleOrderUpdate);
-    connection.on('OrderStatusUpdated', handleOrderUpdate);
+    const handlers = SELLER_ORDER_EVENTS.map((event) => {
+      const handler = (payload) => handleSellerOrderEvent(payload, event.resetToFirstPage);
+      connection.on(event.name, handler);
+      return { eventName: event.name, handler };
+    });
 
     connection.start()
       .then(() => {
-        if (!disposed) connection.invoke('JoinSellerOrders').catch(() => { });
+        if (!disposed) {
+          connection.invoke('JoinSellerOrderGroup', sellerId).catch(() => { });
+          connection.invoke('JoinSellerOrders').catch(() => { });
+        }
       })
       .catch(() => { });
 
     return () => {
       disposed = true;
-      connection.off('ReceiveOrderNotification', handleOrderUpdate);
-      connection.off('OrderStatusUpdated', handleOrderUpdate);
+      handlers.forEach(({ eventName, handler }) => {
+        connection.off(eventName, handler);
+      });
       connection.stop().catch(() => { });
     };
-  }, [authLoading, fetchOrders, isAdmin, isSeller, user]);
+  }, [authLoading, isAdmin, isSeller, sellerId, user]);
 
   const handleFilterChange = (field, value) => {
     setFilterForm((current) => ({ ...current, [field]: value }));

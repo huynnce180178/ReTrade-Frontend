@@ -57,6 +57,16 @@ export default function ResetPassword() {
           {!sent ? (
             /* ========== Email Entry ========== */
             <div className="rp-glass-card rp-animate-in" key="email-step">
+              <button
+                type="button"
+                className="rp-top-back-btn"
+                onClick={() => navigate('/login')}
+                title={t('forgot_password_page.back_to_login')}
+                aria-label={t('forgot_password_page.back_to_login')}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+
               <div className="rp-icon-wrap">
                 <span className="material-symbols-outlined rp-icon">mail</span>
               </div>
@@ -96,17 +106,20 @@ export default function ResetPassword() {
                 <span className="material-symbols-outlined rp-info-icon">info</span>
                 <span>{t('reset_password_page.recovery_info_notice')}</span>
               </div>
-
-              <div className="rp-footer-link">
-                <Link to="/login" className="rp-back-link">
-                  <span className="material-symbols-outlined rp-back-icon">arrow_back</span>
-                  {t('forgot_password_page.back_to_login')}
-                </Link>
-              </div>
             </div>
           ) : (
             /* ========== Success ========== */
             <div className="rp-glass-card rp-animate-in" key="success-step">
+              <button
+                type="button"
+                className="rp-top-back-btn"
+                onClick={() => navigate('/login')}
+                title={t('forgot_password_page.back_to_login')}
+                aria-label={t('forgot_password_page.back_to_login')}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+
               <div className="rp-icon-wrap rp-icon-wrap--success">
                 <span className="material-symbols-outlined rp-icon rp-icon--success">check_circle</span>
               </div>

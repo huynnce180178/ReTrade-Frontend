@@ -12,6 +12,8 @@ import addressService from '../../../services/addressService';
 import checkoutService from '../../../services/checkoutService';
 import { createVnPayPaymentUrl } from '../../../services/paymentService';
 import chatService from '../../../services/chatService';
+import profileService from '../../../services/profileService';
+import SponsoredSpotlight from '../../../components/SponsoredSpotlight/SponsoredSpotlight';
 import '../../../styles/ProductDetail.css';
 
 function formatDate(dateStr, language) {
@@ -42,6 +44,26 @@ const isProductUnavailable = (product) => (
   product?.status === 'Inactive' ||
   Number(product?.stockQuantity ?? 0) <= 0
 );
+
+const PUBLIC_PRODUCT_DETAIL_STATUSES = new Set(['accepted', 'ready', 'sold', 'soldout']);
+
+const canViewProductDetail = (product, user) => {
+  const status = String(product?.status || '').trim().toLowerCase();
+  if (PUBLIC_PRODUCT_DETAIL_STATUSES.has(status)) return true;
+
+  const roles = user?.roles || [];
+  const isAdmin = roles.some((role) => String(role).toLowerCase() === 'admin');
+  if (isAdmin) return true;
+
+  const currentUserId = user?.userId || user?.id || user?.accountId || user?.sub;
+  const productSellerId = product?.sellerId || product?.SellerId || product?.seller?.userId || product?.seller?.id;
+
+  return Boolean(
+    currentUserId &&
+    productSellerId &&
+    String(currentUserId).toLowerCase() === String(productSellerId).toLowerCase()
+  );
+};
 
 function getOfferStatusConfig(status, language) {
   switch (status) {
@@ -249,6 +271,8 @@ export default function ProductDetail() {
   const [showMakeOffer, setShowMakeOffer] = useState(false);
   const [myPendingOffer, setMyPendingOffer] = useState(null);
   const [showCheckoutConfirmModal, setShowCheckoutConfirmModal] = useState(false);
+  const [sellerAvatar, setSellerAvatar] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
   const { notifications } = useNotification();
   const lastNotificationRef = React.useRef(null);
 
@@ -352,7 +376,7 @@ export default function ProductDetail() {
       return;
     }
     if (!isWishlisted && isProductUnavailable(product)) {
-      showToast(language === 'vi' ? 'Sản phẩm đã hết hàng.' : 'This product is out of stock.', 'warning');
+      showToast(t('product.sold_out_cannot_add_wishlist'), 'warning');
       return;
     }
     setTogglingWishlist(true);
@@ -363,15 +387,15 @@ export default function ProductDetail() {
         if (item) {
           await wishlistService.removeItem(item.wishlistItemId);
           setIsWishlisted(false);
-          showToast(language === 'vi' ? 'Đã xóa khỏi danh sách yêu thích.' : 'Removed from wishlist.', 'success');
+          showToast(t('product.remove_from_wishlist'), 'success');
         }
       } else {
         await wishlistService.addToWishlist(product.productId);
         setIsWishlisted(true);
-        showToast(language === 'vi' ? 'Đã thêm vào danh sách yêu thích!' : 'Added to wishlist!', 'success');
+        showToast(t('product.add_to_wishlist'), 'success');
       }
     } catch (err) {
-      const msg = err.response?.data || err.message || (language === 'vi' ? 'Đã xảy ra lỗi.' : 'Something went wrong.');
+      const msg = err.response?.data || err.message || t('common.error_occurred');
       showToast(msg, 'error');
     } finally {
       setTogglingWishlist(false);
@@ -381,7 +405,7 @@ export default function ProductDetail() {
   const handleGoToCheckout = () => {
     if (!product?.productId) return;
     if (isProductUnavailable(product)) {
-      showToast(language === 'vi' ? 'Sản phẩm đã hết hàng, không thể mua ngay.' : 'This product is out of stock and cannot be purchased.', 'warning');
+      showToast(t('product.sold_out_cannot_buy'), 'warning');
       return;
     }
     setShowCheckoutConfirmModal(true);
@@ -427,8 +451,26 @@ export default function ProductDetail() {
       setLoading(true);
       try {
         const data = await productService.getById(productId);
+        if (!canViewProductDetail(data, user)) {
+          setProduct(null);
+          return;
+        }
         setProduct(data);
         setMainImageIndex(0);
+        setAvatarError(false);
+
+        const directAvatar = data?.sellerAvatarUrl || data?.sellerAvatar || data?.seller?.avatarUrl || data?.seller?.avatar;
+        if (directAvatar) {
+          setSellerAvatar(directAvatar);
+        }
+        if (data?.sellerId) {
+          profileService.getSellerProfile(data.sellerId)
+            .then(profile => {
+              const avt = profile?.avatarUrl || profile?.avatar || profile?.user?.avatarUrl;
+              if (avt) setSellerAvatar(avt);
+            })
+            .catch(() => {});
+        }
       } catch (err) {
         if (err?.response?.status === 404) {
           setProduct(null);
@@ -443,7 +485,7 @@ export default function ProductDetail() {
       fetchProduct();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [productId, language, showToast]);
+  }, [productId, language, showToast, user]);
 
   // Determine if current user is the seller
   const isSeller = user && product && (
@@ -607,7 +649,16 @@ export default function ProductDetail() {
             style={{ cursor: product.sellerId ? 'pointer' : 'default' }}
           >
             <div className="pd-seller-avatar">
-              {getSellerInitials(product.sellerName)}
+              {sellerAvatar && !avatarError ? (
+                <img
+                  src={sellerAvatar}
+                  alt={product.sellerName || 'Seller Avatar'}
+                  className="pd-seller-avatar-img"
+                  onError={() => setAvatarError(true)}
+                />
+              ) : (
+                getSellerInitials(product.sellerName)
+              )}
             </div>
             <div className="pd-seller-info">
               <span className="pd-seller-label">{language === 'vi' ? 'Người bán' : 'Seller'}</span>
@@ -822,6 +873,14 @@ export default function ProductDetail() {
             </div>
           </div>
         )}
+
+        {/* Sponsored Spotlight Recommendations */}
+        <SponsoredSpotlight
+          mode="carousel"
+          limit={6}
+          currentProductId={productId}
+          title={language === 'vi' ? '⭐ Gợi ý Ưu tiên Tài trợ (Sponsored Spotlight)' : '⭐ Sponsored Priority Recommendations'}
+        />
       </div>
 
       {/* Lightbox Modal via Portal */}

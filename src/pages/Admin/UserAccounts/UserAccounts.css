@@ -564,6 +564,49 @@
   padding: 24px;
 }
 
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-pagination button {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(2, 36, 27, 0.15);
+  background: #ffffff;
+  color: #02241b;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.admin-pagination button:hover:not(:disabled) {
+  background: rgba(2, 36, 27, 0.06);
+  border-color: #02241b;
+  color: #02241b;
+}
+
+.admin-pagination button.active {
+  background: #02241b;
+  color: #ffffff;
+  border-color: #02241b;
+  box-shadow: 0 2px 8px rgba(2, 36, 27, 0.25);
+}
+
+.admin-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
 .admin-confirm-modal {
   width: 100%;
   max-width: 500px;

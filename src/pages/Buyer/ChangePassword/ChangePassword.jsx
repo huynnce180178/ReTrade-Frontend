@@ -1,14 +1,15 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import AccountSidebar from '../../../components/AccountSidebar/AccountSidebar';
 import accountService from '../../../services/accountService';
 import { useToast } from '../../../context/ToastContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { forceLogout } from '../../../utils/authUtils';
 import '../../../styles/MyAccount.css';
 
 export default function ChangePassword() {
   const { showToast } = useToast();
-  const { user, clearMustChangePassword } = useAuth();
+  const { user, logout, clearMustChangePassword } = useAuth();
   const { t, language } = useLanguage();
   const isPasswordSet = user?.isPasswordSet !== false;
 
@@ -46,12 +47,18 @@ export default function ChangePassword() {
       showToast(language === 'vi' ? 'Vui lòng nhập đầy đủ các trường.' : 'All fields are required.', 'error');
       return;
     }
+    if (isPasswordSet && cleanOldPassword === cleanNewPassword) {
+      showToast(language === 'vi' ? 'Mật khẩu mới phải khác mật khẩu hiện tại.' : 'New password must be different from current password.', 'error');
+      return;
+    }
     if (!isPasswordValid) {
       showToast(language === 'vi' ? 'Vui lòng đáp ứng đầy đủ yêu cầu mật khẩu.' : 'Please satisfy all password requirements.', 'error');
       return;
     }
 
     setLoading(true);
+    window.__isSelfChangingPassword = true;
+    sessionStorage.setItem('retrade_self_changing_pwd', 'true');
     try {
       if (isPasswordSet) {
         await accountService.changePassword(cleanOldPassword, cleanNewPassword);
@@ -60,16 +67,17 @@ export default function ChangePassword() {
       }
       showToast(
         isPasswordSet
-          ? (language === 'vi' ? 'Đổi mật khẩu thành công.' : 'Password changed successfully.')
-          : (language === 'vi' ? 'Đặt mật khẩu thành công.' : 'Password set successfully.'),
+          ? (language === 'vi' ? 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' : 'Password changed successfully. Please log in again.')
+          : (language === 'vi' ? 'Đặt mật khẩu thành công. Vui lòng đăng nhập lại.' : 'Password set successfully. Please log in again.'),
         'success'
       );
-      clearMustChangePassword?.();
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
       setLoading(false);
+      setTimeout(() => {
+        forceLogout();
+      }, 500);
     } catch (err) {
+      window.__isSelfChangingPassword = false;
+      sessionStorage.removeItem('retrade_self_changing_pwd');
       const serverMsg = err?.response?.data?.message || err?.response?.data;
       showToast(
         typeof serverMsg === 'string'

@@ -1084,17 +1084,10 @@
 }
 
 .address-dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 28px;
-  align-items: start;
-}
-
-.address-content-column,
-.address-side-column {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  width: 100%;
 }
 
 .address-hero-card {
@@ -1519,5 +1512,91 @@
   .profile-avatar-section h3 {
     font-size: 18px;
   }
+}
+
+/* Modern Refined Profile Photo Card */
+.ma-photo-card {
+  text-align: center;
+}
+
+.ma-profile-photo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.ma-photo-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #ffffff;
+  box-shadow: 0 10px 30px rgba(2, 36, 27, 0.15);
+  background: linear-gradient(135deg, #02241b 0%, #0f7b5f 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ma-photo-circle .ma-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  border: none;
+  box-shadow: none;
+}
+
+.ma-photo-circle .ma-photo-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ma-photo-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.ma-photo-note {
+  font-size: 13px;
+  color: var(--text-muted, #5c706b);
+  margin: 0;
+}
+
+.ma-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: 50px;
+  background: #02241b;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 14px rgba(2, 36, 27, 0.15);
+}
+
+.ma-upload-btn:hover {
+  background: #065f46;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(6, 95, 70, 0.25);
 }
 

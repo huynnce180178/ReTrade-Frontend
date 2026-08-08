@@ -454,3 +454,48 @@
   cursor: pointer;
   line-height: 1.4;
 }
+
+.field-status-hint {
+  font-family: 'Manrope', sans-serif;
+  font-size: 12px;
+  margin-top: 6px;
+  display: block;
+}
+
+.field-status-hint.checking {
+  color: #64748b;
+  font-style: italic;
+}
+
+.field-status-hint.available {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.field-status-hint.taken {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.password-requirements {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.req-item {
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #94a3b8;
+  transition: color 0.2s ease;
+}
+
+.req-item.valid {
+  color: #16a34a;
+  font-weight: 600;
+}
