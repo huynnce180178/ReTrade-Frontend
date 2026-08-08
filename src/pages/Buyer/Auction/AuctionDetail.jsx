@@ -134,7 +134,6 @@ function getProgress(auction) {
 
 function getMinimumNextBid(auction) {
   if (!auction) return 0;
-  if (!auction.bidCount) return Number(auction.startingPrice || 0);
   return Number(auction.currentPrice || 0) + Number(auction.minIncrement || 0);
 }
 
