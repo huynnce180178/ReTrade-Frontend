@@ -10,6 +10,8 @@ import { createAuctionHubConnection } from '../../../services/auctionRealtimeSer
 import { auctionDateTimeLocalToApiValue, formatAuctionDateTime, getFutureAuctionDateTimeLocal, parseAuctionDateTime } from '../../../utils/auctionTime';
 import './Auction.css';
 import './AuctionDetail.css';
+import { driver } from 'driver.js';
+import 'driver.js/dist/driver.css';
 import { AUCTION_DURATION_PRESETS, calculateEndTimeFromDuration, formatDateTimePreview } from '../../../utils/auctionDurationUtils';
 
 function toAuctionPayload(form) {
@@ -205,13 +207,136 @@ export default function AuctionDetail() {
   const previousAuctionStatusRef = useRef(null);
   const shownEndNoticeRef = useRef(new Set());
 
-  const [showRules, setShowRules] = useState(() => {
-    return !localStorage.getItem('retrade_seen_rules');
-  });
+  const [showRules, setShowRules] = useState(true);
 
   const handleCloseRules = () => {
-    localStorage.setItem('retrade_seen_rules', 'true');
     setShowRules(false);
+  };
+
+  const handleFirstTimeClick = () => {
+    setShowRules(false);
+
+    const tourSteps = [
+      {
+        element: '.auction-detail-gallery',
+        popover: {
+          title: isVi ? 'Hình ảnh sản phẩm' : 'Product Gallery',
+          description: isVi 
+            ? 'Xem hình ảnh chi tiết của sản phẩm đang được đấu giá tại đây.' 
+            : 'View detailed images of the product currently being auctioned here.',
+          side: 'right',
+          align: 'start'
+        }
+      },
+      {
+        element: '#bid-highest',
+        popover: {
+          title: isVi ? 'Giá cao nhất hiện tại' : 'Current Highest Bid',
+          description: isVi 
+            ? 'Đây là mức giá cao nhất đã được trả cho sản phẩm ở thời điểm hiện tại.' 
+            : 'This is the highest bid currently placed for the product.',
+          side: 'bottom',
+          align: 'start'
+        }
+      },
+      {
+        element: '#bid-starting',
+        popover: {
+          title: isVi ? 'Giá khởi điểm' : 'Starting Price',
+          description: isVi 
+            ? 'Mức giá ban đầu mà người bán đưa ra để bắt đầu phiên đấu giá.' 
+            : 'The initial price set by the seller to start the auction.',
+          side: 'bottom',
+          align: 'start'
+        }
+      },
+      {
+        element: '#bid-min-step',
+        popover: {
+          title: isVi ? 'Bước giá tối thiểu' : 'Minimum Increment Step',
+          description: isVi 
+            ? 'Khoảng chênh lệch giá tối thiểu mà bạn cần phải cộng thêm vào giá hiện tại để ra giá tiếp theo hợp lệ.' 
+            : 'The minimum amount you must add to the current price when placing a new bid.',
+          side: 'bottom',
+          align: 'start'
+        }
+      },
+      {
+        element: '#bid-count',
+        popover: {
+          title: isVi ? 'Số lượt ra giá' : 'Total Bids',
+          description: isVi 
+            ? 'Tổng số lượt ra giá mà phiên đấu giá đã nhận được cho tới lúc này.' 
+            : 'The total number of bids placed in this auction so far.',
+          side: 'bottom',
+          align: 'start'
+        }
+      }
+    ];
+
+    if (auction?.buyNowPrice) {
+      tourSteps.push({
+        element: '#bid-buy-now',
+        popover: {
+          title: isVi ? 'Giá mua ngay' : 'Buy Now Price',
+          description: isVi 
+            ? 'Mức giá đặc biệt giúp bạn mua ngay sản phẩm lập tức và kết thúc phiên đấu giá mà không cần chờ đợi.' 
+            : 'A special price that allows you to purchase the product immediately and end the auction.',
+          side: 'bottom',
+          align: 'start'
+        }
+      });
+    }
+
+    tourSteps.push(
+      {
+        element: '#auction-countdown',
+        popover: {
+          title: isVi ? 'Thời gian còn lại' : 'Time Remaining',
+          description: isVi 
+            ? 'Thời gian đếm ngược còn lại của phiên đấu giá. Hãy chú ý để không bỏ lỡ lượt ra giá quyết định!' 
+            : 'The remaining countdown timer. Watch closely so you don\'t miss out on placing your decisive bid!',
+          side: 'bottom',
+          align: 'start'
+        }
+      },
+      {
+        element: '#auction-action-card',
+        popover: {
+          title: isVi ? 'Đặt cọc & Ra giá' : 'Deposit & Bidding',
+          description: isVi 
+            ? 'Để đấu giá, bạn cần nạp tiền cọc (tối thiểu 20.000 VNĐ). Sau khi nạp cọc, bạn có thể nhập giá muốn trả và bấm "Ra giá".' 
+            : 'To bid, you must pay a deposit (minimum 20,000 VND). Once deposited, enter your bid amount and click "Place Bid".',
+          side: 'left',
+          align: 'start'
+        }
+      },
+      {
+        element: '#recent-bids-card',
+        popover: {
+          title: isVi ? 'Lịch sử ra giá' : 'Recent Bids',
+          description: isVi 
+            ? 'Danh sách các lượt ra giá gần đây nhất từ các thành viên khác tham gia phiên đấu giá.' 
+            : 'List of the most recent bids placed by other participants in this auction.',
+          side: 'left',
+          align: 'start'
+        }
+      }
+    );
+
+    const driverObj = driver({
+      showProgress: true,
+      allowClose: true,
+      overlayColor: 'rgba(0, 0, 0, 0.75)',
+      nextBtnText: isVi ? 'Tiếp tục' : 'Next',
+      prevBtnText: isVi ? 'Quay lại' : 'Prev',
+      doneBtnText: isVi ? 'Hoàn tất' : 'Done',
+      steps: tourSteps
+    });
+
+    setTimeout(() => {
+      driverObj.drive();
+    }, 300);
   };
 
   const [timeLeft, setTimeLeft] = useState('');
@@ -668,8 +793,8 @@ export default function AuctionDetail() {
             <h1>{auction.productName}</h1>
             <p>{auction.productDescription || t('common.no_data')}</p>
 
-            <div className="auction-detail-bidbox">
-              <div>
+            <div className="auction-detail-bidbox" id="auction-bidbox">
+              <div id="bid-highest">
                 <span>{t('auction.current_highest_bid')}</span>
                 <strong key={auction.currentPrice} className="price-flash-up">{formatMoney(auction.currentPrice)}</strong>
                 {isLeadingBidder && (
@@ -678,27 +803,27 @@ export default function AuctionDetail() {
                   </span>
                 )}
               </div>
-              <div>
+              <div id="bid-starting">
                 <span>{t('auction.starting_price')}</span>
                 <strong>{formatMoney(auction.startingPrice)}</strong>
               </div>
-              <div>
+              <div id="bid-min-step">
                 <span>{t('auction.min_step')}</span>
                 <strong>{formatMoney(auction.minIncrement)}</strong>
               </div>
-              <div>
+              <div id="bid-count">
                 <span>{t('auction.bid_count')}</span>
                 <strong>{auction.bidCount || 0}</strong>
               </div>
               {auction.buyNowPrice && (
-                <div className="auction-detail-buynow-item">
+                <div className="auction-detail-buynow-item" id="bid-buy-now">
                   <span>{t('auction.buy_now_price')}</span>
                   <strong>{formatMoney(auction.buyNowPrice)}</strong>
                 </div>
               )}
             </div>
 
-            <div className="auction-detail-progress">
+            <div className="auction-detail-progress" id="auction-countdown">
               <div>
                 <span>{t('auction.time_remaining')}</span>
                 <strong>{timeLeft}</strong>
@@ -718,7 +843,7 @@ export default function AuctionDetail() {
             </div>
           </div>
 
-          <section className="auction-detail-action-card">
+          <section className="auction-detail-action-card" id="auction-action-card">
             <div className="auction-detail-action-head">
               <div>
                 <span>{t('auction.min_next_bid')}</span>
@@ -929,7 +1054,7 @@ export default function AuctionDetail() {
             </div>
           </article>
 
-          <article className="auction-detail-card">
+          <article className="auction-detail-card" id="recent-bids-card">
             <h2>{t('auction.recent_bids')}</h2>
             {(auction.recentBids || []).length === 0 ? (
               <p>{t('auction.no_bids_yet')}</p>
@@ -1002,6 +1127,9 @@ export default function AuctionDetail() {
             </div>
 
             <footer className="auction-rules-footer">
+              <button type="button" onClick={handleFirstTimeClick} className="btn-rules-first-time">
+                {isVi ? 'Đây là lần đầu tôi tham gia đấu giá' : 'This is my first time participating in the auction'}
+              </button>
               <button type="button" onClick={handleCloseRules} className="btn-rules-agree">
                 {isVi ? 'Tôi Đã Hiểu & Đồng Ý' : 'I Understand & Agree'}
               </button>
