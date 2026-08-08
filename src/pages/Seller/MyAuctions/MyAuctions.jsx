@@ -73,8 +73,8 @@ function getProgress(auction) {
 
 function getAuctionEditBlockReason(auction, t) {
   if (!auction) return t('common.no_data');
-  if (isEndedStatus(auction.status)) return t('auction.auction_ended');
-  if (Number(auction.bidCount || 0) > 0) return t('auction.cannot_edit_has_bids');
+  if (auction.winnerId) return t('auction.cannot_edit_has_winner');
+  if (!isEndedStatus(auction.status) && Number(auction.bidCount || 0) > 0) return t('auction.cannot_edit_has_bids');
 
   return '';
 }
@@ -600,6 +600,17 @@ export default function MyAuctions() {
                           {t('common.update')}
                         </button>
                       )}
+                      {(isEndedStatus(auction.status) && !auction.winnerId && auction.status !== 'Cancelled') && (
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          style={{ color: '#059669', borderColor: '#6ee7b7' }}
+                          onClick={() => openRelistModal(auction)}
+                          disabled={saving}
+                        >
+                          {t('my_auctions.relist_auction')}
+                        </button>
+                      )}
                       {auction.status === 'Ongoing' && (
                         <button
                           type="button"
@@ -837,23 +848,23 @@ export default function MyAuctions() {
               <div className="form-group">
                 <label>{t('auction.starting_price')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="startingPrice"
-                  value={relistForm.startingPrice}
+                  value={formatFormattedNumber(relistForm.startingPrice)}
                   onChange={handleRelistChange}
                   required
-                  min="1"
                 />
               </div>
               <div className="form-group">
                 <label>{t('auction.min_step')} (VND) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   name="minIncrement"
-                  value={relistForm.minIncrement}
+                  value={formatFormattedNumber(relistForm.minIncrement)}
                   onChange={handleRelistChange}
                   required
-                  min="1"
                 />
               </div>
             </div>
@@ -861,12 +872,12 @@ export default function MyAuctions() {
             <div className="form-group">
               <label>{t('auction.buy_now_price')} (VND) *</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="buyNowPrice"
-                value={relistForm.buyNowPrice}
+                value={formatFormattedNumber(relistForm.buyNowPrice)}
                 onChange={handleRelistChange}
                 required
-                min="1"
               />
             </div>
 

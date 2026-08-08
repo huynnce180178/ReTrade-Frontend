@@ -785,7 +785,7 @@ export default function AuctionDetail() {
                       {t('my_auctions.end_auction')}
                     </button>
                   )}
-                  {(effectiveStatus === 'EndedNoBid' || (isEnded && Number(auction.bidCount || 0) === 0)) && (
+                  {(isEnded && !auction.winnerId) && (
                     <button
                       type="button"
                       className="btn-primary"
